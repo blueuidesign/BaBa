@@ -35,7 +35,7 @@ export default function Batches() {
         {!catalog || !stock ? (
           <Loading />
         ) : (
-          catalog.batchRecipes.map((br) => {
+          catalog.batchRecipes.map((br, idx) => {
             const out = catalog.ingredientById[br.output_ingredient_id];
             const st = stockOf(br.output_ingredient_id);
             const n = count[br.id] ?? 1;
@@ -76,7 +76,7 @@ export default function Batches() {
                 </div>
                 {br.note && <span className="small muted">{br.note}</span>}
                 {shortItems.length > 0 && <span className="small" style={{ color: 'var(--warn)' }}>Kho chưa đủ nguyên liệu; vẫn ghi được nếu hàng đã có mà chưa nhập.</span>}
-                <button className="btn block" disabled={busy === br.id} onClick={() => record(br.id)}>
+                <button className={`btn block ${idx > 0 ? 'secondary' : ''}`} disabled={busy === br.id} onClick={() => record(br.id)}>
                   {busy === br.id ? 'Đang ghi…' : `Ghi đã làm ${num(n, 1)} mẻ ${br.name.toLowerCase()}`}
                 </button>
               </section>

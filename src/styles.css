@@ -96,7 +96,7 @@ p { margin: 0; }
   background: var(--warn); color: #fff; font-size: 11px; line-height: 18px; font-weight: 700; text-align: center;
 }
 .avatar {
-  width: 36px; height: 36px; border-radius: 50%; background: var(--bg-brand); color: var(--ink-on-brand);
+  width: 36px; height: 36px; border-radius: 50%; background: var(--bg-brand-soft); color: var(--ink-brand); box-shadow: inset 0 0 0 1.5px var(--brand);
   display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; text-decoration: none; margin-left: 4px;
 }
 
@@ -138,7 +138,7 @@ p { margin: 0; }
 .btn:disabled, .btn.disabled { opacity: 0.45; pointer-events: none; }
 .btn.lg { min-height: 52px; font-size: 17px; }
 .btn.block { width: 100%; }
-.btn.secondary { background: var(--bg-100); color: var(--ink-brand); border-color: var(--border-strong); }
+.btn.secondary { background: var(--bg-100); color: var(--ink-brand); border-color: var(--brand); }
 .btn.secondary:active { background: var(--bg-200); }
 .btn.quiet { background: transparent; border-color: transparent; color: var(--ink-brand); min-height: 40px; padding: 0 10px; font-size: 14px; }
 .btn.danger { background: var(--bg-100); color: var(--danger); border-color: var(--danger); }
@@ -147,7 +147,10 @@ p { margin: 0; }
   display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: var(--radius-pill);
   border: 1.5px solid var(--border); background: var(--bg-100); color: var(--ink); font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; text-decoration: none;
 }
-.chip.on { background: var(--bg-brand); color: var(--ink-on-brand); border-color: var(--brand); }
+/* Chip luôn nền trắng: đang chọn = viền xanh + chữ xanh; chip hành động (.action) cũng viền xanh.
+   Mỗi màn chỉ nút chính (.btn) được tô nền xanh đậm. */
+.chip.on { background: var(--bg-100); color: var(--ink-brand); border: 2px solid var(--brand); font-weight: 700; }
+.chip.action { color: var(--ink-brand); border-color: var(--brand); }
 .chips { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0; }
 .chips.wrap { flex-wrap: wrap; overflow: visible; }
 

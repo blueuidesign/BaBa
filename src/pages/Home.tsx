@@ -143,7 +143,7 @@ export default function Home() {
           </section>
         )}
 
-        <Link to="/ban" className="btn lg block">
+        <Link to="/ban" className={`btn lg block ${fresh ? 'secondary' : ''}`}>
           <Icon name="cart" size={22} sw={2} /> Ghi đơn mới
         </Link>
 
