@@ -1,0 +1,342 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-11-09T08:55:00Z"
+ },
+ "title": "Kho BaBa – Thiết kế app bản 1 (phong cách hiện đại)",
+ "launch": {
+  "view": "canvas"
+ },
+ "pages": [],
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "A01 · Đăng nhập",
+   "is_interactive": true
+  },
+  "A02.dc.html": {
+   "x": 470,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "A02 · Mã xác nhận",
+   "is_interactive": true
+  },
+  "A03.dc.html": {
+   "x": 940,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "A03 · Chọn cơ sở",
+   "is_interactive": true
+  },
+  "A04.dc.html": {
+   "x": 1410,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "A04 · Trang chủ",
+   "is_interactive": true
+  },
+  "G01.dc.html": {
+   "x": 0,
+   "y": 1224,
+   "w": 390,
+   "h": 844,
+   "title": "G01 · Tài khoản",
+   "is_interactive": true
+  },
+  "F03.dc.html": {
+   "x": 470,
+   "y": 1224,
+   "w": 390,
+   "h": 844,
+   "title": "F03 · Lịch sử (mở từ Tài khoản)",
+   "is_interactive": true
+  },
+  "F02.dc.html": {
+   "x": 940,
+   "y": 1224,
+   "w": 390,
+   "h": 844,
+   "title": "F02 · Thông báo",
+   "is_interactive": true
+  },
+  "B01.dc.html": {
+   "x": 0,
+   "y": 2448,
+   "w": 390,
+   "h": 844,
+   "title": "B01 · Ghi đơn và lưu",
+   "is_interactive": true
+  },
+  "B02.dc.html": {
+   "x": 470,
+   "y": 2448,
+   "w": 390,
+   "h": 844,
+   "title": "B02 · Đã lưu đơn",
+   "is_interactive": true
+  },
+  "C01.dc.html": {
+   "x": 0,
+   "y": 3672,
+   "w": 390,
+   "h": 844,
+   "title": "C01 · Kế hoạch nấu",
+   "is_interactive": true
+  },
+  "C02.dc.html": {
+   "x": 470,
+   "y": 3672,
+   "w": 390,
+   "h": 844,
+   "title": "C02 · Nguyên liệu cần (tổng)",
+   "is_interactive": true
+  },
+  "C04.dc.html": {
+   "x": 940,
+   "y": 3672,
+   "w": 390,
+   "h": 844,
+   "title": "C04 · Nguyên liệu theo từng món",
+   "is_interactive": true
+  },
+  "C03.dc.html": {
+   "x": 1410,
+   "y": 3672,
+   "w": 390,
+   "h": 844,
+   "title": "C03 · Mẻ syrup, cốt cold brew",
+   "is_interactive": true
+  },
+  "D01.dc.html": {
+   "x": 0,
+   "y": 4896,
+   "w": 390,
+   "h": 844,
+   "title": "D01 · Tồn kho",
+   "is_interactive": true
+  },
+  "D02.dc.html": {
+   "x": 470,
+   "y": 4896,
+   "w": 390,
+   "h": 844,
+   "title": "D02 · Chi tiết vật tư",
+   "is_interactive": true
+  },
+  "D03.dc.html": {
+   "x": 940,
+   "y": 4896,
+   "w": 390,
+   "h": 844,
+   "title": "D03 · Nhập hàng",
+   "is_interactive": true
+  },
+  "D05.dc.html": {
+   "x": 1410,
+   "y": 4896,
+   "w": 390,
+   "h": 844,
+   "title": "D05 · Kiểm kê kho",
+   "is_interactive": true
+  },
+  "D04.dc.html": {
+   "x": 1880,
+   "y": 4896,
+   "w": 390,
+   "h": 844,
+   "title": "D04 · Chai đang có",
+   "is_interactive": true
+  },
+  "E01.dc.html": {
+   "x": 0,
+   "y": 6120,
+   "w": 390,
+   "h": 844,
+   "title": "E01 · Bước 1: đếm chai còn",
+   "is_interactive": true
+  },
+  "E02.dc.html": {
+   "x": 470,
+   "y": 6120,
+   "w": 390,
+   "h": 844,
+   "title": "E02 · Bước 2: đếm tiền",
+   "is_interactive": true
+  },
+  "E03.dc.html": {
+   "x": 940,
+   "y": 6120,
+   "w": 390,
+   "h": 844,
+   "title": "E03 · Kết quả đối chiếu",
+   "is_interactive": true
+  },
+  "F01.dc.html": {
+   "x": 0,
+   "y": 7344,
+   "w": 390,
+   "h": 844,
+   "title": "F01 · Doanh thu",
+   "is_interactive": true
+  },
+  "S01.dc.html": {
+   "x": 0,
+   "y": 8568,
+   "w": 390,
+   "h": 844,
+   "title": "S01 · Lỗi mã xác nhận",
+   "is_interactive": true
+  },
+  "S02.dc.html": {
+   "x": 470,
+   "y": 8568,
+   "w": 390,
+   "h": 844,
+   "title": "S02 · Trang chủ trống đầu ngày",
+   "is_interactive": true
+  },
+  "S03.dc.html": {
+   "x": 940,
+   "y": 8568,
+   "w": 390,
+   "h": 844,
+   "title": "S03 · Ghi đơn: mất mạng, món hết",
+   "is_interactive": true
+  },
+  "S04.dc.html": {
+   "x": 1410,
+   "y": 8568,
+   "w": 390,
+   "h": 844,
+   "title": "S04 · Lỗi lưu đơn",
+   "is_interactive": true
+  },
+  "S05.dc.html": {
+   "x": 1880,
+   "y": 8568,
+   "w": 390,
+   "h": 844,
+   "title": "S05 · Kho trống (cơ sở mới)",
+   "is_interactive": true
+  },
+  "N01.dc.html": {
+   "x": 0,
+   "y": 9792,
+   "w": 1240,
+   "h": 1180,
+   "title": "N01 · Màn nào đi đến màn nào",
+   "is_interactive": false
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "A02.dc.html",
+  "A03.dc.html",
+  "A04.dc.html",
+  "G01.dc.html",
+  "F03.dc.html",
+  "F02.dc.html",
+  "B01.dc.html",
+  "B02.dc.html",
+  "C01.dc.html",
+  "C02.dc.html",
+  "C04.dc.html",
+  "C03.dc.html",
+  "D01.dc.html",
+  "D02.dc.html",
+  "D03.dc.html",
+  "D05.dc.html",
+  "D04.dc.html",
+  "E01.dc.html",
+  "E02.dc.html",
+  "E03.dc.html",
+  "F01.dc.html",
+  "S01.dc.html",
+  "S02.dc.html",
+  "S03.dc.html",
+  "S04.dc.html",
+  "S05.dc.html",
+  "N01.dc.html"
+ ],
+ "notes": {
+  "row0": {
+   "x": 0,
+   "y": -240,
+   "text": "A · Vào app",
+   "kind": "title1",
+   "maxW": 1800
+  },
+  "row1": {
+   "x": 0,
+   "y": 984,
+   "text": "G · Tài khoản",
+   "kind": "title1",
+   "maxW": 1800
+  },
+  "row2": {
+   "x": 0,
+   "y": 2208,
+   "text": "B · Ghi đơn",
+   "kind": "title1",
+   "maxW": 1800
+  },
+  "row3": {
+   "x": 0,
+   "y": 3432,
+   "text": "C · Nấu",
+   "kind": "title1",
+   "maxW": 1800
+  },
+  "row4": {
+   "x": 0,
+   "y": 4656,
+   "text": "D · Kho",
+   "kind": "title1",
+   "maxW": 1800
+  },
+  "row5": {
+   "x": 0,
+   "y": 5880,
+   "text": "E · Đối chiếu cuối ngày",
+   "kind": "title1",
+   "maxW": 1800
+  },
+  "row6": {
+   "x": 0,
+   "y": 7104,
+   "text": "F · Báo cáo",
+   "kind": "title1",
+   "maxW": 1800
+  },
+  "row7": {
+   "x": 0,
+   "y": 8328,
+   "text": "S · Trạng thái: lỗi, trống, mất mạng",
+   "kind": "title1",
+   "maxW": 1800
+  },
+  "row8": {
+   "x": 0,
+   "y": 9552,
+   "text": "N · Sơ đồ điều hướng",
+   "kind": "title1",
+   "maxW": 1800
+  }
+ },
+ "designSystems": [
+  {
+   "title": "BaBa Design System",
+   "namespace": "baba",
+   "artifact": "https://claude.ai/artifact/13c04ce9-871b-4558-aef0-ca57278877a1",
+   "version": "1794198098-84a6",
+   "copiedAt": "2026-11-09T08:55:00Z"
+  }
+ ]
+}

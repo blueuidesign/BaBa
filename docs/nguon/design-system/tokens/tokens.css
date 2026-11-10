@@ -1,0 +1,32 @@
+:root {
+  /* BaBa */
+  --baba-green: #296241;
+  --baba-cream: #F7F3EB;
+  --baba-green-soft: #4A7C5F;
+  --baba-green-deep: #3B6A4F;
+  --baba-cream-tint: #E4EEE6;
+  --baba-mint-tint: #CFE2D4;
+  --baba-sand: #EDE6D8;
+  --baba-ink: #1F3A2A;
+  /* BABA's Hug */
+  --hug-green: #296241;
+  --hug-cream: #F7F3EB;
+  --hug-terracotta: #B85F3A;
+  --hug-terracotta-tint: #E9C9B5;
+  --hug-sand: #D9CBB3;
+  --hug-stone: #A8A8A0;
+  --hug-denim: #3E5A7A;
+  --hug-earth: #8A6A4F;
+  /* Typography */
+  --font-baba: 'Quicksand', 'Segoe UI', sans-serif;
+  --font-hug-headline: 'Bricolage Grotesque', 'Segoe UI', sans-serif;
+  --font-hug-slogan: 'Fraunces', Georgia, serif;
+  --font-hug-hand: 'Caveat', 'Segoe Print', cursive;
+  --text-xs: 13px; --text-sm: 15px; --text-base: 18px; --text-md: 20px; --text-lg: 24px;
+  --text-xl: 30px; --text-2xl: 40px; --text-3xl: 56px; --text-display: 76px;
+  /* Spacing & radius */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px; --space-16: 64px;
+  --radius-sm: 8px; --radius-md: 14px; --radius-lg: 18px; --radius-xl: 22px; --radius-pill: 999px;
+  --shadow-soft: 0 6px 24px rgba(31,58,42,0.08);
+}

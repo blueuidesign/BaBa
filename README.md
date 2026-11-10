@@ -4,7 +4,8 @@ App bán hàng và kho cho quầy **Sữa lành từ BaBa**: ghi đơn, kế ho�
 
 - Frontend: React 19 + Vite + TypeScript, chạy dạng PWA (cài lên màn hình điện thoại).
 - Backend: Supabase (Postgres + Auth + pg_cron). Mọi thao tác ghi đi qua hàm `fn_*` trong DB, hàm tự kiểm quyền.
-- Tài liệu thiết kế: [`docs/BaBa_Thiet_ke_DB.md`](docs/BaBa_Thiet_ke_DB.md), [`docs/BaBa_User_Stories.md`](docs/BaBa_User_Stories.md).
+- Tài liệu thiết kế: [`docs/phan-tich/BaBa_Thiet_ke_DB.md`](docs/phan-tich/BaBa_Thiet_ke_DB.md), [`docs/phan-tich/BaBa_User_Stories.md`](docs/phan-tich/BaBa_User_Stories.md).
+- Toàn bộ tài liệu (nguồn, phân tích, thiết kế màn hình): [`docs/README.md`](docs/README.md). Hướng dẫn cho Claude Code: [`CLAUDE.md`](CLAUDE.md).
 
 ## Chạy trên máy
 
