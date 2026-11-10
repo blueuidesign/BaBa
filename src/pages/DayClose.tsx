@@ -183,12 +183,12 @@ export default function DayClose() {
             <div className="chips wrap">
               <span className="xs muted strong" style={{ alignSelf: 'center' }}>Cộng nhanh</span>
               {QUICK.map((q) => (
-                <button key={q} className="chip" style={{ minHeight: 34, fontSize: 13, padding: '0 10px' }} onClick={() => setCash(String(Number(cash || 0) + q))}>
+                <button key={q} className="chip action" style={{ minHeight: 34, fontSize: 13, padding: '0 10px' }} onClick={() => setCash(String(Number(cash || 0) + q))}>
                   +{q / 1000}k
                 </button>
               ))}
               {cash && (
-                <button className="chip" style={{ minHeight: 34, fontSize: 13, padding: '0 10px' }} onClick={() => setCash('')}>
+                <button className="chip action" style={{ minHeight: 34, fontSize: 13, padding: '0 10px' }} onClick={() => setCash('')}>
                   Xóa
                 </button>
               )}

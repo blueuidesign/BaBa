@@ -130,10 +130,10 @@ export default function Revenue() {
         ) : (
           <>
             <div className="grid2">
-              <section className="card" style={{ background: 'var(--bg-brand)', color: 'var(--ink-on-brand)', gap: 2 }}>
-                <span className="small strong" style={{ opacity: 0.85 }}>{picked ? `Doanh thu ${ddmm(picked)}` : 'Doanh thu'}</span>
+              <section className="card" style={{ gap: 2 }}>
+                <span className="small strong muted">{picked ? `Doanh thu ${ddmm(picked)}` : 'Doanh thu'}</span>
                 <span style={{ fontSize: 26, fontWeight: 700 }} className="num">{vndShort(view.revenue)}</span>
-                <span className="xs" style={{ color: 'var(--baba-mint-tint)' }}>{delta == null || picked ? ' ' : `${delta >= 0 ? '+' : ''}${delta}% so với kỳ trước`}</span>
+                <span className="xs muted">{delta == null || picked ? ' ' : `${delta >= 0 ? '+' : ''}${delta}% so với kỳ trước`}</span>
               </section>
               <section className="card" style={{ gap: 2 }}>
                 <span className="small strong muted">Chai đã bán</span>
