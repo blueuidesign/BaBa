@@ -6,6 +6,12 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export default function Login() {
   const [step, setStep] = useState<'email' | 'code'>('email');
+  // Màn đăng nhập nền kem: thanh trạng thái điện thoại đổi theo, rời màn thì về xám.
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    meta?.setAttribute('content', '#F7F3EB');
+    return () => meta?.setAttribute('content', '#F7F7F7');
+  }, []);
   const [email, setEmail] = useState(localStorage.getItem('kho-baba-last-email') || '');
   const [code, setCode] = useState('');
   const [err, setErr] = useState<string | null>(null);
