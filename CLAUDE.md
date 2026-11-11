@@ -4,11 +4,28 @@ App bán hàng và quản lý kho cho sữa hạt **Sữa lành từ BaBa**: PWA
 
 ## Đọc trước khi làm
 
+0. `tasks/README.md` và biên bản mới nhất trong `docs/bien-ban/`: việc đang giao và quyết định mới nhất.
 1. `docs/README.md`: danh mục tài liệu và thứ tự ưu tiên khi chúng mâu thuẫn.
 2. `docs/phan-tich/BaBa_User_Stories.md`: bản 1 phải làm gì. Mục "Ngoài phạm vi bản 1" là ranh giới.
 3. `docs/phan-tich/Ghi_chu_trien_khai.md`: code đang khác thiết kế ở đâu, màn hình nào ở file nào, việc còn thiếu.
 4. `docs/phan-tich/BaBa_Thiet_ke_DB.md`: khi đụng tới DB.
 5. `docs/phan-tich/BaBa_Project_Instructions.md`: vai trò, ràng buộc, giọng văn.
+
+## Task
+
+- Việc được giao nằm trong `tasks/`. Mở `tasks/README.md` xem task nào đang mở, chỉ làm task được giao cho phiên `code`.
+- Làm xong mục nào thì đánh `[x]` và ghi kết quả (commit, PR) ngay dưới mục đó, trong cùng PR. Điểm chưa rõ ghi vào "Câu hỏi mở" của task, không tự đoán.
+- Quyết định mới nhất nằm trong `docs/bien-ban/`. Biên bản mâu thuẫn với User Stories thì làm theo biên bản và sửa luôn User Stories trong cùng PR.
+- Không merge PR. Tùng duyệt và merge.
+
+## Danh mục món
+
+- Danh mục (món, giá, công thức, vật tư, menu theo cơ sở) là **dữ liệu trong DB**, không phải hằng số trong code. Không viết cứng tên món, mã món hay số món ở frontend; mọi màn đọc từ `catalog`.
+- Đổi danh mục bằng **migration mới**, không sửa migration cũ.
+- Món ngừng bán: `products.status = 'retired'` và tắt trong `outlet_menu`. **Không xóa** sản phẩm, giá hay công thức, vì đơn và mẻ nấu cũ còn trỏ tới. Chai tồn của món ngừng bán vẫn phải đếm được ở đối chiếu cho tới khi hết.
+- Đổi giá hay công thức: thêm phiên bản mới với `valid_from`, đóng phiên bản cũ bằng `valid_to`. Không sửa số trong phiên bản cũ.
+- Món chưa có công thức: vẫn ghi nấu và bán được; nấu chỉ trừ bao bì, màn Nấu ghi "Chưa có công thức". Món chưa có giá thì để tắt trong menu.
+- Danh sách hiện hành: 9 món trong 4 dòng (xem `tasks/2026-11-11_code_giai-doan-1.md`, mục A). Ô số âm do người dùng gõ luôn bị từ chối; tồn kho do hệ thống tính được phép âm.
 
 ## Cách làm việc
 
@@ -46,4 +63,4 @@ App bán hàng và quản lý kho cho sữa hạt **Sữa lành từ BaBa**: PWA
 
 ## Thương hiệu
 
-Giọng ấm, giản dị, không khẳng định công dụng chữa bệnh. Chỉ 3 mức ngọt 0 / 10 / 20 ml syrup. Giá và định lượng theo Phụ lục A của `docs/nguon/BaBa_Dac_ta_phan_mem.md` (đã nạp ở `0008_seed.sql`).
+Giọng ấm, giản dị, không khẳng định công dụng chữa bệnh. Chỉ 3 mức ngọt 0 / 10 / 20 ml syrup. Danh sách món hiện hành theo biên bản 11/11 (9 món); giá và định lượng các món cũ theo Phụ lục A của `docs/nguon/BaBa_Dac_ta_phan_mem.md` (đã nạp ở `0008_seed.sql`).

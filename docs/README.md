@@ -4,6 +4,7 @@ Khi các tài liệu mâu thuẫn nhau, ưu tiên theo thứ tự trong bảng d
 
 | # | Tài liệu | Loại | Dùng để |
 | --- | --- | --- | --- |
+| 0 | [`bien-ban/`](bien-ban/) và [`../tasks/`](../tasks/) | Quyết định và việc giao | Quyết định mới nhất (thắng mọi tài liệu bên dưới) và task cho phiên design, phiên code |
 | 1 | [`phan-tich/BaBa_User_Stories.md`](phan-tich/BaBa_User_Stories.md) | Phân tích (v1.1) | Bản 1 phải làm gì: 24 story, tiêu chí nghiệm thu, ngoại lệ, phạm vi |
 | 2 | [`phan-tich/BaBa_Thiet_ke_DB.md`](phan-tich/BaBa_Thiet_ke_DB.md) | Phân tích (v1.2) | Bảng, RLS, hàm, phân quyền ba tầng, rà soát mở rộng |
 | 3 | [`phan-tich/Ghi_chu_trien_khai.md`](phan-tich/Ghi_chu_trien_khai.md) | Phân tích | Code khác thiết kế ở đâu, màn hình ↔ file, việc còn thiếu |
