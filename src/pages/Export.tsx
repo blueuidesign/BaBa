@@ -46,7 +46,7 @@ export default function Export() {
 
   return (
     <div className="screen">
-      <Header title="Xuất file Excel" back="/bao-cao" sub={outlet.name} />
+      <Header title="Xuất file Excel (CSV)" back="/bao-cao" sub={outlet.name} />
       <main className="main">
         <p className="small">File CSV mở bằng Excel hoặc Google Sheets. Không gồm đơn đã hoàn tác.</p>
         <span className="label strong small">Tháng</span>
