@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useLoad } from '../lib/data';
 import { dateVN, timeHM, vnToday } from '../lib/format';
 import { Empty, Header, Icon, Loading, Nav } from '../components/ui';
+import PushCard from '../components/PushCard';
 
 const ICON: Record<string, string> = { reorder: 'truck', expiry: 'warn', day_close_missing: 'scale', count_diff: 'scale', invite: 'mail', info: 'bell' };
 const ROUTE = (link: string | null) => {
@@ -55,6 +56,7 @@ export default function Notifications() {
         }
       />
       <main className="main">
+        <PushCard compact />
         {!data ? (
           <Loading />
         ) : data.items.length === 0 ? (

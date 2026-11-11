@@ -95,7 +95,7 @@ export default function StockCount() {
               </button>
             ))}
           </div>
-          <p className="xs muted">Lưu xong, sổ kho đặt lại theo số thực tế. Chênh lệch được ghi thành bản ghi kiểm kê trong Lịch sử, không sửa các bản ghi cũ. Syrup và cốt kiểm bằng ml theo vạch bình.</p>
+          <p className="xs muted">Lưu xong, sổ kho đặt lại theo số thực tế. Chênh lệch được ghi thành bản ghi kiểm kê trong Lịch sử, không sửa các bản ghi cũ. Syrup kiểm bằng ml theo vạch bình.</p>
         </section>
       </main>
       <div className="bar">

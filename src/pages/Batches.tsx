@@ -30,7 +30,7 @@ export default function Batches() {
 
   return (
     <div className="screen">
-      <Header title="Mẻ syrup và cốt" back="/nau" sub="Bán thành phẩm tự làm" />
+      <Header title="Mẻ syrup" back="/nau" sub="Bán thành phẩm tự làm" />
       <main className="main">
         {!catalog || !stock ? (
           <Loading />
@@ -84,7 +84,7 @@ export default function Batches() {
           })
         )}
         {err && <span className="err">{err}</span>}
-        <p className="xs muted">Cốt cold brew trừ 75 ml mỗi chai Cold Brew khi ghi nấu. Bản 1 chưa ghi mức ngọt theo đơn nên syrup không tự trừ theo bán; đo bình syrup khi đối chiếu cuối ngày để sổ khớp thực tế.</p>
+        <p className="xs muted">Bản 1 chưa ghi mức ngọt theo đơn nên syrup không tự trừ theo bán; đo bình syrup khi đối chiếu cuối ngày để sổ khớp thực tế.</p>
       </main>
       <Nav />
       {toast.node}

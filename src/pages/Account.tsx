@@ -4,6 +4,7 @@ import { MODELS, useApp } from '../lib/app';
 import { supabase } from '../lib/supabase';
 import { readQueue } from '../lib/queue';
 import { Header, Icon, Nav } from '../components/ui';
+import PushCard from '../components/PushCard';
 
 function Item({ icon, title, sub, to, right }: { icon: string; title: string; sub?: string; to: string; right?: React.ReactNode }) {
   return (
@@ -70,6 +71,8 @@ export default function Account() {
           </div>
         </section>
 
+        <PushCard />
+
         {outlet && (
           <section className="card tight">
             <div className="h2" style={{ padding: '12px 0 2px' }}>Cơ sở đang làm việc</div>
@@ -100,7 +103,7 @@ export default function Account() {
         <section className="card">
           <div className="h2">Quản trị hệ thống</div>
           {isAdmin ? (
-            <Link to="/quan-tri" className="btn secondary block">Quản trị: báo cáo tất cả cơ sở, chủ cơ sở</Link>
+            <Link to="/quan-tri" className="btn secondary block">Báo cáo tất cả cơ sở, chủ cơ sở</Link>
           ) : (
             <p className="small muted">Admin BaBa tạo cơ sở mới, gán chủ cơ sở, quản lý công thức và giá chung.</p>
           )}

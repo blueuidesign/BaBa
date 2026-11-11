@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../lib/app';
-import { csvDownload, exportDaily, exportMonthly, exportOrders, monthLabel } from '../lib/reports';
+import { monthLabel } from '../lib/reports';
 import { supabase } from '../lib/supabase';
 import { useLoad } from '../lib/data';
 import { ddmm, num, vnd, vndShort, vnToday } from '../lib/format';
@@ -25,8 +25,6 @@ function rangeOf(r: Range): [string, string, string, string] {
 
 export default function Revenue() {
   const { outlet, catalog, canManage, isAdmin } = useApp();
-  const [csvMonth, setCsvMonth] = useState(vnToday().slice(0, 7));
-  const [csvBusy, setCsvBusy] = useState(false);
   const [range, setRange] = useState<Range>('today');
   const [picked, setPicked] = useState<string | null>(null);
   const [from, to, pFrom, pTo] = rangeOf(range);
@@ -96,18 +94,6 @@ export default function Revenue() {
   const byDay = new Map((data?.days || []).map((d: any) => [d.business_date, d]));
   const maxB = Math.max(1, ...((data?.days || []) as any[]).map((d) => d.bottles));
   const delta = data && data.prevRev ? Math.round(((view!.revenue - data.prevRev) / data.prevRev) * 100) : null;
-
-  async function runCsv(kind: 'orders' | 'monthly' | 'daily') {
-    setCsvBusy(true);
-    try {
-      const name = outlet!.name;
-      if (kind === 'orders') csvDownload(await exportOrders(outlet!.id, from, to, product), `Don-hang_${name}_${from}.csv`);
-      if (kind === 'monthly') csvDownload(await exportMonthly([outlet!.id], { [outlet!.id]: name }), `Theo-thang_${name}.csv`);
-      if (kind === 'daily') csvDownload(await exportDaily(outlet!.id, csvMonth), `Theo-ngay_${name}_${csvMonth}.csv`);
-    } finally {
-      setCsvBusy(false);
-    }
-  }
 
   return (
     <div className="screen">
@@ -263,24 +249,14 @@ export default function Revenue() {
             )}
 
             {canManage && (
-              <section className="card">
-                <div className="h2">Xuất file Excel (CSV)</div>
-                <p className="xs muted">Không gồm đơn đã hoàn tác. Mở bằng Excel hoặc Google Sheets.</p>
-                <button className="btn secondary block" disabled={csvBusy} onClick={() => runCsv('orders')}>
-                  Đơn hàng · {range === 'today' ? 'hôm nay' : monthLabel(from)}
-                </button>
-                <button className="btn secondary block" disabled={csvBusy} onClick={() => runCsv('monthly')}>
-                  Theo tháng · doanh thu, chi phí, lợi nhuận
-                </button>
-                <div className="row" style={{ gap: 8 }}>
-                  <label className="input-wrap" style={{ width: 150 }}>
-                    <input type="month" value={csvMonth} max={vnToday().slice(0, 7)} onChange={(e) => setCsvMonth(e.target.value)} aria-label="Tháng xuất theo ngày" style={{ textAlign: 'left', fontSize: 15 }} />
-                  </label>
-                  <button className="btn secondary grow" disabled={csvBusy || !csvMonth} onClick={() => runCsv('daily')}>
-                    Theo ngày
-                  </button>
-                </div>
-              </section>
+              <Link to="/bao-cao/xuat" className="list-row card tight" style={{ textDecoration: 'none', color: 'inherit' }}>
+                <span className="ico-box"><Icon name="box" size={20} /></span>
+                <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span className="strong">Xuất file Excel (CSV)</span>
+                  <span className="small muted">Đơn hàng, theo ngày, theo tháng</span>
+                </span>
+                <Icon name="chev" size={20} style={{ color: 'var(--ink-muted)' }} />
+              </Link>
             )}
 
             {isAdmin && (

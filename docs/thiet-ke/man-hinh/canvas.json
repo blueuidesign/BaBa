@@ -183,11 +183,19 @@
    "y": 7344,
    "w": 390,
    "h": 844,
-   "title": "F01 · Báo cáo: doanh thu, lợi nhuận, CSV",
+   "title": "F01 · Báo cáo: doanh thu, lợi nhuận",
+   "is_interactive": true
+  },
+  "F04.dc.html": {
+   "x": 470,
+   "y": 7344,
+   "w": 390,
+   "h": 844,
+   "title": "F04 · Xuất file Excel (CSV)",
    "is_interactive": true
   },
   "H01.dc.html": {
-   "x": 470,
+   "x": 940,
    "y": 7344,
    "w": 390,
    "h": 844,
@@ -195,7 +203,7 @@
    "is_interactive": true
   },
   "H02.dc.html": {
-   "x": 940,
+   "x": 1410,
    "y": 7344,
    "w": 390,
    "h": 844,
@@ -203,7 +211,7 @@
    "is_interactive": true
   },
   "H03.dc.html": {
-   "x": 1410,
+   "x": 1880,
    "y": 7344,
    "w": 390,
    "h": 844,
@@ -330,6 +338,7 @@
   "E02.dc.html",
   "E03.dc.html",
   "F01.dc.html",
+  "F04.dc.html",
   "H01.dc.html",
   "H02.dc.html",
   "H03.dc.html",
