@@ -93,6 +93,6 @@ Deno.serve(async (req) => {
   const { data: u } = await admin.auth.getUser(token);
   if (!u?.user) return json({ error: 'Cần đăng nhập' }, 401);
   if (body.action !== 'test') return json({ error: 'unknown action' }, 400);
-  const r = await sendTo([u.user.id], { title: 'Kho BaBa', body: 'Thông báo đã bật. Nhắc đặt hàng và nhắc đối chiếu sẽ hiện như thế này.', link: '/thong-bao', tag: 'test' });
+  const r = await sendTo([u.user.id], { title: 'Kho BaBa', body: 'Thông báo đã bật. Nhắc đặt hàng và nhắc đối chiếu sẽ hiện như thế này.', link: '/thong-bao', tag: `test-${Date.now()}` }); // mã riêng mỗi lần để lần sau vẫn kêu
   return json(r);
 });
