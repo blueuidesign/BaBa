@@ -1,0 +1,28 @@
+/* Kho BaBa app theme — overrides on top of the BaBa Design System for software UI.
+   Brand colours stay; surfaces go neutral light grey, body type goes to Be Vietnam Pro. */
+:root, [data-theme="light"] {
+  --bg-000: #f7f7f7;          /* page background: light neutral grey, zero saturation */
+  --bg-100: #ffffff;          /* cards */
+  --bg-200: #efefef;          /* secondary surface */
+  --bg-brand-soft: #e6efe9;   /* selected / brand tint */
+  --border: #e4e4e4;
+  --ink: #1c1c1c;
+  --ink-muted: #666666;
+  --shadow-soft: 0 1px 6px rgba(0, 0, 0, 0.06);
+  --font-baba: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Quicksand", "Be Vietnam Pro", sans-serif;
+}
+h1 { font-family: var(--font-display); letter-spacing: -0.01em; }
+.bb-btn { font-size: 16px; line-height: 20px; font-weight: 600; }
+.bb-btn--lg { font-size: 17px; min-height: 52px; }
+.bb-chip { font-size: 14px; font-weight: 600; }
+.bb-badge { font-size: 12px; font-weight: 600; }
+.bb-stock__name { font-size: 15px; line-height: 20px; font-weight: 600; }
+.bb-stock__days { font-size: 14px; }
+.bb-stock__meta { font-size: 12px; font-weight: 500; }
+.bb-tile { box-shadow: var(--shadow-soft); }
+
+/* Hide scrollbars inside the phone frame: on real phones they overlay and take no space. */
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; width: 0; height: 0; }
