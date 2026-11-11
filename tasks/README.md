@@ -13,6 +13,6 @@ Mỗi task là một file `YYYY-MM-DD_<phien>_<ten>.md`. `<phien>` là `design` 
 
 | File | Phiên | Trạng thái | Phụ thuộc |
 | --- | --- | --- | --- |
-| [2026-11-11_design_ban1-mo-rong.md](2026-11-11_design_ban1-mo-rong.md) | Design | Chưa làm | Không |
-| [2026-11-11_code_giai-doan-1.md](2026-11-11_code_giai-doan-1.md) | Code | Chưa làm | Không (làm song song với design) |
-| [2026-11-11_code_giai-doan-2.md](2026-11-11_code_giai-doan-2.md) | Code | Chờ | Tùng duyệt xong task design |
+| [2026-11-11_design_ban1-mo-rong.md](2026-11-11_design_ban1-mo-rong.md) | Design | Đã làm, chờ duyệt | Không |
+| [2026-11-11_code_giai-doan-1.md](2026-11-11_code_giai-doan-1.md) | Code | Đã làm, chờ duyệt | Không (làm song song với design) |
+| [2026-11-11_code_giai-doan-2.md](2026-11-11_code_giai-doan-2.md) | Code | Đã làm (trừ L5), chờ duyệt | Tùng duyệt xong task design |

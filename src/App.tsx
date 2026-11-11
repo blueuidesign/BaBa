@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useApp } from './lib/app';
-import { Loading } from './components/ui';
+import { DialogHost, Loading } from './components/ui';
 import Login from './pages/Login';
 import Outlets from './pages/Outlets';
 import Home from './pages/Home';
@@ -19,6 +19,12 @@ import Revenue from './pages/Revenue';
 import Notifications from './pages/Notifications';
 import History from './pages/History';
 import Account from './pages/Account';
+import Expenses from './pages/Expenses';
+import ExpenseNew from './pages/ExpenseNew';
+import Historical from './pages/Historical';
+import Suppliers from './pages/Suppliers';
+import Members from './pages/Members';
+import AdminOverview from './pages/AdminOverview';
 
 export default function App() {
   const { session, loading, outlet, outlets } = useApp();
@@ -30,6 +36,8 @@ export default function App() {
   if (!outlet && loc.pathname !== '/co-so' && loc.pathname !== '/tai-khoan') return <Navigate to="/co-so" replace />;
 
   return (
+    <>
+    <DialogHost />
     <Routes>
       <Route path="/co-so" element={<Outlets />} />
       <Route path="/" element={<Home />} />
@@ -48,7 +56,14 @@ export default function App() {
       <Route path="/thong-bao" element={<Notifications />} />
       <Route path="/lich-su" element={<History />} />
       <Route path="/tai-khoan" element={<Account />} />
+      <Route path="/chi-phi" element={<Expenses />} />
+      <Route path="/chi-phi/moi" element={<ExpenseNew />} />
+      <Route path="/thang-cu" element={<Historical />} />
+      <Route path="/nha-cung-cap" element={<Suppliers />} />
+      <Route path="/nhan-vien" element={<Members />} />
+      <Route path="/quan-tri" element={<AdminOverview />} />
       <Route path="*" element={<Navigate to={outlets.length ? '/' : '/co-so'} replace />} />
     </Routes>
+    </>
   );
 }

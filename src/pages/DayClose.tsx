@@ -4,14 +4,14 @@ import { useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { fetchBottles, fetchDaySales, isDayClosed, useLoad } from '../lib/data';
 import { ddmm, vnd, vnToday, weekdayLabel } from '../lib/format';
-import { Empty, Header, Icon, Loading, Nav, Stepper } from '../components/ui';
+import { Empty, Header, Icon, Loading, MoneyInput, Nav, NumberField, Stepper, confirmDialog, reasonDialog } from '../components/ui';
 
 const QUICK = [500000, 200000, 100000, 50000, 20000, 10000];
 
 export default function DayClose() {
   const [params] = useSearchParams();
   const date = params.get('ngay') || vnToday();
-  const { outlet, catalog, queue, bump } = useApp();
+  const { outlet, catalog, queue, bump, canManage } = useApp();
   const nav = useNavigate();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [left, setLeft] = useState<Record<string, number>>({});
@@ -20,38 +20,47 @@ export default function DayClose() {
   const [cash, setCash] = useState('');
   const [transfer, setTransfer] = useState('');
   const [reason, setReason] = useState('');
-  const [reclose, setReclose] = useState('');
   const [syrup, setSyrup] = useState('');
   const [catchup, setCatchup] = useState(true);
+  const [showAll, setShowAll] = useState(false);
+  const [cashMode, setCashMode] = useState<'collected' | 'box'>('collected');
   const [preview, setPreview] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const { data } = useLoad(async (oid) => {
-    const [bottles, sales, closed] = await Promise.all([fetchBottles(oid, date), fetchDaySales(oid, date), isDayClosed(oid, date)]);
-    return { bottles: bottles.filter((b) => b.carried || b.cooked || b.sold), sales, closed };
+    const [bottles, sales, closed, open] = await Promise.all([
+      fetchBottles(oid, date),
+      fetchDaySales(oid, date),
+      isDayClosed(oid, date),
+      supabase.from('cash_opens').select('amount_vnd').eq('outlet_id', oid).eq('business_date', date).order('created_at', { ascending: false }).limit(1)
+    ]);
+    return { all: bottles, bottles: bottles.filter((b) => b.carried || b.cooked || b.sold), sales, closed, cashOpen: ((open.data || [])[0]?.amount_vnd as number) ?? 0 };
   }, [date]);
 
   useEffect(() => {
     if (!data) return;
     const m: Record<string, number> = {};
-    data.bottles.forEach((b) => (m[b.product_id] = Math.max(0, b.carried + b.cooked - b.sold)));
+    data.all.forEach((b) => (m[b.product_id] = Math.max(0, b.carried + b.cooked - b.sold)));
     setLeft(m);
   }, [data]);
 
   if (!outlet) return null;
   const pending = queue.filter((q) => !q.rejected && q.outletId === outlet.id).length;
   const product = (pid: string) => catalog?.allProducts.find((p) => p.id === pid);
+  // Tiền mặt gửi lên luôn là tiền thu được trong ngày. Đếm cả hộp thì trừ tiền đầu ngày.
+  const cashCollected = () => Math.max(0, Number(cash || 0) - (cashMode === 'box' ? data?.cashOpen || 0 : 0));
   const payload = () => ({
     outlet_id: outlet.id,
     business_date: date,
-    lines: Object.entries(left).map(([product_id, counted_left]) => ({ product_id, counted_left })),
+    lines: Object.entries(left)
+      .filter(([pid, v]) => v > 0 || data?.bottles.some((b) => b.product_id === pid))
+      .map(([product_id, counted_left]) => ({ product_id, counted_left })),
     gift_total: gift,
     waste_total: waste,
-    cash_vnd: Number(cash || 0),
+    cash_vnd: cashCollected(),
     transfer_vnd: Number(transfer || 0),
     money_diff_reason: reason || null,
-    reclose_reason: reclose || null,
     syrup_measured_ml: syrup === '' ? null : Number(syrup),
     create_catchup_order: catchup
   });
@@ -59,8 +68,18 @@ export default function DayClose() {
   async function toResult() {
     setErr(null);
     const expected = data?.sales.revenue_vnd || 0;
-    const got = Number(cash || 0) + Number(transfer || 0);
-    if (expected > 0 && Math.abs(got - expected) / expected > 0.2 && !confirm('Tiền thu lệch hơn 20% so với tổng đơn. Bạn có chắc đã đếm hết?')) return;
+    const got = cashCollected() + Number(transfer || 0);
+    if (
+      expected > 0 &&
+      Math.abs(got - expected) / expected > 0.2 &&
+      !(await confirmDialog({
+        title: 'Tiền thu lệch hơn 20% so với tổng đơn',
+        text: `Thu ${vnd(got)}, theo đơn ${vnd(expected)}. Bạn đã đếm hết tiền mặt và xem đủ chuyển khoản chưa?`,
+        ok: 'Vẫn xem kết quả',
+        cancel: 'Đếm lại'
+      }))
+    )
+      return;
     setBusy(true);
     const { data: pv, error } = await supabase.rpc('fn_close_day', { p: payload(), p_commit: false });
     setBusy(false);
@@ -72,7 +91,6 @@ export default function DayClose() {
   async function commit() {
     setErr(null);
     if (pending > 0) return setErr(`Còn ${pending} đơn chưa gửi lên máy chủ. Cần có mạng để đồng bộ trước khi chốt ngày.`);
-    if (data?.closed && !reclose.trim()) return setErr('Ngày này đã chốt. Chốt lại cần ghi lý do.');
     setBusy(true);
     const { error } = await supabase.rpc('fn_close_day', { p: payload(), p_commit: true });
     setBusy(false);
@@ -92,25 +110,61 @@ export default function DayClose() {
       </div>
     );
 
+  async function unlock() {
+    const why = await reasonDialog({
+      title: `Mở khóa ngày ${ddmm(date)}?`,
+      text: 'Mở khóa để sửa đơn, mẻ nấu hoặc đếm lại. Bản chốt cũ vẫn giữ trong Lịch sử. Xong việc thì chốt lại ngày này.',
+      ok: 'Mở khóa',
+      reason: { label: 'Lý do mở khóa', placeholder: 'Ví dụ: quên ghi 2 đơn lúc 17h', required: true }
+    });
+    if (!why) return;
+    const { error } = await supabase.rpc('fn_unlock_day', { p_outlet: outlet!.id, p_date: date, p_reason: why });
+    if (error) return setErr(errorText(error));
+    bump();
+  }
+
+  if (data.closed) {
+    return (
+      <div className="screen">
+        <Header title="Đối chiếu cuối ngày" back="/" sub={sub} />
+        <main className="main">
+          <section className="card" style={{ alignItems: 'center', textAlign: 'center', padding: 24 }}>
+            <span className="ico-box" style={{ width: 52, height: 52 }}><Icon name="check" size={26} /></span>
+            <strong style={{ fontSize: 17 }}>Ngày {ddmm(date)} đã chốt</strong>
+            <span className="small muted">Ngày đã chốt thì không ghi thêm đơn, mẻ nấu hay hoàn tác được. Số chai còn đã chuyển sang ngày sau.</span>
+            {canManage ? (
+              <button className="btn secondary" onClick={unlock}>Mở khóa ngày này</button>
+            ) : (
+              <span className="small">Cần sửa thì nhờ chủ cơ sở mở khóa.</span>
+            )}
+            {err && <span className="err">{err}</span>}
+          </section>
+          <button className="btn quiet" onClick={() => nav(`/lich-su`)}>Xem lịch sử ngày này</button>
+        </main>
+        <Nav />
+      </div>
+    );
+  }
+
   if (step === 1) {
+    const zeroRows = (data.all || []).filter((b) => !(b.carried || b.cooked || b.sold) && catalog.products.some((p) => p.id === b.product_id));
+    const rowsShown = showAll ? [...data.bottles, ...zeroRows] : data.bottles;
     return (
       <div className="screen">
         <Header title="Đối chiếu cuối ngày" back="/" sub={`Bước 1/2 · đếm chai · ${sub}`} />
         <main className="main with-bar">
-          {data.closed && (
-            <div className="alert info">
-              <Icon name="check" size={20} sw={2} />
-              <span>Ngày {ddmm(date)} đã chốt. Làm lại sẽ tạo bản chốt mới thay bản cũ (bản cũ vẫn giữ trong Lịch sử).</span>
-            </div>
-          )}
-          {data.bottles.length === 0 ? (
-            <Empty icon="scale" title="Không có gì để đối chiếu" text="Hôm nay chưa nấu, chưa bán và không có chai tồn. Vẫn có thể chốt ngày trống để giữ chuỗi ngày." />
+          {rowsShown.length === 0 ? (
+            <Empty icon="scale" title="Không có gì để đối chiếu" text="Hôm nay chưa nấu, chưa bán và không có chai tồn. Vẫn có thể chốt ngày trống để giữ chuỗi ngày.">
+              {zeroRows.length > 0 && (
+                <button className="btn quiet" onClick={() => setShowAll(true)}>Hiển thị cả những món không nấu/tồn</button>
+              )}
+            </Empty>
           ) : (
             <>
               <p className="small">Đếm chai còn trên quầy. Bước sau là đếm tiền. App so cả hai với các đơn đã ghi để tìm chỗ lệch.</p>
               <section className="card tight">
                 <div className="h2" style={{ padding: '12px 0 2px' }}>1 · Chai còn lại trên quầy</div>
-                {data.bottles.map((b) => {
+                {rowsShown.map((b) => {
                   const p = product(b.product_id);
                   const max = b.carried + b.cooked;
                   const over = (left[b.product_id] ?? 0) > max;
@@ -127,6 +181,11 @@ export default function DayClose() {
                     </div>
                   );
                 })}
+                {zeroRows.length > 0 && (
+                  <button className="btn quiet" style={{ alignSelf: 'flex-start' }} onClick={() => setShowAll((v) => !v)}>
+                    {showAll ? 'Ẩn những món không nấu/tồn' : 'Hiển thị cả những món không nấu/tồn'}
+                  </button>
+                )}
                 <p className="xs muted" style={{ padding: '6px 0 12px' }}>Chai còn chuyển thành tồn của ngày mai (bán trong ngày hoặc để lạnh 0–4 °C).</p>
               </section>
               <section className="card tight">
@@ -157,7 +216,7 @@ export default function DayClose() {
   }
 
   if (step === 2) {
-    const got = Number(cash || 0) + Number(transfer || 0);
+    const got = cashCollected() + Number(transfer || 0);
     return (
       <div className="screen">
         <header className="header">
@@ -172,14 +231,19 @@ export default function DayClose() {
         <main className="main with-bar">
           <p className="small">Đếm tiền mặt trong hộp và xem tổng tiền vào trong app ngân hàng, rồi nhập hai con số.</p>
           <section className="card">
-            <label className="field">
-              <span className="label">Tiền mặt đếm được</span>
-              <span className="input-wrap" style={{ minHeight: 56 }}>
-                <input inputMode="numeric" style={{ fontSize: 24, fontWeight: 700 }} value={cash ? Number(cash).toLocaleString('vi-VN') : ''} onChange={(e) => setCash(e.target.value.replace(/\D/g, ''))} aria-label="Tiền mặt đếm được" />
-                <span className="u">đ</span>
+            <div className="seg" role="tablist" aria-label="Cách nhập tiền mặt">
+              <button className={cashMode === 'collected' ? 'on' : ''} onClick={() => setCashMode('collected')}>Số tiền thu được</button>
+              <button className={cashMode === 'box' ? 'on' : ''} onClick={() => setCashMode('box')}>Tổng tiền trong hộp</button>
+            </div>
+            <div className="field">
+              <span className="label">{cashMode === 'box' ? 'Tổng tiền mặt trong hộp' : 'Tiền mặt thu được hôm nay'}</span>
+              <MoneyInput value={cash} onChange={setCash} label="Tiền mặt" big />
+              <span className="xs muted">
+                {cashMode === 'box'
+                  ? `App trừ tiền đầu ngày ${vnd(data.cashOpen)} → thu được ${vnd(cashCollected())}`
+                  : 'Đã trừ tiền lẻ có sẵn lúc mở bán'}
               </span>
-              <span className="xs muted">Đếm trong hộp tiền, trừ tiền lẻ đầu ca</span>
-            </label>
+            </div>
             <div className="chips wrap">
               <span className="xs muted strong" style={{ alignSelf: 'center' }}>Cộng nhanh</span>
               {QUICK.map((q) => (
@@ -193,14 +257,11 @@ export default function DayClose() {
                 </button>
               )}
             </div>
-            <label className="field">
+            <div className="field">
               <span className="label">Chuyển khoản nhận được</span>
-              <span className="input-wrap" style={{ minHeight: 56 }}>
-                <input inputMode="numeric" style={{ fontSize: 24, fontWeight: 700 }} value={transfer ? Number(transfer).toLocaleString('vi-VN') : ''} onChange={(e) => setTransfer(e.target.value.replace(/\D/g, ''))} aria-label="Chuyển khoản nhận được" />
-                <span className="u">đ</span>
-              </span>
+              <MoneyInput value={transfer} onChange={setTransfer} label="Chuyển khoản nhận được" big />
               <span className="xs muted">Tổng tiền vào trong ngày theo app ngân hàng; để trống nếu không nhận chuyển khoản</span>
-            </label>
+            </div>
             <div className="row between strong">
               <span>Tổng thu thực tế</span>
               <span className="num">{vnd(got)}</span>
@@ -309,20 +370,11 @@ export default function DayClose() {
           <div className="h2">Kho syrup (tùy chọn)</div>
           <div className="row">
             <span className="grow small">Đo bình syrup thực tế</span>
-            <span className="input-wrap" style={{ width: 130 }}>
-              <input inputMode="numeric" value={syrup} onChange={(e) => setSyrup(e.target.value.replace(/\D/g, ''))} aria-label="Syrup đo được" />
-              <span className="u">ml</span>
-            </span>
+            <NumberField value={syrup} onChange={setSyrup} unit="ml" label="Syrup đo được" />
           </div>
           <p className="xs muted">Bản 1 chưa trừ syrup theo mức ngọt từng đơn; số đo này đặt lại kho syrup cho đúng.</p>
         </section>
 
-        {data.closed && (
-          <label className="field">
-            <span className="label">Lý do chốt lại</span>
-            <input className="input sm" value={reclose} onChange={(e) => setReclose(e.target.value)} placeholder="Ví dụ: đếm sót 2 chai trong thùng đá" />
-          </label>
-        )}
       </main>
       <div className="bar">
         {err && <span className="err">{err}</span>}

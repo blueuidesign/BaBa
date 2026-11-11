@@ -23,7 +23,7 @@ function Item({ icon, title, sub, to, right }: { icon: string; title: string; su
 const ROLE: Record<string, string> = { owner: 'Chủ cơ sở', staff: 'Nhân viên', admin: 'Admin BaBa' };
 
 export default function Account() {
-  const { profile, outlet, isAdmin } = useApp();
+  const { profile, outlet, isAdmin, canManage } = useApp();
   const nav = useNavigate();
   const [admins, setAdmins] = useState<string[]>([]);
   const [members, setMembers] = useState<number>(0);
@@ -84,12 +84,26 @@ export default function Account() {
             <Item icon="bottle" title="Chai đang có" sub="Tồn thành phẩm theo món" to="/kho/chai" />
             <Item icon="history" title="Lịch sử bản ghi" sub="Đơn, nấu, nhập, kiểm kê, đối chiếu" to="/lich-su" />
             <Item icon="bell" title="Thông báo và nhắc nhở" sub="Đặt hàng, hết hạn, chốt ngày" to="/thong-bao" />
+            <Item icon="truck" title="Nhà cung cấp" sub="Ai cung cấp vật tư nào" to="/nha-cung-cap" />
+          </section>
+        )}
+
+        {outlet && canManage && (
+          <section className="card tight">
+            <div className="h2" style={{ padding: '12px 0 2px' }}>Chủ cơ sở</div>
+            <Item icon="coin" title="Chi phí" sub="Ghi chi phí, xem chi theo loại" to="/chi-phi" />
+            <Item icon="history" title="Số liệu tháng cũ" sub="Nhập doanh thu, chi phí trước khi dùng app" to="/thang-cu" />
+            <Item icon="user" title="Nhân viên" sub="Thêm người bằng email, chọn cơ sở" to="/nhan-vien" />
           </section>
         )}
 
         <section className="card">
           <div className="h2">Quản trị hệ thống</div>
-          <p className="small muted">Admin BaBa gắn người dùng vào cơ sở, quản lý công thức và giá chung. Màn hình phân quyền làm ở bản sau.</p>
+          {isAdmin ? (
+            <Link to="/quan-tri" className="btn secondary block">Quản trị: báo cáo tất cả cơ sở, chủ cơ sở</Link>
+          ) : (
+            <p className="small muted">Admin BaBa tạo cơ sở mới, gán chủ cơ sở, quản lý công thức và giá chung.</p>
+          )}
           {admins.map((e) => (
             <div key={e} className="row small">
               <Icon name="check" size={18} sw={2} style={{ color: 'var(--ink-brand)' }} />

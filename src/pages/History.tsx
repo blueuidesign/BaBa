@@ -12,10 +12,11 @@ const FILTERS: [string, string][] = [
   ['batch', 'Mẻ'],
   ['purchase', 'Nhập kho'],
   ['count', 'Kiểm kê'],
-  ['close', 'Đối chiếu']
+  ['close', 'Đối chiếu'],
+  ['expense', 'Chi phí']
 ];
 const ICON: Record<string, [string, string]> = {
-  order: ['cart', ''], cook: ['blender', 'info'], batch: ['blender', 'info'], purchase: ['truck', ''], count: ['scale', 'warn'], close: ['check', '']
+  order: ['cart', ''], cook: ['blender', 'info'], batch: ['blender', 'info'], purchase: ['truck', ''], count: ['scale', 'warn'], close: ['check', ''], expense: ['coin', '']
 };
 const PAGE = 50;
 
@@ -25,6 +26,7 @@ export default function History() {
   const [rows, setRows] = useState<any[] | null>(null);
   const [more, setMore] = useState(true);
   const [names, setNames] = useState<Record<string, string>>({});
+  const [showReversed, setShowReversed] = useState(false);
 
   async function load(offset: number) {
     if (!outlet) return;
@@ -49,7 +51,10 @@ export default function History() {
   if (!outlet) return null;
   const rejected = queue.filter((q) => q.rejected && q.outletId === outlet.id);
   const byDay = new Map<string, any[]>();
-  (rows || []).forEach((r) => byDay.set(r.business_date, [...(byDay.get(r.business_date) || []), r]));
+  // Đơn đã hoàn tác (đơn gốc và bản đảo) ẩn mặc định; vẫn còn trong sổ
+  const isReversedOrder = (r: any) => r.kind === 'order' && (r.status === 'reversed' || r.status === 'reversal');
+  const hiddenCount = (rows || []).filter(isReversedOrder).length;
+  (rows || []).filter((r) => showReversed || !isReversedOrder(r)).forEach((r) => byDay.set(r.business_date, [...(byDay.get(r.business_date) || []), r]));
 
   return (
     <div className="screen">
@@ -62,6 +67,13 @@ export default function History() {
             </button>
           ))}
         </div>
+
+        {hiddenCount > 0 || showReversed ? (
+          <label className="row small" style={{ cursor: 'pointer' }}>
+            <input type="checkbox" checked={showReversed} onChange={(e) => setShowReversed(e.target.checked)} style={{ width: 20, height: 20 }} />
+            <span>Hiện cả đơn đã hoàn tác{hiddenCount ? ` (${hiddenCount})` : ''}</span>
+          </label>
+        ) : null}
 
         {rejected.length > 0 && (
           <section className="card">
@@ -90,7 +102,7 @@ export default function History() {
                 const [icon, tone] = ICON[r.kind] || ['history', ''];
                 const warn = r.status === 'reversal';
                 return (
-                  <div key={`${r.kind}-${r.ref_id}`} className="list-row" style={{ alignItems: 'flex-start', opacity: r.status === 'reversed' || r.status === 'superseded' ? 0.6 : 1 }}>
+                  <div key={`${r.kind}-${r.ref_id}`} className="list-row" style={{ alignItems: 'flex-start', opacity: r.status === 'reversed' || r.status === 'superseded' || r.status === 'unlock' ? 0.6 : 1 }}>
                     <span className={`ico-box ${warn ? 'warn' : tone}`}>
                       <Icon name={warn ? 'undo' : icon} size={20} sw={2} />
                     </span>

@@ -73,6 +73,11 @@ export default function Ingredients() {
     });
     setBusy(false);
     if (error) return setErr(errorText(error));
+    try {
+      localStorage.removeItem(`kho-baba-cook-draft:${outlet!.id}:${data!.plan.plan_date}:${data!.plan.kind}`);
+    } catch {
+      /* bỏ qua */
+    }
     bump();
     nav('/nau', { replace: true });
   }

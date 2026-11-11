@@ -4,7 +4,7 @@ import { GROUPS, useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { fetchStock, useLoad } from '../lib/data';
 import { qty as fq, unitLabel, uuid } from '../lib/format';
-import { Header, Loading, Nav, NumberField } from '../components/ui';
+import { Header, Loading, Nav, NumberField, confirmDialog } from '../components/ui';
 
 const REASONS: [string, string][] = [
   ['shrink', 'Hao hụt khi cân'],
@@ -36,7 +36,7 @@ export default function StockCount() {
       const a = Number(vals[s.ingredient_id]);
       return s.qty_on_hand > 0 && Math.abs(a - s.qty_on_hand) / s.qty_on_hand > 0.3;
     });
-    if (big.length && !confirm(`${big.map((b) => b.name).join(', ')} lệch hơn 30% so với sổ. Kiểm tra lại số cân. Vẫn lưu?`)) return;
+    if (big.length && !(await confirmDialog({ title: 'Lệch hơn 30% so với sổ', text: `${big.map((b) => b.name).join(', ')}. Kiểm tra lại số cân trước khi lưu.`, ok: 'Vẫn lưu', cancel: 'Cân lại' }))) return;
     setBusy(true);
     const { error } = await supabase.rpc('fn_post_count', {
       p: { outlet_id: outlet!.id, client_id: uuid(), reason, lines: counted.map((s) => ({ ingredient_id: s.ingredient_id, qty_actual: Number(vals[s.ingredient_id]) })) }

@@ -140,44 +140,157 @@ export function Nav() {
   );
 }
 
+/** Ô số người dùng gõ: chỉ nhận số dương. Gõ dấu "-" thì báo lỗi dưới ô và không đổi giá trị. */
+export const NEG_MSG = 'Chỉ nhập số dương. Số âm không được lưu.';
+export function hasMinus(raw: string) {
+  return raw.includes('-') || raw.includes('−');
+}
+
 export function Stepper({ value, onChange, label, min = 0, step = 1, editable = false }: { value: number; onChange: (v: number) => void; label: string; min?: number; step?: number; editable?: boolean }) {
+  const [bad, setBad] = useState(false);
   return (
-    <span className="stepper">
-      <button type="button" aria-label={`Bớt ${label}`} onClick={() => onChange(Math.max(min, +(value - step).toFixed(2)))}>
-        <Icon name="minus" size={18} sw={2.2} />
-      </button>
-      {editable ? (
-        <input
-          className="val"
-          inputMode="numeric"
-          aria-label={label}
-          value={value}
-          onChange={(e) => {
-            const v = Number(e.target.value.replace(/\D/g, ''));
-            onChange(Number.isFinite(v) ? Math.max(min, v) : min);
-          }}
-        />
-      ) : (
-        <span className="val" aria-live="polite">{value}</span>
-      )}
-      <button type="button" className="plus" aria-label={`Thêm ${label}`} onClick={() => onChange(+(value + step).toFixed(2))}>
-        <Icon name="plus" size={18} sw={2.2} />
-      </button>
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+      <span className="stepper">
+        <button type="button" aria-label={`Bớt ${label}`} onClick={() => { setBad(false); onChange(Math.max(min, +(value - step).toFixed(2))); }}>
+          <Icon name="minus" size={18} sw={2.2} />
+        </button>
+        {editable ? (
+          <input
+            className="val"
+            inputMode="numeric"
+            aria-label={label}
+            aria-invalid={bad}
+            value={value}
+            onChange={(e) => {
+              if (hasMinus(e.target.value)) return setBad(true);
+              setBad(false);
+              const v = Number(e.target.value.replace(/\D/g, ''));
+              onChange(Number.isFinite(v) ? Math.max(min, v) : min);
+            }}
+          />
+        ) : (
+          <span className="val" aria-live="polite">{value}</span>
+        )}
+        <button type="button" className="plus" aria-label={`Thêm ${label}`} onClick={() => { setBad(false); onChange(+(value + step).toFixed(2)); }}>
+          <Icon name="plus" size={18} sw={2.2} />
+        </button>
+      </span>
+      {bad && <span className="err xs">Chỉ nhập số dương</span>}
     </span>
   );
 }
 
 export function NumberField({ value, onChange, unit, label, width = 130, decimals = false }: { value: string; onChange: (v: string) => void; unit?: string; label: string; width?: number; decimals?: boolean }) {
+  const [bad, setBad] = useState(false);
   return (
-    <label className="input-wrap" style={{ width, flexShrink: 0 }}>
-      <input
-        inputMode={decimals ? 'decimal' : 'numeric'}
-        aria-label={label}
-        value={value}
-        onChange={(e) => onChange(decimals ? e.target.value.replace(/[^\d.,]/g, '').replace(',', '.') : e.target.value.replace(/\D/g, ''))}
-      />
-      {unit && <span className="u">{unit}</span>}
-    </label>
+    <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 2, width, flexShrink: 0 }}>
+      <label className="input-wrap" style={{ width }}>
+        <input
+          inputMode={decimals ? 'decimal' : 'numeric'}
+          aria-label={label}
+          aria-invalid={bad}
+          value={value}
+          onChange={(e) => {
+            if (hasMinus(e.target.value)) return setBad(true);
+            setBad(false);
+            onChange(decimals ? e.target.value.replace(/[^\d.,]/g, '').replace(',', '.') : e.target.value.replace(/\D/g, ''));
+          }}
+        />
+        {unit && <span className="u">{unit}</span>}
+      </label>
+      {bad && <span className="err xs">Chỉ nhập số dương</span>}
+    </span>
+  );
+}
+
+/** Ô nhập tiền VND (hiện dấu chấm nghìn). value là chuỗi chữ số. */
+export function MoneyInput({ value, onChange, label, big = false, placeholder }: { value: string; onChange: (v: string) => void; label: string; big?: boolean; placeholder?: string }) {
+  const [bad, setBad] = useState(false);
+  return (
+    <>
+      <label className="input-wrap">
+        <input
+          inputMode="numeric"
+          style={big ? { fontSize: 24, fontWeight: 700 } : undefined}
+          value={value ? Number(value).toLocaleString('vi-VN') : ''}
+          placeholder={placeholder}
+          aria-label={label}
+          aria-invalid={bad}
+          onChange={(e) => {
+            if (hasMinus(e.target.value)) return setBad(true);
+            setBad(false);
+            onChange(e.target.value.replace(/\D/g, '').replace(/^0+(?=\d)/, ''));
+          }}
+        />
+        <span className="u">đ</span>
+      </label>
+      {bad && <span className="err">{NEG_MSG}</span>}
+    </>
+  );
+}
+
+/* ===== Popup xác nhận (thay confirm() của trình duyệt) ===== */
+type DialogReq = {
+  title: string; text?: ReactNode; ok?: string; cancel?: string; danger?: boolean; tone?: 'warn' | 'info';
+  reason?: { label: string; placeholder?: string; required?: boolean };
+  resolve: (v: { ok: boolean; reason: string }) => void;
+};
+let pushDialog: ((r: DialogReq) => void) | null = null;
+
+/** Hỏi xác nhận bằng popup có nền mờ. Trả về true khi người dùng bấm nút chính. */
+export function confirmDialog(o: Omit<DialogReq, 'resolve' | 'reason'>): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (!pushDialog) return resolve(window.confirm(o.title));
+    pushDialog({ ...o, resolve: (v) => resolve(v.ok) });
+  });
+}
+/** Popup có ô ghi lý do. Trả về lý do, hoặc null khi bấm hủy. */
+export function reasonDialog(o: Omit<DialogReq, 'resolve'> & { reason: NonNullable<DialogReq['reason']> }): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (!pushDialog) return resolve(window.prompt(o.title) || null);
+    pushDialog({ ...o, resolve: (v) => resolve(v.ok ? v.reason : null) });
+  });
+}
+
+export function DialogHost() {
+  const [req, setReq] = useState<DialogReq | null>(null);
+  const [reason, setReason] = useState('');
+  useEffect(() => {
+    pushDialog = (r) => {
+      setReason('');
+      setReq(r);
+    };
+    return () => {
+      pushDialog = null;
+    };
+  }, []);
+  if (!req) return null;
+  const close = (ok: boolean) => {
+    req.resolve({ ok, reason: reason.trim() });
+    setReq(null);
+  };
+  const needReason = !!req.reason?.required && !reason.trim();
+  return (
+    <>
+      <div className="dialog-back" onClick={() => close(false)} />
+      <div className="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t">
+        <span className={`dialog-ico ${req.tone === 'info' ? 'info' : ''}`}>
+          <Icon name="warn" size={26} sw={2} />
+        </span>
+        <strong id="dlg-t" className="dialog-title">{req.title}</strong>
+        {req.text && <div className="small muted" style={{ textAlign: 'center' }}>{req.text}</div>}
+        {req.reason && (
+          <label className="field" style={{ alignSelf: 'stretch' }}>
+            <span className="small strong">{req.reason.label}</span>
+            <textarea rows={2} value={reason} placeholder={req.reason.placeholder} onChange={(e) => setReason(e.target.value)} autoFocus />
+          </label>
+        )}
+        <div className="dialog-actions">
+          <button className="btn secondary" onClick={() => close(false)}>{req.cancel || 'Quay lại'}</button>
+          <button className={`btn ${req.danger ? 'danger' : ''}`} disabled={needReason} onClick={() => close(true)}>{req.ok || 'Đồng ý'}</button>
+        </div>
+      </div>
+    </>
   );
 }
 

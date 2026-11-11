@@ -183,12 +183,84 @@
    "y": 7344,
    "w": 390,
    "h": 844,
-   "title": "F01 · Doanh thu",
+   "title": "F01 · Báo cáo: doanh thu, lợi nhuận, CSV",
+   "is_interactive": true
+  },
+  "H01.dc.html": {
+   "x": 470,
+   "y": 7344,
+   "w": 390,
+   "h": 844,
+   "title": "H01 · Chi phí",
+   "is_interactive": true
+  },
+  "H02.dc.html": {
+   "x": 940,
+   "y": 7344,
+   "w": 390,
+   "h": 844,
+   "title": "H02 · Ghi chi phí",
+   "is_interactive": true
+  },
+  "H03.dc.html": {
+   "x": 1410,
+   "y": 7344,
+   "w": 390,
+   "h": 844,
+   "title": "H03 · Nhập số liệu tháng cũ",
+   "is_interactive": true
+  },
+  "Q01.dc.html": {
+   "x": 0,
+   "y": 8568,
+   "w": 390,
+   "h": 844,
+   "title": "Q01 · Nhân viên (chủ cơ sở)",
+   "is_interactive": true
+  },
+  "P01.dc.html": {
+   "x": 470,
+   "y": 8568,
+   "w": 390,
+   "h": 844,
+   "title": "P01 · Nhà cung cấp",
+   "is_interactive": true
+  },
+  "K01.dc.html": {
+   "x": 940,
+   "y": 8568,
+   "w": 390,
+   "h": 844,
+   "title": "K01 · Quản trị (admin): mọi cơ sở, chủ cơ sở",
+   "is_interactive": true
+  },
+  "W01.dc.html": {
+   "x": 0,
+   "y": 9792,
+   "w": 390,
+   "h": 844,
+   "title": "W01 · Popup xác nhận",
+   "is_interactive": true
+  },
+  "W02.dc.html": {
+   "x": 470,
+   "y": 9792,
+   "w": 390,
+   "h": 844,
+   "title": "W02 · Ô số âm bị từ chối",
+   "is_interactive": true
+  },
+  "E04.dc.html": {
+   "x": 940,
+   "y": 9792,
+   "w": 390,
+   "h": 844,
+   "title": "E04 · Ngày đã chốt, mở khóa",
    "is_interactive": true
   },
   "S01.dc.html": {
    "x": 0,
-   "y": 8568,
+   "y": 11016,
    "w": 390,
    "h": 844,
    "title": "S01 · Lỗi mã xác nhận",
@@ -196,7 +268,7 @@
   },
   "S02.dc.html": {
    "x": 470,
-   "y": 8568,
+   "y": 11016,
    "w": 390,
    "h": 844,
    "title": "S02 · Trang chủ trống đầu ngày",
@@ -204,7 +276,7 @@
   },
   "S03.dc.html": {
    "x": 940,
-   "y": 8568,
+   "y": 11016,
    "w": 390,
    "h": 844,
    "title": "S03 · Ghi đơn: mất mạng, món hết",
@@ -212,7 +284,7 @@
   },
   "S04.dc.html": {
    "x": 1410,
-   "y": 8568,
+   "y": 11016,
    "w": 390,
    "h": 844,
    "title": "S04 · Lỗi lưu đơn",
@@ -220,7 +292,7 @@
   },
   "S05.dc.html": {
    "x": 1880,
-   "y": 8568,
+   "y": 11016,
    "w": 390,
    "h": 844,
    "title": "S05 · Kho trống (cơ sở mới)",
@@ -228,7 +300,7 @@
   },
   "N01.dc.html": {
    "x": 0,
-   "y": 9792,
+   "y": 12240,
    "w": 1240,
    "h": 1180,
    "title": "N01 · Màn nào đi đến màn nào",
@@ -258,6 +330,15 @@
   "E02.dc.html",
   "E03.dc.html",
   "F01.dc.html",
+  "H01.dc.html",
+  "H02.dc.html",
+  "H03.dc.html",
+  "Q01.dc.html",
+  "P01.dc.html",
+  "K01.dc.html",
+  "W01.dc.html",
+  "W02.dc.html",
+  "E04.dc.html",
   "S01.dc.html",
   "S02.dc.html",
   "S03.dc.html",
@@ -318,13 +399,27 @@
   "row7": {
    "x": 0,
    "y": 8328,
-   "text": "S · Trạng thái: lỗi, trống, mất mạng",
+   "text": "Q · Người dùng, nhà cung cấp, quản trị",
    "kind": "title1",
    "maxW": 1800
   },
   "row8": {
    "x": 0,
    "y": 9552,
+   "text": "W · Popup, mở khóa ngày",
+   "kind": "title1",
+   "maxW": 1800
+  },
+  "row9": {
+   "x": 0,
+   "y": 10776,
+   "text": "S · Trạng thái: lỗi, trống, mất mạng",
+   "kind": "title1",
+   "maxW": 1800
+  },
+  "row10": {
+   "x": 0,
+   "y": 12000,
    "text": "N · Sơ đồ điều hướng",
    "kind": "title1",
    "maxW": 1800

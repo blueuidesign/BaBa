@@ -1,9 +1,10 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../lib/app';
-import { supabase } from '../lib/supabase';
+import { errorText, supabase } from '../lib/supabase';
 import { fetchBottles, fetchDaySales, fetchStock, useLoad } from '../lib/data';
-import { ddmm, timeHM, vnd, vnToday, weekdayLabel } from '../lib/format';
-import { BellLink, Icon, Loading, Nav, Header } from '../components/ui';
+import { ddmm, timeHM, uuid, vnd, vnToday, weekdayLabel } from '../lib/format';
+import { BellLink, Icon, Loading, MoneyInput, Nav, Header } from '../components/ui';
 
 function Task({ icon, title, sub, to, kind }: { icon: string; title: string; sub: string; to: string; kind?: string }) {
   return (
@@ -21,12 +22,15 @@ function Task({ icon, title, sub, to, kind }: { icon: string; title: string; sub
 }
 
 export default function Home() {
-  const { outlet, profile, catalog } = useApp();
+  const { outlet, profile, catalog, bump } = useApp();
+  const [cashSheet, setCashSheet] = useState(false);
+  const [cashIn, setCashIn] = useState('');
+  const [cashErr, setCashErr] = useState<string | null>(null);
   const today = vnToday();
   const yesterday = vnToday(-1);
 
   const { data, loading } = useLoad(async (oid) => {
-    const [sales, bottles, stock, recent, closes, ydayOrders] = await Promise.all([
+    const [sales, bottles, stock, recent, closes, ydayOrders, cashOpen] = await Promise.all([
       fetchDaySales(oid, today),
       fetchBottles(oid, today),
       fetchStock(oid),
@@ -39,9 +43,14 @@ export default function Home() {
         .order('placed_at', { ascending: false })
         .limit(3),
       supabase.from('day_closes').select('business_date').eq('outlet_id', oid).eq('is_current', true).in('business_date', [today, yesterday]),
-      supabase.from('orders').select('id', { count: 'exact', head: true }).eq('outlet_id', oid).eq('business_date', yesterday).eq('status', 'active')
+      supabase.from('orders').select('id', { count: 'exact', head: true }).eq('outlet_id', oid).eq('business_date', yesterday).eq('status', 'active'),
+      supabase.from('cash_opens').select('amount_vnd').eq('outlet_id', oid).eq('business_date', today).order('created_at', { ascending: false }).limit(1)
     ]);
-    return { sales, bottles, stock, recent: recent.data || [], closed: new Set((closes.data || []).map((c: any) => c.business_date)), ydayCount: ydayOrders.count || 0 };
+    return {
+      sales, bottles, stock, recent: recent.data || [],
+      closed: new Set((closes.data || []).map((c: any) => c.business_date)), ydayCount: ydayOrders.count || 0,
+      cashOpen: (cashOpen.data || [])[0]?.amount_vnd as number | undefined
+    };
   });
 
   if (!outlet) return null;
@@ -77,8 +86,7 @@ export default function Home() {
   const cooked = data.bottles.reduce((s, b) => s + b.cooked, 0);
   const carried = data.bottles.reduce((s, b) => s + b.carried, 0);
   const needs = data.stock.filter((s) => s.needs_order);
-  const bySupplier = new Map<string, string[]>();
-  needs.forEach((s) => bySupplier.set(s.supplier_name || 'Chưa gán nhà cung cấp', [...(bySupplier.get(s.supplier_name || 'Chưa gán nhà cung cấp') || []), s.name]));
+  const supplierCount = new Set(needs.map((s) => s.supplier_id || 'none')).size;
   const expiring = data.stock.filter((s) => s.expiring);
   const hour = new Date(Date.now() + 7 * 3600000).getUTCHours();
   const fresh = cooked === 0 && data.sales.bottles === 0;
@@ -86,9 +94,17 @@ export default function Home() {
   const tasks: React.ReactElement[] = [];
   if (data.ydayCount > 0 && !data.closed.has(yesterday))
     tasks.push(<Task key="y" icon="scale" kind="warn" title={`Chưa đối chiếu ${ddmm(yesterday)}`} sub="Tồn qua đang lấy theo số sổ, chưa đếm" to={`/doi-chieu?ngay=${yesterday}`} />);
-  [...bySupplier.entries()].forEach(([sup, items]) =>
-    tasks.push(<Task key={sup} icon="truck" kind="warn" title={`Nên đặt: ${sup}`} sub={items.join(', ')} to="/kho" />)
-  );
+  if (needs.length)
+    tasks.push(
+      <Task
+        key="need"
+        icon="truck"
+        kind="warn"
+        title={`Nên đặt ${needs.length} vật tư${supplierCount > 1 ? ` · ${supplierCount} nhà cung cấp` : ''}`}
+        sub={needs.slice(0, 4).map((s) => s.name).join(', ') + (needs.length > 4 ? '…' : '')}
+        to="/kho?loc=can-dat"
+      />
+    );
   expiring.forEach((s) => tasks.push(<Task key={s.ingredient_id} icon="warn" kind="warn" title={`${s.name} sắp hết hạn`} sub={`Hạn ${ddmm(s.nearest_expiry!)}`} to={s.kind === 'made' ? '/nau/me' : `/kho/${s.ingredient_id}`} />));
   if (data.sales.bottles > 0 && !data.closed.has(today))
     tasks.push(<Task key="c" icon="scale" title="Đối chiếu cuối ngày" sub="Đếm chai còn và tiền thu được" to="/doi-chieu" />);
@@ -125,7 +141,8 @@ export default function Home() {
                 <div className="l">Đã bán hôm nay</div>
                 <div className="v">{data.sales.bottles} chai</div>
                 <div className="small muted">
-                  {vnd(data.sales.revenue_vnd)} · {data.sales.orders_count} đơn
+                  {vnd(data.sales.revenue_vnd)} · {data.sales.orders_count + (data.sales.gift_orders_count || 0)} đơn
+                  {data.sales.gift_orders_count ? ` · ${data.sales.gift_orders_count} tặng` : ''}
                 </div>
               </div>
               <span className="divider" />
@@ -146,6 +163,25 @@ export default function Home() {
         <Link to="/ban" className={`btn lg block ${fresh ? 'secondary' : ''}`}>
           <Icon name="cart" size={22} sw={2} /> Ghi đơn mới
         </Link>
+
+        {!data.closed.has(today) && (
+          <button
+            className="list-row card tight"
+            style={{ border: 0, width: '100%', textAlign: 'left', cursor: 'pointer' }}
+            onClick={() => {
+              setCashIn(data.cashOpen != null ? String(data.cashOpen) : '');
+              setCashErr(null);
+              setCashSheet(true);
+            }}
+          >
+            <span className="ico-box"><Icon name="coin" size={20} /></span>
+            <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
+              <span className="strong">Tiền đầu ngày</span>
+              <span className="small muted">{data.cashOpen != null ? `${vnd(data.cashOpen)} trong hộp lúc mở bán` : 'Chưa nhập. Nhập để cuối ngày app tự trừ ra.'}</span>
+            </span>
+            <span className="small strong" style={{ color: 'var(--ink-brand)' }}>{data.cashOpen != null ? 'Sửa' : 'Nhập'}</span>
+          </button>
+        )}
 
         <section className="card tight">
           <div className="h2" style={{ padding: '12px 0 2px' }}>Việc hôm nay</div>
@@ -178,6 +214,29 @@ export default function Home() {
         )}
       </main>
       <Nav />
+      {cashSheet && (
+        <>
+          <div className="sheet-back" onClick={() => setCashSheet(false)} />
+          <div className="sheet" role="dialog" aria-label="Tiền đầu ngày">
+            <strong style={{ fontSize: 17 }}>Tiền đầu ngày</strong>
+            <span className="small muted">Số tiền có sẵn trong hộp trước khi bán (tiền lẻ để thối). Cuối ngày bạn có thể đếm cả hộp, app tự trừ số này.</span>
+            <MoneyInput value={cashIn} onChange={setCashIn} label="Tiền đầu ngày" big />
+            {cashErr && <span className="err">{cashErr}</span>}
+            <button
+              className="btn lg block"
+              disabled={cashIn === ''}
+              onClick={async () => {
+                const { error } = await supabase.rpc('fn_set_cash_open', { p: { outlet_id: outlet.id, client_id: uuid(), amount_vnd: Number(cashIn) } });
+                if (error) return setCashErr(errorText(error));
+                setCashSheet(false);
+                bump();
+              }}
+            >
+              Lưu tiền đầu ngày
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
