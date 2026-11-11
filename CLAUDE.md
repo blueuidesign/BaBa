@@ -40,7 +40,7 @@ App bán hàng và quản lý kho cho sữa hạt **Sữa lành từ BaBa**: PWA
 - React 19 + Vite 7 + TypeScript ~5.9, react-router 7, `@supabase/supabase-js`, `vite-plugin-pwa`. Không có thư viện UI; style ở `src/styles.css`.
 - `npm run dev` · `npm run typecheck` · `npm run build`. Chạy typecheck và build trước mỗi commit.
 - Biến môi trường: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (xem `.env.example`; key là publishable key, để lộ được).
-- Supabase project ref `fsqpajvjjmpyrgllrhgz` (Singapore). Migration ở `supabase/migrations/`, đã chạy tới `0011`. Migration mới đánh số từ `0012`.
+- Supabase project ref `fsqpajvjjmpyrgllrhgz` (Singapore). Migration ở `supabase/migrations/`, đã chạy tới `0011`; `0012`, `0013` đã viết (nhánh `ban1-mo-rong`), chờ chạy. Migration mới đánh số từ `0014`.
 
 ## Ràng buộc kỹ thuật bắt buộc
 

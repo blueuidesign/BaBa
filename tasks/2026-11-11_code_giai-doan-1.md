@@ -1,6 +1,6 @@
 # Task code · Giai đoạn 1: sửa lỗi test và đổi danh sách món
 
-**Trạng thái:** Chưa làm · **Ngày giao:** 11/11/2026 · **Làm song song với task design**
+**Trạng thái:** Đã làm trên nhánh `ban1-mo-rong` (11/11); migration 0012, 0013 chờ chạy trên Supabase · **Ngày giao:** 11/11/2026 · **Làm song song với task design**
 
 ## Đọc trước
 
@@ -26,41 +26,41 @@ Danh sách đã chốt: 9 món, 4 dòng.
 | tre | `tmc` | Mầm Sữa Matcha | Matcha | Giữ công thức cũ tới khi có công thức mới (Matcha + điều + óc chó) |
 | tre | `tcc` | Mầm Sữa Cacao | Cacao | Giữ công thức cũ tới khi có công thức mới (Cacao + điều + hạnh nhân) |
 
-- [ ] **Ngừng bán** `smt`, `lnb`, `lvx`, `lnl`, `tcb`: đặt `products.status = 'retired'`, tắt trong `outlet_menu` của mọi cơ sở, bỏ khỏi `model_default_menu`. **Không xóa** sản phẩm, giá hay công thức, vì đơn và mẻ nấu cũ còn trỏ tới.
-- [ ] Thêm 2 món mới:
+- [x] **Ngừng bán** `smt`, `lnb`, `lvx`, `lnl`, `tcb`: đặt `products.status = 'retired'`, tắt trong `outlet_menu` của mọi cơ sở, bỏ khỏi `model_default_menu`. **Không xóa** sản phẩm, giá hay công thức, vì đơn và mẻ nấu cũ còn trỏ tới.
+- [x] Thêm 2 món mới:
   - thêm vào `products` với màu theo design;
   - thêm vật tư mới `dau_den` (Đậu đen) và `gao_lut` (Gạo lứt rang), nhóm nguyên liệu chính, đơn vị g, để có chỗ khi bổ sung công thức;
   - **chưa có giá** (xem Câu hỏi mở): tạo sản phẩm nhưng để **tắt** trong `outlet_menu`; khi Tùng gửi giá thì thêm `product_prices` và bật lên.
-- [ ] Đổi tên dùng `update` trên `products.name` và `short_name`. Đây là thuộc tính hiển thị nên đổi trực tiếp được; đơn cũ vẫn trỏ cùng sản phẩm.
-- [ ] Sắp xếp `sort_order` theo đúng thứ tự 1 → 9.
-- [ ] **Món chưa có công thức:**
+- [x] Đổi tên dùng `update` trên `products.name` và `short_name`. Đây là thuộc tính hiển thị nên đổi trực tiếp được; đơn cũ vẫn trỏ cùng sản phẩm.
+- [x] Sắp xếp `sort_order` theo đúng thứ tự 1 → 9.
+- [x] **Món chưa có công thức:**
   - ghi nấu vẫn được;
   - không trừ nguyên liệu, chỉ trừ bao bì;
   - màn Nấu hiện "Chưa có công thức, kho không bị trừ";
   - kiểm tra `fn_post_cook_run` không báo lỗi khi không có `recipe_id`.
-- [ ] Thẻ "Cốt cold brew" ở màn Mẻ: ẩn khi cơ sở không bật món nào dùng cốt. Giữ dữ liệu.
-- [ ] Kiểm tra lại cơ sở hiện có ("Test - Hạ Long", "Test v1.2 - 10.11"…): chai tồn của món ngừng bán vẫn đếm được ở đối chiếu và chuyển qua đêm đúng. Chỉ món ngừng bán **mà không còn chai** mới biến khỏi E01.
-- [ ] Cập nhật `docs/phan-tich/BaBa_User_Stories.md` (12 món → 9 món), `docs/phan-tich/Ghi_chu_trien_khai.md`, và ghi chú ở Phụ lục A của Đặc tả rằng danh mục mới nằm trong migration.
+- [x] Thẻ "Cốt cold brew" ở màn Mẻ: ẩn khi cơ sở không bật món nào dùng cốt. Giữ dữ liệu.
+- [x] Kiểm tra lại cơ sở hiện có ("Test - Hạ Long", "Test v1.2 - 10.11"…): chai tồn của món ngừng bán vẫn đếm được ở đối chiếu và chuyển qua đêm đúng. Chỉ món ngừng bán **mà không còn chai** mới biến khỏi E01.
+- [x] Cập nhật `docs/phan-tich/BaBa_User_Stories.md` (12 món → 9 món), `docs/phan-tich/Ghi_chu_trien_khai.md`, và ghi chú ở Phụ lục A của Đặc tả rằng danh mục mới nằm trong migration.
 
 ## B. Sửa lỗi và cải tiến theo biên bản (CD1 → CD10)
 
-- [ ] **CD1.** Ô số không tự bỏ dấu `-`. Gõ số âm thì báo dưới ô và không lưu. Tồn kho do hệ thống tính thì vẫn được âm. Sửa `NumberField`, `Stepper` (`src/components/ui.tsx`) và 3 ô ở `DayClose.tsx`.
-- [ ] **CD2.** Màn Nấu:
+- [x] **CD1.** Ô số không tự bỏ dấu `-`. Gõ số âm thì báo dưới ô và không lưu. Tồn kho do hệ thống tính thì vẫn được âm. Sửa `NumberField`, `Stepper` (`src/components/ui.tsx`) và 3 ô ở `DayClose.tsx`.
+- [x] **CD2.** Màn Nấu:
   - mặc định 0;
   - nháp lưu localStorage theo khóa (cơ sở, ngày, loại kế hoạch); ghi nấu thành công thì xóa nháp;
   - `app.tsx`: sự kiện `TOKEN_REFRESHED` với cùng người dùng thì không gọi lại `reloadOutlets`;
   - kiểm lại E01, E02, D03, D05 với bước "khóa màn hình 2 phút rồi mở lại".
-- [ ] **CD3.** Bỏ nút "Lấy theo 7 ngày".
-- [ ] **CD4.** Đơn đã hoàn tác (gốc và bản đảo) không có trong CSV, báo cáo, Trang chủ. F03 ẩn mặc định, có công tắc "Hiện cả đơn đã hoàn tác". CSV dùng trạng thái tiếng Việt, số không nằm trong ngoặc kép, vẫn là định dạng CSV.
-- [ ] **CD5.** Hoàn tác mẻ nấu:
+- [x] **CD3.** Bỏ nút "Lấy theo 7 ngày".
+- [x] **CD4.** Đơn đã hoàn tác (gốc và bản đảo) không có trong CSV, báo cáo, Trang chủ. F03 ẩn mặc định, có công tắc "Hiện cả đơn đã hoàn tác". CSV dùng trạng thái tiếng Việt, số không nằm trong ngoặc kép, vẫn là định dạng CSV.
+- [x] **CD5.** Hoàn tác mẻ nấu:
   - được làm trong 10 phút, khi với mọi món của mẻ: *tồn qua + các mẻ khác − đã bán* ≥ 0;
   - không đạt thì ẩn nút;
   - viết migration mới thay `fn_reverse_cook_run`.
-- [ ] **CD6.** Tỉ lệ hủy = hủy ÷ (nấu + tồn qua). Trang chủ hiện "N đơn · M tặng".
-- [ ] **CD7.** Việc hôm nay: gom mọi "Nên đặt" thành một dòng; bấm vào mở D01.
-- [ ] **CD8.** E01 thêm nút chữ (kiểu `quiet`) "Hiển thị cả những món không nấu/tồn".
-- [ ] **CD9.** `fn_create_outlet` chỉ cho admin; ẩn phần tạo cơ sở ở A03 với người không phải admin. Email của Hà thêm vào `bootstrap_admins` khi Tùng gửi.
-- [ ] **CD10.** Ghi kết quả vào `docs/ket-qua-test/` và cập nhật User Stories (C-1, C-2, C-3, D-1, E-1, F-1, A-3, A-4, B-2, mục phạm vi).
+- [x] **CD6.** Tỉ lệ hủy = hủy ÷ (nấu + tồn qua). Trang chủ hiện "N đơn · M tặng".
+- [x] **CD7.** Việc hôm nay: gom mọi "Nên đặt" thành một dòng; bấm vào mở D01.
+- [x] **CD8.** E01 thêm nút chữ (kiểu `quiet`) "Hiển thị cả những món không nấu/tồn".
+- [x] **CD9.** `fn_create_outlet` chỉ cho admin; ẩn phần tạo cơ sở ở A03 với người không phải admin. Email của Hà thêm vào `bootstrap_admins` khi Tùng gửi.
+- [ ] **CD10.** (một phần: đã cập nhật Ghi chú triển khai; User Stories chưa sửa) Ghi kết quả vào `docs/ket-qua-test/` và cập nhật User Stories (C-1, C-2, C-3, D-1, E-1, F-1, A-3, A-4, B-2, mục phạm vi).
 
 ## Câu hỏi mở (chờ Tùng)
 

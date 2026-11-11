@@ -1,6 +1,6 @@
 # Ghi chú triển khai · Kho BaBa bản 1
 
-Phiên bản 1.0 · 10/11/2026
+Phiên bản 1.1 · 11/11/2026 (thêm phần mở rộng theo biên bản 11/11)
 
 Tài liệu này ghi lại **code thực tế khác thiết kế ở đâu**, màn hình nằm ở file nào, và còn thiếu những gì. Đọc sau `BaBa_User_Stories.md` và `BaBa_Thiet_ke_DB.md`. Nếu tài liệu này mâu thuẫn với hai tài liệu kia về chuyện **code đang làm gì**, tin tài liệu này. Còn chuyện **code nên làm gì**, tin User Stories.
 
@@ -11,6 +11,7 @@ Tài liệu này ghi lại **code thực tế khác thiết kế ở đâu**, m�
 | Hạng mục | Trạng thái |
 | --- | --- |
 | Database (migration 0001–0011) | Đã chạy trên Supabase project `fsqpajvjjmpyrgllrhgz`. Đã kiểm thử luồng nấu → bán → đối chiếu → chuyển tồn trong transaction rollback |
+| Migration 0012 (thực đơn 9 món), 0013 (chi phí, tháng cũ, tiền đầu ngày, mở khóa ngày, quyền) | **Đã viết, chưa chạy** trên Supabase (11/11). Frontend nhánh `ban1-mo-rong` cần 2 migration này; chạy migration trước rồi mới merge |
 | Frontend 18 trang | Đã code, `npm run typecheck` và `npm run build` sạch. Chưa có test tự động |
 | Deploy | Repo đã nối Vercel; cần 2 biến môi trường (xem README) |
 | Đăng nhập bằng mã 6 số | **Đang chặn.** Supabase gói Free không cho sửa mẫu email khi chưa có custom SMTP, mà mẫu mặc định chỉ có link. Cần cài SMTP Resend rồi thêm `{{ .Token }}` vào mẫu "Magic link or OTP" và "Confirm sign up". Tạm thời bấm link trong email vẫn đăng nhập được (app tự nhận phiên từ URL), điều kiện Site URL trỏ đúng địa chỉ Vercel |
@@ -38,7 +39,15 @@ Bản thiết kế gốc là artifact Design `5a78cd59-3e4a-4a15-b6be-f7d2cb82e6
 | D04 | Chai đang có | `/kho/chai` | `src/pages/Bottles.tsx` |
 | D05 | Kiểm kê | `/kho/kiem-ke` | `src/pages/StockCount.tsx` |
 | E01–E03 | Đối chiếu cuối ngày (3 bước trong một trang) | `/doi-chieu?ngay=` | `src/pages/DayClose.tsx` |
-| F01 | Doanh thu | `/bao-cao` | `src/pages/Revenue.tsx` |
+| F01 | Báo cáo: doanh thu, lợi nhuận, theo tháng, CSV | `/bao-cao` | `src/pages/Revenue.tsx` (CSV ở `src/lib/reports.ts`) |
+| H01 | Chi phí (biểu đồ tròn, lịch sử) | `/chi-phi` | `src/pages/Expenses.tsx` |
+| H02 | Ghi chi phí | `/chi-phi/moi` | `src/pages/ExpenseNew.tsx` |
+| H03 | Số liệu tháng cũ | `/thang-cu` | `src/pages/Historical.tsx` |
+| P01 | Nhà cung cấp | `/nha-cung-cap?id=` | `src/pages/Suppliers.tsx` |
+| Q01 | Nhân viên (chủ cơ sở; admin gán chủ cơ sở) | `/nhan-vien` | `src/pages/Members.tsx` |
+| K01 | Quản trị (admin) | `/quan-tri` | `src/pages/AdminOverview.tsx` |
+| W01, W02 | Popup xác nhận, ô số âm | (dùng chung) | `confirmDialog`, `reasonDialog`, `DialogHost`, `NumberField`, `MoneyInput` trong `src/components/ui.tsx` |
+| E04 | Ngày đã chốt, mở khóa | `/doi-chieu?ngay=` | `src/pages/DayClose.tsx` |
 | F02 | Thông báo | `/thong-bao` | `src/pages/Notifications.tsx` |
 | F03 | Lịch sử | `/lich-su` | `src/pages/History.tsx` |
 | G01 | Tài khoản | `/tai-khoan` | `src/pages/Account.tsx` |
@@ -57,6 +66,9 @@ Dùng chung: `src/lib/app.tsx` (phiên, cơ sở, danh mục, hàng đợi, `bum
 | RPC `fn_ingredients_needed` | Không có; C02/C04 tính ở client từ `catalog.allProducts[].recipe` và `catalog.packaging` | Danh mục đã tải sẵn ở client, đỡ một lượt gọi |
 | Partition sẵn cho `stock_movements` | Chưa partition; chưa có `stock_balances_daily` | Làm khi vượt ngưỡng ở mục 7b |
 | Edge Function `send-digest-email` | Chưa có | Chờ SMTP/Resend |
+| Bảng `expenses`, `historical_entries`, `cash_opens`, `day_unlocks` (0013) | Chưa có trong thiết kế DB 1.2 | Theo biên bản 11/11. Tiền nhập hàng tự sinh dòng `expenses` (trigger `purchases_expense`). Chi phí, tháng cũ chỉ chủ cơ sở và admin đọc |
+| View `v_daily_pnl`, `v_monthly_pnl`, `v_monthly_expenses`, `v_daily_expenses` (0013) | Chưa có trong thiết kế | Doanh thu tháng = đơn trong app + doanh thu nhập tay tháng cũ |
+| `fn_reverse_cook_run` (0013) | Bỏ điều kiện "ngày chưa có đơn"; thay bằng: mọi món của mẻ còn tồn qua + mẻ khác − đã bán ≥ 0. Thêm `fn_cook_run_reversible` để ẩn nút | Biên bản C5 |
 | `fn_close_day(outlet_id, business_date, payload)` | `fn_close_day(p jsonb, p_commit boolean)`; `p_commit = false` trả bản xem trước, `true` thì ghi | Màn E03 cần xem trước khi chốt |
 | Đánh dấu tặng | `fn_mark_gift(p_order)`: đảo đơn gốc rồi tạo đơn `is_gift` giá 0 | Đúng story B-2 |
 | Giờ cron | `pg_cron` chạy theo UTC: `0 23 * * *` (06:00 VN), `0 14 * * *` (21:00 VN) | |
@@ -80,7 +92,8 @@ Dùng chung: `src/lib/app.tsx` (phiên, cơ sở, danh mục, hàng đợi, `bum
 
 1. Cài custom SMTP (Resend) cho Supabase, sửa 2 mẫu email có `{{ .Token }}`, đặt Email OTP Length = 6.
 2. Supabase → Authentication → URL Configuration: Site URL và Redirect URLs = địa chỉ Vercel.
-3. Mời người vào cơ sở: `select public.fn_invite_member('<outlet_id>', '<email>', 'staff');` trong SQL Editor (chưa có màn hình).
+3. Mời người vào cơ sở: màn Q01 `/nhan-vien` (sau khi chạy 0013). Email của Hà thêm vào `bootstrap_admins` khi có.
+5. Chạy migration 0012, 0013 trong SQL Editor (hoặc qua Supabase MCP) trước khi merge nhánh `ban1-mo-rong`.
 4. Khi chạy thật: nâng Supabase lên gói Pro để không bị tạm dừng sau 7 ngày không dùng, bật PITR.
 
 ---
@@ -90,3 +103,7 @@ Dùng chung: `src/lib/app.tsx` (phiên, cơ sở, danh mục, hàng đợi, `bum
 - Ngoài đơn, Hà có cần ghi nấu và nhập hàng khi mất mạng không, hay lúc đó thường đang ở nhà có wifi?
 - Cuối ngày Hà có nhận chuyển khoản không, và xem tổng chuyển khoản trong ngày ở app ngân hàng nào?
 - Nhân viên có được xem doanh thu tháng không (hiện chỉ xem hôm nay)?
+- Nhân viên có được ghi chi phí không? Hiện chỉ chủ cơ sở ghi và xem chi phí, lợi nhuận (nhân viên nhập kho thì tiền nhập hàng vẫn tự ghi).
+- Tháng cũ đã có đơn ghi trong app (đợt test) mà Hà lại nhập tổng doanh thu tháng đó thì sẽ bị cộng trùng. Có cần chặn không?
+- Giá món 5 (Mè đen · Đậu đen · Điều) và món 7 (Gạo lứt · Hạnh nhân · Điều); công thức món 5, 7 và công thức mới của Matcha, Cacao.
+- Tên món 1 và 4: "Hồng Đào" hay "Hồng Hào"? Code đang theo "Hồng Đào".
