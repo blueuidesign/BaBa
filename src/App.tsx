@@ -20,6 +20,7 @@ import Notifications from './pages/Notifications';
 import History from './pages/History';
 import Account from './pages/Account';
 import Expenses from './pages/Expenses';
+import Export from './pages/Export';
 import ExpenseNew from './pages/ExpenseNew';
 import Historical from './pages/Historical';
 import Suppliers from './pages/Suppliers';
@@ -56,6 +57,7 @@ export default function App() {
       <Route path="/thong-bao" element={<Notifications />} />
       <Route path="/lich-su" element={<History />} />
       <Route path="/tai-khoan" element={<Account />} />
+      <Route path="/bao-cao/xuat" element={<Export />} />
       <Route path="/chi-phi" element={<Expenses />} />
       <Route path="/chi-phi/moi" element={<ExpenseNew />} />
       <Route path="/thang-cu" element={<Historical />} />

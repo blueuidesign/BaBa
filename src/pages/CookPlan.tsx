@@ -135,14 +135,14 @@ export default function CookPlan() {
           </div>
         )}
         <div className="chips">
-          <button className={`chip ${kind === 'next_day' ? 'on' : ''}`} onClick={() => setKind('next_day')}>
-            Nấu cho ngày mai
-          </button>
           <button className={`chip ${kind === 'extra_today' ? 'on' : ''}`} onClick={() => setKind('extra_today')}>
             Nấu cho hôm nay
           </button>
+          <button className={`chip ${kind === 'next_day' ? 'on' : ''}`} onClick={() => setKind('next_day')}>
+            Nấu cho ngày mai
+          </button>
           <Link className="chip" to="/nau/me">
-            Mẻ syrup, cốt
+            Mẻ syrup
           </Link>
         </div>
         {!catalog || !data ? (

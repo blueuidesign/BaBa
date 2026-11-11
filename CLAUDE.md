@@ -25,7 +25,7 @@ App bán hàng và quản lý kho cho sữa hạt **Sữa lành từ BaBa**: PWA
 - Món ngừng bán: `products.status = 'retired'` và tắt trong `outlet_menu`. **Không xóa** sản phẩm, giá hay công thức, vì đơn và mẻ nấu cũ còn trỏ tới. Chai tồn của món ngừng bán vẫn phải đếm được ở đối chiếu cho tới khi hết.
 - Đổi giá hay công thức: thêm phiên bản mới với `valid_from`, đóng phiên bản cũ bằng `valid_to`. Không sửa số trong phiên bản cũ.
 - Món chưa có công thức: vẫn ghi nấu và bán được; nấu chỉ trừ bao bì, màn Nấu ghi "Chưa có công thức". Món chưa có giá thì để tắt trong menu.
-- Danh sách hiện hành: 9 món trong 4 dòng (xem `tasks/2026-11-11_code_giai-doan-1.md`, mục A). Ô số âm do người dùng gõ luôn bị từ chối; tồn kho do hệ thống tính được phép âm.
+- Danh sách hiện hành: 9 món trong 4 dòng (xem `tasks/2026-11-11_code_giai-doan-1.md`, mục A; tên 2 món mới và giá theo dòng ở `0014`). Giá theo dòng: Mầm Xanh 15K, Mầm Sáng 20K, Mầm Lành 25K, Mầm Trẻ 30K. Ô số âm do người dùng gõ luôn bị từ chối; tồn kho do hệ thống tính được phép âm.
 
 ## Cách làm việc
 
@@ -40,7 +40,7 @@ App bán hàng và quản lý kho cho sữa hạt **Sữa lành từ BaBa**: PWA
 - React 19 + Vite 7 + TypeScript ~5.9, react-router 7, `@supabase/supabase-js`, `vite-plugin-pwa`. Không có thư viện UI; style ở `src/styles.css`.
 - `npm run dev` · `npm run typecheck` · `npm run build`. Chạy typecheck và build trước mỗi commit.
 - Biến môi trường: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (xem `.env.example`; key là publishable key, để lộ được).
-- Supabase project ref `fsqpajvjjmpyrgllrhgz` (Singapore). Migration ở `supabase/migrations/`, đã chạy tới `0013` (11/11/2026). Migration mới đánh số từ `0014`.
+- Supabase project ref `fsqpajvjjmpyrgllrhgz` (Singapore). Migration ở `supabase/migrations/`, đã chạy tới `0015` (11/11/2026); `0016_push_keys` chờ chạy tay (ghi Vault). Migration mới đánh số từ `0017`.
 
 ## Ràng buộc kỹ thuật bắt buộc
 

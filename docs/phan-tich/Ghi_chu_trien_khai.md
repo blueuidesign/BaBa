@@ -16,6 +16,8 @@ Tài liệu này ghi lại **code thực tế khác thiết kế ở đâu**, m�
 | Deploy | Repo đã nối Vercel; cần 2 biến môi trường (xem README) |
 | Đăng nhập bằng mã 6 số | **Đang chặn.** Supabase gói Free không cho sửa mẫu email khi chưa có custom SMTP, mà mẫu mặc định chỉ có link. Cần cài SMTP Resend rồi thêm `{{ .Token }}` vào mẫu "Magic link or OTP" và "Confirm sign up". Tạm thời bấm link trong email vẫn đăng nhập được (app tự nhận phiên từ URL), điều kiện Site URL trỏ đúng địa chỉ Vercel |
 | Email nhắc đặt hàng | Chưa có. Thông báo chỉ hiện trong app (`notifications.emailed_at` luôn null) |
+| Migration 0014 (tên 2 món mới, giá theo dòng 15/20/25/30K, bỏ cốt cold brew), 0015 (trigger gửi push qua pg_net) | Đã chạy 11/11/2026 |
+| Thông báo đẩy (Web Push) | Code đã có: `src/sw.ts` (service worker nhận push), `src/lib/push.ts`, `src/components/PushCard.tsx` (nút bật ở Tài khoản và Thông báo), Edge Function `supabase/functions/send-push`, migration `0016_push_keys.sql`. **Chưa chạy được**: còn thiếu chạy `0016` và deploy `send-push` (verify_jwt = false). Xem mục 5 |
 
 ---
 
@@ -39,7 +41,8 @@ Bản thiết kế gốc là artifact Design `5a78cd59-3e4a-4a15-b6be-f7d2cb82e6
 | D04 | Chai đang có | `/kho/chai` | `src/pages/Bottles.tsx` |
 | D05 | Kiểm kê | `/kho/kiem-ke` | `src/pages/StockCount.tsx` |
 | E01–E03 | Đối chiếu cuối ngày (3 bước trong một trang) | `/doi-chieu?ngay=` | `src/pages/DayClose.tsx` |
-| F01 | Báo cáo: doanh thu, lợi nhuận, theo tháng, CSV | `/bao-cao` | `src/pages/Revenue.tsx` (CSV ở `src/lib/reports.ts`) |
+| F01 | Báo cáo: doanh thu, lợi nhuận, theo tháng | `/bao-cao` | `src/pages/Revenue.tsx` |
+| F04 | Xuất file Excel (CSV) | `/bao-cao/xuat` | `src/pages/Export.tsx` (CSV ở `src/lib/reports.ts`) |
 | H01 | Chi phí (biểu đồ tròn, lịch sử) | `/chi-phi` | `src/pages/Expenses.tsx` |
 | H02 | Ghi chi phí | `/chi-phi/moi` | `src/pages/ExpenseNew.tsx` |
 | H03 | Số liệu tháng cũ | `/thang-cu` | `src/pages/Historical.tsx` |
@@ -93,7 +96,8 @@ Dùng chung: `src/lib/app.tsx` (phiên, cơ sở, danh mục, hàng đợi, `bum
 1. Cài custom SMTP (Resend) cho Supabase, sửa 2 mẫu email có `{{ .Token }}`, đặt Email OTP Length = 6.
 2. Supabase → Authentication → URL Configuration: Site URL và Redirect URLs = địa chỉ Vercel.
 3. Mời người vào cơ sở: màn Q01 `/nhan-vien` (sau khi chạy 0013). Email của Hà thêm vào `bootstrap_admins` khi có.
-4. Khi chạy thật: nâng Supabase lên gói Pro để không bị tạm dừng sau 7 ngày không dùng, bật PITR.
+4. Bật thông báo đẩy: chạy `supabase/migrations/0016_push_keys.sql` trong SQL Editor (sinh khóa hook trong Vault), rồi deploy Edge Function: `supabase functions deploy send-push --no-verify-jwt`. Lần gọi đầu, function tự sinh cặp khóa VAPID và cất vào Vault. Kiểm tra: iPhone đã "Thêm vào MH chính" → Tài khoản → Bật thông báo → Gửi thử.
+6. Khi chạy thật: nâng Supabase lên gói Pro để không bị tạm dừng sau 7 ngày không dùng, bật PITR.
 
 ---
 

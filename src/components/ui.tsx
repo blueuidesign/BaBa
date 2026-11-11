@@ -96,18 +96,30 @@ export function Header({ title, sub, back, right }: { title: string; sub?: React
 export function BellLink() {
   const { outlet, profile, dataVersion } = useApp();
   const [n, setN] = useState(0);
+  const [tick, setTick] = useState(0);
+  // Quay lại app (mở từ màn hình khóa, đổi tab) thì đếm lại thông báo
+  useEffect(() => {
+    const on = () => document.visibilityState === 'visible' && setTick((t) => t + 1);
+    document.addEventListener('visibilitychange', on);
+    return () => document.removeEventListener('visibilitychange', on);
+  }, []);
   useEffect(() => {
     if (!outlet || !profile) return;
     import('../lib/supabase').then(async ({ supabase }) => {
-      const since = new Date(Date.now() - 14 * 86400000).toISOString();
+      // Cùng mốc 30 ngày với màn Thông báo
+      const since = new Date(Date.now() - 30 * 86400000).toISOString();
       const [{ data: ns }, { data: rs }] = await Promise.all([
         supabase.from('notifications').select('id').eq('outlet_id', outlet.id).gte('created_at', since),
         supabase.from('notification_reads').select('notification_id').eq('user_id', profile.id)
       ]);
       const read = new Set((rs || []).map((r: any) => r.notification_id));
-      setN((ns || []).filter((x: any) => !read.has(x.id)).length);
+      const count = (ns || []).filter((x: any) => !read.has(x.id)).length;
+      setN(count);
+      // Số trên biểu tượng app ngoài màn hình chính (iPhone, Android có hỗ trợ)
+      const nav = navigator as any;
+      if (nav.setAppBadge) (count ? nav.setAppBadge(count) : nav.clearAppBadge?.())?.catch?.(() => undefined);
     });
-  }, [outlet, profile, dataVersion]);
+  }, [outlet, profile, dataVersion, tick]);
   return (
     <Link to="/thong-bao" className="icon-btn" aria-label={`Thông báo, ${n} chưa đọc`}>
       <Icon name="bell" size={24} />
