@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LINES, useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
@@ -35,26 +35,47 @@ export default function CookPlan() {
       const avg: Record<string, number> = {};
       (sales.data || []).forEach((r: any) => (avg[r.product_id] = (avg[r.product_id] || 0) + r.qty));
       Object.keys(avg).forEach((k) => (avg[k] = Math.ceil(avg[k] / Math.max(days, 1))));
-      return { avg, days, plan: plan.data as any, recent: (recent.data || [])[0] as any };
+      const last = (recent.data || [])[0] as any;
+      let canUndo = false;
+      if (last) {
+        const { data: ok } = await supabase.rpc('fn_cook_run_reversible', { p_run: last.id });
+        canUndo = !!ok;
+      }
+      return { avg, days, plan: plan.data as any, recent: last, canUndo };
     },
     [kind]
   );
 
-  const suggestion = useMemo(() => {
-    const s: Record<string, number> = {};
-    (catalog?.products || []).forEach((p) => (s[p.id] = data?.days ? data.avg[p.id] || 0 : 6));
-    return s;
-  }, [catalog, data]);
+  // Nháp lưu trên máy theo (cơ sở, ngày, loại) để khóa màn hình hay đổi tab không mất số
+  const draftKey = outlet ? `kho-baba-cook-draft:${outlet.id}:${planDate}:${kind}` : '';
+  const [loadedKey, setLoadedKey] = useState('');
 
-  // Mở lại thì thấy số đã nhập; chưa có thì lấy gợi ý
+  // Mở lại: ưu tiên nháp trên máy, rồi kế hoạch đã lưu; không có thì để 0
   useEffect(() => {
-    if (!data || !catalog) return;
-    if (data.plan?.cook_plan_lines?.length) {
-      const q: Record<string, number> = {};
-      data.plan.cook_plan_lines.forEach((l: any) => (q[l.product_id] = l.planned_qty));
-      setQty(q);
-    } else setQty(suggestion);
-  }, [data, catalog, suggestion]);
+    if (!data || !catalog || !draftKey) return;
+    let q: Record<string, number> = {};
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) q = JSON.parse(raw);
+    } catch {
+      q = {};
+    }
+    if (!Object.keys(q).length && data.plan?.cook_plan_lines?.length) data.plan.cook_plan_lines.forEach((l: any) => (q[l.product_id] = l.planned_qty));
+    setQty(q);
+    setLoadedKey(draftKey);
+    // chỉ chạy khi đổi ngày/loại hoặc tải xong, không chạy lại khi dữ liệu nền làm mới
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!data, !!catalog, draftKey]);
+
+  useEffect(() => {
+    if (!draftKey || loadedKey !== draftKey) return;
+    try {
+      if (Object.values(qty).some((v) => v > 0)) localStorage.setItem(draftKey, JSON.stringify(qty));
+      else localStorage.removeItem(draftKey);
+    } catch {
+      /* bộ nhớ máy đầy: bỏ qua */
+    }
+  }, [qty, draftKey, loadedKey]);
 
   if (!outlet) return null;
   const products = catalog?.products || [];
@@ -104,11 +125,13 @@ export default function CookPlan() {
           <div className="alert ok" role="status">
             <Icon name="check" size={20} sw={2} />
             <span className="grow">
-              Đã ghi nấu {recentBottles} chai cho ngày {ddmm(data.recent.business_date)}. Ghi nhầm thì hoàn tác trong 10 phút.
+              Đã ghi nấu {recentBottles} chai cho ngày {ddmm(data.recent.business_date)}. {data.canUndo ? 'Ghi nhầm thì hoàn tác trong 10 phút.' : 'Đã bán một phần số chai này nên không hoàn tác được; sửa bằng đếm chai cuối ngày.'}
             </span>
-            <button className="btn quiet" style={{ minHeight: 32 }} onClick={undoRecent}>
-              Hoàn tác
-            </button>
+            {data.canUndo && (
+              <button className="btn quiet" style={{ minHeight: 32 }} onClick={undoRecent}>
+                Hoàn tác
+              </button>
+            )}
           </div>
         )}
         <div className="chips">
@@ -117,9 +140,6 @@ export default function CookPlan() {
           </button>
           <button className={`chip ${kind === 'extra_today' ? 'on' : ''}`} onClick={() => setKind('extra_today')}>
             Nấu cho hôm nay
-          </button>
-          <button className="chip" onClick={() => setQty(suggestion)}>
-            <Icon name="spark" size={16} /> Lấy theo 7 ngày
           </button>
           <Link className="chip" to="/nau/me">
             Mẻ syrup, cốt
@@ -140,7 +160,10 @@ export default function CookPlan() {
                       <span className="dot-color" style={{ background: p.color || '#ddd' }} />
                       <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
                         <span className="strong">{p.name}</span>
-                        <span className="xs muted">{data.days ? `TB ${data.days} ngày: ${data.avg[p.id] || 0} chai` : 'Gợi ý mẫu: 6 chai'}</span>
+                        <span className="xs muted">
+                          {data.days ? `TB ${data.days} ngày: ${data.avg[p.id] || 0} chai` : 'Chưa có số bán để tham khảo'}
+                          {!p.recipe.length && ' · Chưa có công thức, kho chỉ trừ bao bì'}
+                        </span>
                       </span>
                       <Stepper value={qty[p.id] || 0} onChange={(v) => setQty((q) => ({ ...q, [p.id]: v }))} label={`chai ${p.short_name}`} editable />
                     </div>
@@ -150,7 +173,7 @@ export default function CookPlan() {
             })}
           </section>
         )}
-        <p className="xs muted">Gợi ý lấy từ số chai bán trung bình các ngày gần nhất của cơ sở này. Bạn sửa tự do; kế hoạch chỉ để tính nguyên liệu, chưa trừ kho.</p>
+        <p className="xs muted">Số trung bình lấy từ các ngày gần nhất của cơ sở này để bạn tham khảo. Kế hoạch chỉ để tính nguyên liệu, chưa trừ kho. Số đang nhập được giữ trên máy cho tới khi ghi nấu.</p>
       </main>
       <div className="bar">
         {err && <span className="err">{err}</span>}

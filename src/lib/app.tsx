@@ -9,7 +9,7 @@ export type OutletAccess = Outlet & { role: 'owner' | 'staff' | 'admin' };
 export type Product = {
   id: string; code: string; name: string; short_name: string; line: string; color: string | null;
   image_url: string | null; has_caffeine: boolean; yield_per_jar: number; sort_order: number; kind: string;
-  price: number; recipe: { ingredient_id: string; qty: number }[];
+  status: string; price: number; recipe: { ingredient_id: string; qty: number }[];
 };
 export type Ingredient = {
   id: string; code: string; name: string; grp: string; unit: string; purchase_unit: string;
@@ -106,7 +106,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSession(data.session);
       if (!data.session) setLoading(false);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((e, s) => {
+      // Làm mới token (khi mở lại màn hình) với cùng người dùng: giữ nguyên session cũ để
+      // không tải lại cơ sở và danh mục, tránh mất số đang nhập dở.
+      if (e === 'TOKEN_REFRESHED' || (e === 'SIGNED_IN' && s)) {
+        setSession((old) => (old && s && old.user.id === s.user.id ? old : s));
+        return;
+      }
       setSession(s);
       if (!s) {
         setProfile(null);
@@ -160,7 +166,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (async () => {
       const today = vnToday();
       const [prods, menu, prices, recipes, ings, brs, pack] = await Promise.all([
-        supabase.from('products').select('*').eq('status', 'active').order('sort_order'),
+        supabase.from('products').select('*').order('sort_order'),
         supabase.from('outlet_menu').select('product_id,enabled,sort_order').eq('outlet_id', outlet.id),
         supabase.from('product_prices').select('product_id,price_vnd,price_list_id,valid_from,valid_to'),
         supabase.from('recipes').select('id,product_id,version,valid_from,valid_to,status,recipe_items(ingredient_id,qty)').eq('status', 'approved'),
@@ -189,8 +195,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         recipe: recipeOf(p.id)
       }));
       const menuMap = new Map((menu.data || []).map((m: any) => [m.product_id, m]));
+      // Món đã ngừng bán vẫn nằm trong allProducts để đơn cũ hiện đúng tên
       const products = allProducts
-        .filter((p) => menuMap.get(p.id)?.enabled)
+        .filter((p) => p.status !== 'retired' && menuMap.get(p.id)?.enabled)
         .sort((a, b) => (menuMap.get(a.id)?.sort_order ?? a.sort_order) - (menuMap.get(b.id)?.sort_order ?? b.sort_order));
       const ingredients: Ingredient[] = (ings.data || []).map((i: any) => ({ ...i, purchase_factor: Number(i.purchase_factor) }));
       setCatalog({

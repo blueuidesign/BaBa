@@ -13,7 +13,8 @@ export default function Outlets() {
   const [model, setModel] = useState('M1_cart');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const canCreate = isAdmin || outlets.some((o) => o.role === 'owner');
+  // Chỉ admin tạo cơ sở mới (biên bản 11/11, CD9). DB cũng chặn ở fn_create_outlet.
+  const canCreate = isAdmin;
 
   async function create() {
     setErr(null);

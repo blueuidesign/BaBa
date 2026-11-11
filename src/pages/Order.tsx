@@ -5,7 +5,7 @@ import { fetchBottles, fetchDaySales, useLoad } from '../lib/data';
 import { callOrQueue, enqueue, type QueuedCall } from '../lib/queue';
 import { errorText } from '../lib/supabase';
 import { uuid, vnd, vnToday } from '../lib/format';
-import { BellLink, Bottle, Header, Icon, Loading, Nav } from '../components/ui';
+import { BellLink, Bottle, Header, Icon, Loading, Nav, confirmDialog } from '../components/ui';
 
 export default function Order() {
   const { outlet, catalog, queue, bump } = useApp();
@@ -198,8 +198,8 @@ export default function Order() {
             <button
               className="btn quiet block"
               style={{ color: 'var(--danger)' }}
-              onClick={() => {
-                if (confirm('Bỏ đơn này? Đơn sẽ không được ghi.')) {
+              onClick={async () => {
+                if (await confirmDialog({ title: 'Bỏ đơn này?', text: 'Đơn sẽ không được ghi và không gửi lên máy chủ.', ok: 'Bỏ đơn', cancel: 'Giữ lại', danger: true })) {
                   setStuck(null);
                   setCounts({});
                 }

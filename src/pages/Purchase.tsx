@@ -4,7 +4,7 @@ import { GROUPS, useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { useLoad } from '../lib/data';
 import { num, unitLabel, uuid, vnd } from '../lib/format';
-import { Header, Icon, Nav, NumberField } from '../components/ui';
+import { Header, Icon, Nav, NumberField, confirmDialog } from '../components/ui';
 
 type Line = { key: string; ingredient_id: string; qty: string; price: string; expires: string };
 
@@ -48,7 +48,7 @@ export default function Purchase() {
     });
     const sig = JSON.stringify(payloadLines.map((l) => [l.ingredient_id, l.qty]));
     if (!force && lastSaved && lastSaved.sig === sig && Date.now() - lastSaved.at < 120000) {
-      if (!confirm('Bạn vừa nhập giống hệt cách đây chưa tới 2 phút. Vẫn nhập thêm lần nữa?')) return;
+      if (!(await confirmDialog({ title: 'Nhập thêm lần nữa?', text: 'Bạn vừa nhập giống hệt cách đây chưa tới 2 phút. Nếu đây là lần mua khác thì cứ nhập.', ok: 'Vẫn nhập', cancel: 'Thôi' }))) return;
     }
     setBusy(true);
     const { error } = await supabase.rpc('fn_post_purchase', {

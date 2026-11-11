@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { GROUPS, useApp } from '../lib/app';
 import { fetchStock, useLoad, type StockRow } from '../lib/data';
 import { ddmm, num, qty as fq } from '../lib/format';
-import { Empty, Header, Icon, Loading, Nav } from '../components/ui';
+import { Header, Icon, Loading, Nav } from '../components/ui';
 
 export function StockLine({ s }: { s: StockRow }) {
   const scale = Math.max(s.min_qty * 3, s.qty_on_hand, 1);
@@ -36,7 +36,8 @@ export function StockLine({ s }: { s: StockRow }) {
 
 export default function Stock() {
   const { outlet } = useApp();
-  const [filter, setFilter] = useState<string>('all');
+  const [params] = useSearchParams();
+  const [filter, setFilter] = useState<string>(params.get('loc') === 'can-dat' ? 'need' : 'all');
   const { data, loading } = useLoad((oid) => fetchStock(oid));
   if (!outlet) return null;
 
@@ -81,19 +82,28 @@ export default function Stock() {
         </div>
         {loading && !data ? (
           <Loading />
-        ) : empty ? (
-          <Empty icon="box" title="Kho chưa có gì" text="Danh mục vật tư và công thức đã có sẵn từ BaBa. Nhập lần mua đầu tiên, hoặc kiểm kê để nhập số đang có.">
-            <Link to="/kho/nhap" className="btn">
-              <Icon name="plus" size={20} sw={2.2} /> Nhập hàng lần đầu
-            </Link>
-            <Link to="/kho/kiem-ke" className="small strong" style={{ textDecoration: 'none' }}>
-              Hoặc kiểm kê để nhập số đang có
-            </Link>
-          </Empty>
         ) : (
           <>
+            {empty && (
+              <section className="card">
+                <strong>Kho chưa có số nào</strong>
+                <span className="small muted">Danh mục vật tư bên dưới đã có sẵn từ BaBa. Nhập lần mua đầu tiên, hoặc kiểm kê để ghi số đang có.</span>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <Link to="/kho/nhap" className="btn">
+                    <Icon name="plus" size={20} sw={2.2} /> Nhập hàng lần đầu
+                  </Link>
+                  <Link to="/kho/kiem-ke" className="btn secondary">Kiểm kê</Link>
+                </div>
+              </section>
+            )}
+            <Link to="/nha-cung-cap" className="list-row card tight" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <span className="ico-box"><Icon name="truck" size={20} /></span>
+              <span className="grow strong">Nhà cung cấp</span>
+              <span className="small muted">Ai cung cấp món nào</span>
+              <Icon name="chev" size={20} style={{ color: 'var(--ink-muted)' }} />
+            </Link>
             {[...bySupplier.entries()].map(([sup, items]) => (
-              <Link key={sup} to={`/kho/${items[0].ingredient_id}`} className="alert warn" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
+              <Link key={sup} to={items[0].supplier_id ? `/nha-cung-cap?id=${items[0].supplier_id}` : `/kho/${items[0].ingredient_id}`} className="alert warn" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
                 <Icon name="truck" size={22} sw={2} />
                 <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <strong>
