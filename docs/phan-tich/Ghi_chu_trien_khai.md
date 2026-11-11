@@ -17,7 +17,7 @@ Tài liệu này ghi lại **code thực tế khác thiết kế ở đâu**, m�
 | Đăng nhập bằng mã 6 số | **Đang chặn.** Supabase gói Free không cho sửa mẫu email khi chưa có custom SMTP, mà mẫu mặc định chỉ có link. Cần cài SMTP Resend rồi thêm `{{ .Token }}` vào mẫu "Magic link or OTP" và "Confirm sign up". Tạm thời bấm link trong email vẫn đăng nhập được (app tự nhận phiên từ URL), điều kiện Site URL trỏ đúng địa chỉ Vercel |
 | Email nhắc đặt hàng | Chưa có. Thông báo chỉ hiện trong app (`notifications.emailed_at` luôn null) |
 | Migration 0014 (tên 2 món mới, giá theo dòng 15/20/25/30K, bỏ cốt cold brew), 0015 (trigger gửi push qua pg_net) | Đã chạy 11/11/2026 |
-| Thông báo đẩy (Web Push) | Code đã có: `src/sw.ts` (service worker nhận push), `src/lib/push.ts`, `src/components/PushCard.tsx` (nút bật ở Tài khoản và Thông báo), Edge Function `supabase/functions/send-push`, migration `0016_push_keys.sql`. **Chưa chạy được**: còn thiếu chạy `0016` và deploy `send-push` (verify_jwt = false). Xem mục 5 |
+| Thông báo đẩy (Web Push) | Code đã có: `src/sw.ts` (service worker nhận push), `src/lib/push.ts`, `src/components/PushCard.tsx` (nút bật ở Tài khoản và Thông báo), Edge Function `supabase/functions/send-push`, migration `0016_push_keys.sql`. Đã chạy `0016` và deploy `send-push` (verify_jwt = false) ngày 11/11/2026. Đã thử: lấy khóa công khai (200), gọi từ DB với khóa hook đúng (qua được bước kiểm khóa). Còn thử trên iPhone thật |
 
 ---
 
