@@ -21,6 +21,7 @@
 
 - [ ] Popup cảnh báo dùng chung; thay mọi `confirm()` trong app.
 - [ ] Chi phí: ghi, danh sách, thống kê theo loại.
+- [ ] Nhập số liệu tháng cũ (chủ cơ sở và admin): bảng `historical_entries` nối thêm, gồm (cơ sở, tháng, loại doanh thu hoặc chi phí, loại chi, số tiền, ghi chú). Chỉ nhập cho tháng trước tháng hiện tại; sai thì tạo bản đảo. Báo cáo cộng số liệu này vào, có nhãn "Nhập tay".
 - [ ] Báo cáo cơ sở: doanh thu, chi phí, lợi nhuận.
 - [ ] CSV Theo tháng và Theo ngày.
 - [ ] Báo cáo và xuất file toàn bộ cơ sở cho admin.

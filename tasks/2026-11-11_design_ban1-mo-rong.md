@@ -61,6 +61,7 @@ Danh sách đã chốt, 9 món trong 4 dòng:
 - [ ] DS9 · Trang chủ (A04): ô tiền mặt đầu ngày; số đơn dạng "6 đơn · 1 tặng"; Việc hôm nay gom mọi "Nên đặt" thành một dòng; dòng cam "Ngày … đang mở lại, cần chốt lại". **Giữ nguyên** số chai to hơn số tiền.
 - [ ] DS10 · Tồn kho (D01): cơ sở mới hiện đủ danh sách vật tư (số 0) kèm thẻ "Nhập lần đầu" ở đầu; bỏ S05. **Giữ nguyên** cách giữ chip như hiện tại.
 - [ ] DS11 · Tài khoản (G01): mục theo vai trò. Ai cũng có Nhà cung cấp; chủ cơ sở có thêm Nhân viên; admin có thêm Quản trị và Báo cáo nhiều cơ sở. Chủ cơ sở không thấy nút tạo cơ sở.
+- [ ] DS13 · Nhập số liệu tháng cũ (mới, cho chủ cơ sở): dùng khi chuyển từ Knote sang. Một danh sách theo tháng các khoản đã nhập, cùng bottom sheet thêm khoản: chọn **Doanh thu** hoặc **Chi phí** (có loại chi), số tiền, tháng. Chỉ nhập được cho các tháng trước tháng hiện tại. Số liệu này cộng vào báo cáo và mang nhãn "Nhập tay".
 - [ ] DS12 · N01: cập nhật sơ đồ điều hướng.
 
 Tham khảo Knote (ảnh trong biên bản) cho chi phí và lợi nhuận, nhưng vẽ theo phong cách Kho BaBa, không chép giao diện Knote.

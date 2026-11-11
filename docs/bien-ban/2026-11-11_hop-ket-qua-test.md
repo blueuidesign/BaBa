@@ -241,3 +241,9 @@ Món không ghi nguyên liệu thì giữ công thức cũ. Công thức của m
 - giá bán món 5, món 7;
 - tên món 1 và 4 là "Hồng Đào" hay "Hồng Hào" như cũ;
 - công thức cho món 5, 7, 8, 9.
+
+## 9. Bổ sung (10:22): nhập số liệu tháng cũ
+
+Chủ cơ sở cần nhập doanh thu và chi phí của các tháng trước để báo cáo đủ số liệu khi chuyển từ Knote sang. Cách nhập phải đơn giản, gồm ba thứ: loại (doanh thu hoặc chi phí), số tiền, tháng. Việc giao: DS13 (design), giai đoạn 2 (code).
+
+Tùng giao Claude làm luôn phần thiết kế, code và deploy, tự gộp các PR cần thiết, không chờ duyệt thiết kế riêng.
