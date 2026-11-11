@@ -1,6 +1,6 @@
 # Task code · Giai đoạn 2: chi phí, lợi nhuận, quản lý người dùng và nhà cung cấp
 
-**Trạng thái:** Đã làm trên nhánh `ban1-mo-rong` (11/11), trừ L5 và cập nhật tài liệu DB/User Stories. Migration 0012, 0013 chờ chạy trên Supabase
+**Trạng thái:** Đã làm trên nhánh `ban1-mo-rong` (11/11), trừ L5 và cập nhật tài liệu DB/User Stories. Migration 0012, 0013 đã chạy 11/11
 
 ## Đọc trước
 

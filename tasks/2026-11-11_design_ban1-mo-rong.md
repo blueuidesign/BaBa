@@ -1,6 +1,6 @@
 # Task design · Bản 1 mở rộng và danh sách món mới
 
-**Trạng thái:** Đã làm trên nhánh `ban1-mo-rong` (11/11); migration 0012, 0013 chờ chạy trên Supabase · **Ngày giao:** 11/11/2026 · **Người duyệt:** Tùng
+**Trạng thái:** Đã làm trên nhánh `ban1-mo-rong` (11/11); migration 0012, 0013 đã chạy 11/11 · **Ngày giao:** 11/11/2026 · **Người duyệt:** Tùng
 
 ## Đọc trước
 

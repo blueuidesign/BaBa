@@ -1,6 +1,6 @@
 # Task code · Giai đoạn 1: sửa lỗi test và đổi danh sách món
 
-**Trạng thái:** Đã làm trên nhánh `ban1-mo-rong` (11/11); migration 0012, 0013 chờ chạy trên Supabase · **Ngày giao:** 11/11/2026 · **Làm song song với task design**
+**Trạng thái:** Đã làm trên nhánh `ban1-mo-rong` (11/11); migration 0012, 0013 đã chạy 11/11 · **Ngày giao:** 11/11/2026 · **Làm song song với task design**
 
 ## Đọc trước
 

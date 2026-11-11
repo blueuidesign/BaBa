@@ -11,7 +11,7 @@ Tài liệu này ghi lại **code thực tế khác thiết kế ở đâu**, m�
 | Hạng mục | Trạng thái |
 | --- | --- |
 | Database (migration 0001–0011) | Đã chạy trên Supabase project `fsqpajvjjmpyrgllrhgz`. Đã kiểm thử luồng nấu → bán → đối chiếu → chuyển tồn trong transaction rollback |
-| Migration 0012 (thực đơn 9 món), 0013 (chi phí, tháng cũ, tiền đầu ngày, mở khóa ngày, quyền) | **Đã viết, chưa chạy** trên Supabase (11/11). Frontend nhánh `ban1-mo-rong` cần 2 migration này; chạy migration trước rồi mới merge |
+| Migration 0012 (thực đơn 9 món), 0013 (chi phí, tháng cũ, tiền đầu ngày, mở khóa ngày, quyền) | Đã chạy trên Supabase 11/11/2026. Đã thử ghi/hủy chi phí, nhập tháng cũ (chặn tháng hiện tại), tiền đầu ngày, danh sách người, lãi lỗ tháng trong transaction rollback |
 | Frontend 18 trang | Đã code, `npm run typecheck` và `npm run build` sạch. Chưa có test tự động |
 | Deploy | Repo đã nối Vercel; cần 2 biến môi trường (xem README) |
 | Đăng nhập bằng mã 6 số | **Đang chặn.** Supabase gói Free không cho sửa mẫu email khi chưa có custom SMTP, mà mẫu mặc định chỉ có link. Cần cài SMTP Resend rồi thêm `{{ .Token }}` vào mẫu "Magic link or OTP" và "Confirm sign up". Tạm thời bấm link trong email vẫn đăng nhập được (app tự nhận phiên từ URL), điều kiện Site URL trỏ đúng địa chỉ Vercel |
@@ -93,7 +93,6 @@ Dùng chung: `src/lib/app.tsx` (phiên, cơ sở, danh mục, hàng đợi, `bum
 1. Cài custom SMTP (Resend) cho Supabase, sửa 2 mẫu email có `{{ .Token }}`, đặt Email OTP Length = 6.
 2. Supabase → Authentication → URL Configuration: Site URL và Redirect URLs = địa chỉ Vercel.
 3. Mời người vào cơ sở: màn Q01 `/nhan-vien` (sau khi chạy 0013). Email của Hà thêm vào `bootstrap_admins` khi có.
-5. Chạy migration 0012, 0013 trong SQL Editor (hoặc qua Supabase MCP) trước khi merge nhánh `ban1-mo-rong`.
 4. Khi chạy thật: nâng Supabase lên gói Pro để không bị tạm dừng sau 7 ngày không dùng, bật PITR.
 
 ---
