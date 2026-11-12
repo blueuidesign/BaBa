@@ -1,7 +1,8 @@
 -- 0019 · Nhập chi phí cũ vào cơ sở Phan Văn Hớn
 -- Nguồn: claude/data/BaBa_Doi_chieu_chi_phi_Excel.csv (82 dòng) và claude/data/BaBa_Chi_phi_Knote_03-11_11-11.csv (23 dòng).
 -- Sinh bằng scripts/import/build_import_sql.py. client_id = uuid v5 theo nguồn + STT nên chạy lại không trùng.
--- Chỉ ghi tiền, không tạo phiếu nhập, không cộng kho. Quyết định 12/11: STT 69 là chi phí; STT 82 vào Nguyên liệu khác.
+-- Chỉ ghi tiền, không tạo phiếu nhập, không cộng kho. Quyết định của Tùng 12/11: Excel STT 69 là chi phí; STT 82 vào
+-- Nguyên liệu khác; Knote: đá vào Phụ liệu, đường là đường thốt nốt, 2 dòng "4 chai mẫu" không trùng.
 -- Tổng theo nguồn Excel:
 --   excel_I: 1.909.500
 --   excel_II: 16.343.000
@@ -107,29 +108,29 @@ select o.id, v.cid, v.d, c.legacy_category, v.amt, v.note, 'import', 'active', '
        c.id, v.item, v.ing, v.ref, v.rn
 from public.outlets o
 cross join lateral (values
-('f29422e4-ce61-5dc3-92cf-2814d2e7d121'::uuid, '2026-11-03'::date, 'nước đá', 30000, 'khac', null, '[Knote · Nước] nước đá · CHỜ CHỐT loại cho đá lạnh', 'knote_cp', 1),
-('2a23e89c-eba3-5275-821b-7e957d11430a'::uuid, '2026-11-04'::date, 'đường', 231000, 'phu_lieu', null, '[Knote · Nhập hàng] đường · chưa rõ đường phèn hay thốt nốt', 'knote_cp', 2),
+('f29422e4-ce61-5dc3-92cf-2814d2e7d121'::uuid, '2026-11-03'::date, 'nước đá', 30000, 'phu_lieu', null, '[Knote · Nước] nước đá · Tùng 12/11: đá xếp Phụ liệu', 'knote_cp', 1),
+('2a23e89c-eba3-5275-821b-7e957d11430a'::uuid, '2026-11-04'::date, 'đường', 231000, 'phu_lieu', (select id from ingredients where code = 'thot_not' and org_id = o.org_id), '[Knote · Nhập hàng] đường · Tùng 12/11: đường thốt nốt', 'knote_cp', 2),
 ('df08819e-c031-512b-8608-e849f792c9fc'::uuid, '2026-11-04'::date, 'Dù', 880000, 'dt_xe_quay', null, '[Knote · Khác] Dù', 'knote_cp', 3),
 ('c2c7867d-5114-5ba4-8660-f6c4db74dff0'::uuid, '2026-11-04'::date, 'mặt bằng', 5000000, 'mat_bang', null, '[Knote · Mặt bằng] mặt bằng · CHỜ HỎI: tiền thuê tháng 11 hay tiền cọc', 'knote_cp', 4),
-('e377ad0f-f90f-5c1a-b660-2ce3a1230db1'::uuid, '2026-11-05'::date, '4 chai mẫu', 35000, 'dt_dung_cu', null, '[Knote · Khác] 4 chai mẫu · CHỜ HỎI: chai mẫu dùng làm gì', 'knote_cp', 5),
-('7ded5348-0129-5f4b-a10a-d89d2cd3eda5'::uuid, '2026-11-05'::date, '4 chai mẫu', 35000, 'dt_dung_cu', null, '[Knote · Khác] 4 chai mẫu · CHỜ HỎI: có ghi trùng dòng trên không', 'knote_cp', 6),
+('e377ad0f-f90f-5c1a-b660-2ce3a1230db1'::uuid, '2026-11-05'::date, '4 chai mẫu', 35000, 'dt_dung_cu', null, '[Knote · Khác] 4 chai mẫu · Tùng 12/11: không trùng, mua 2 lần', 'knote_cp', 5),
+('7ded5348-0129-5f4b-a10a-d89d2cd3eda5'::uuid, '2026-11-05'::date, '4 chai mẫu', 35000, 'dt_dung_cu', null, '[Knote · Khác] 4 chai mẫu · Tùng 12/11: không trùng, mua 2 lần', 'knote_cp', 6),
 ('03423be7-9c0d-55f2-a680-0109f2dca674'::uuid, '2026-11-05'::date, 'matcha', 128000, 'phu_lieu', (select id from ingredients where code = 'matcha' and org_id = o.org_id), '[Knote · Nhập hàng] matcha', 'knote_cp', 7),
-('9a6c13c6-99be-5645-8930-8fb5aa8ef0f7'::uuid, '2026-11-05'::date, 'nhập hàng', 485000, 'nl_chinh', null, '[Knote · Nhập hàng] nhập hàng · CHỜ HỎI: Knote không ghi mua gì, tạm xếp nguyên liệu chính', 'knote_cp', 8),
-('da3f511d-b1b2-56ec-8fdc-24de3b165260'::uuid, '2026-11-05'::date, 'nước đá', 20000, 'khac', null, '[Knote · Nước] nước đá · CHỜ CHỐT loại cho đá lạnh', 'knote_cp', 9),
+('9a6c13c6-99be-5645-8930-8fb5aa8ef0f7'::uuid, '2026-11-05'::date, 'nhập hàng', 485000, 'nl_chinh', null, '[Knote · Nhập hàng] nhập hàng · Tùng 12/11: tạm xếp Nguyên liệu chính, chưa rõ mua gì', 'knote_cp', 8),
+('da3f511d-b1b2-56ec-8fdc-24de3b165260'::uuid, '2026-11-05'::date, 'nước đá', 20000, 'phu_lieu', null, '[Knote · Nước] nước đá · Tùng 12/11: đá xếp Phụ liệu', 'knote_cp', 9),
 ('7fe9f243-dc27-5c65-8582-4a2be7c8e989'::uuid, '2026-11-05'::date, 'bắp', 28000, 'nl_chinh', (select id from ingredients where code = 'bap' and org_id = o.org_id), '[Knote · Nhập hàng] bắp', 'knote_cp', 10),
 ('a1a955e5-257c-59b2-8b57-26b42acbaa97'::uuid, '2026-11-06'::date, 'thanh long', 10000, 'nl_chinh', (select id from ingredients where code = 'thanh_long' and org_id = o.org_id), '[Knote · Nhập hàng] thanh long', 'knote_cp', 11),
 ('c060d67c-c767-548e-90e8-ef356d1ef0a9'::uuid, '2026-11-06'::date, 'bắp', 24000, 'nl_chinh', (select id from ingredients where code = 'bap' and org_id = o.org_id), '[Knote · Nhập hàng] bắp', 'knote_cp', 12),
-('107c2425-aab7-5889-b1dd-647650251d23'::uuid, '2026-11-08'::date, 'đá', 13000, 'khac', null, '[Knote · Nhập hàng] đá · CHỜ CHỐT loại cho đá lạnh', 'knote_cp', 13),
+('107c2425-aab7-5889-b1dd-647650251d23'::uuid, '2026-11-08'::date, 'đá', 13000, 'phu_lieu', null, '[Knote · Nhập hàng] đá · Tùng 12/11: đá xếp Phụ liệu', 'knote_cp', 13),
 ('a59eaa27-7eb2-5bfa-991f-92744856309e'::uuid, '2026-11-08'::date, 'nhập hàng thanh long', 30000, 'nl_chinh', (select id from ingredients where code = 'thanh_long' and org_id = o.org_id), '[Knote · Nhập hàng] nhập hàng thanh long', 'knote_cp', 14),
 ('c7bf93ef-1c36-5d87-99a3-e2de4409c835'::uuid, '2026-11-08'::date, 'bí đỏ', 30000, 'nl_chinh', (select id from ingredients where code = 'bi_do' and org_id = o.org_id), '[Knote · Nhập hàng] bí đỏ', 'knote_cp', 15),
-('5d4b9415-532a-58be-ad63-a9edea5fca7b'::uuid, '2026-11-09'::date, 'đường', 112000, 'phu_lieu', null, '[Knote · Nhập hàng] đường · chưa rõ đường phèn hay thốt nốt', 'knote_cp', 16),
+('5d4b9415-532a-58be-ad63-a9edea5fca7b'::uuid, '2026-11-09'::date, 'đường', 112000, 'phu_lieu', (select id from ingredients where code = 'thot_not' and org_id = o.org_id), '[Knote · Nhập hàng] đường · Tùng 12/11: đường thốt nốt', 'knote_cp', 16),
 ('909abe36-cf4e-5e71-a370-262b4fe4fdf6'::uuid, '2026-11-09'::date, 'bắp', 48000, 'nl_chinh', (select id from ingredients where code = 'bap' and org_id = o.org_id), '[Knote · Nhập hàng] bắp', 'knote_cp', 17),
 ('6694403d-8315-5b9a-976b-077c5084e75f'::uuid, '2026-11-10'::date, 'mã qr', 24000, 'khac', null, '[Knote · Khác] mã qr', 'knote_cp', 18),
-('f45cccf0-8ec7-516f-a625-991644ff3459'::uuid, '2026-11-10'::date, '10kg đường', 340000, 'phu_lieu', null, '[Knote · Nhập hàng] 10kg đường · chưa rõ đường phèn hay thốt nốt', 'knote_cp', 19),
+('f45cccf0-8ec7-516f-a625-991644ff3459'::uuid, '2026-11-10'::date, '10kg đường', 340000, 'phu_lieu', (select id from ingredients where code = 'thot_not' and org_id = o.org_id), '[Knote · Nhập hàng] 10kg đường · Tùng 12/11: đường thốt nốt', 'knote_cp', 19),
 ('e84a5dc4-2a4c-51a3-9934-300e18deecdb'::uuid, '2026-11-10'::date, '5kg điều', 700000, 'nl_chinh', (select id from ingredients where code = 'dieu' and org_id = o.org_id), '[Knote · Nhập hàng] 5kg điều', 'knote_cp', 20),
 ('d37ecc8d-ea5c-58ac-aa18-d284d76656c0'::uuid, '2026-11-11'::date, 'pin cân', 8000, 'khac', null, '[Knote · Khác] pin cân', 'knote_cp', 21),
 ('f4a26efa-ff67-5bc5-b492-49d04b8ced26'::uuid, '2026-11-11'::date, 'cacao', 85000, 'phu_lieu', (select id from ingredients where code = 'cacao' and org_id = o.org_id), '[Knote · Nhập hàng] cacao', 'knote_cp', 22),
-('5a092ec0-ad18-5b77-a914-a20bb2e1d504'::uuid, '2026-11-11'::date, 'đá', 20000, 'khac', null, '[Knote · Nhập hàng] đá · CHỜ CHỐT loại cho đá lạnh', 'knote_cp', 23)
+('5a092ec0-ad18-5b77-a914-a20bb2e1d504'::uuid, '2026-11-11'::date, 'đá', 20000, 'phu_lieu', null, '[Knote · Nhập hàng] đá · Tùng 12/11: đá xếp Phụ liệu', 'knote_cp', 23)
 ) as v(cid, d, item, amt, cat, ing, note, ref, rn)
 join public.expense_categories c on c.org_id = o.org_id and c.code = v.cat and c.valid_to is null
 where o.id = '3e1f4df8-6dcb-4593-85a4-2bef47468f42'::uuid
@@ -146,6 +147,6 @@ do $$ begin
   if (select count(*) from expenses where outlet_id='3e1f4df8-6dcb-4593-85a4-2bef47468f42' and import_ref in ('knote_cp') and status='active') <> 23 then raise exception 'Knote chi phí: số dòng lệch'; end if;
   if (select sum(amount_vnd) from expenses where outlet_id='3e1f4df8-6dcb-4593-85a4-2bef47468f42' and import_ref in ('knote_cp') and status='active') <> 8316000 then raise exception 'Knote chi phí: tổng tiền lệch'; end if;
   if (select coalesce(sum(e.amount_vnd),0) from expenses e join expense_categories c on c.id=e.category_id where e.outlet_id='3e1f4df8-6dcb-4593-85a4-2bef47468f42' and e.import_ref in ('knote_cp') and e.status='active' and c.group_code='dau_tu') <> 950000 then raise exception 'Knote chi phí: nhóm dau_tu lệch'; end if;
-  if (select coalesce(sum(e.amount_vnd),0) from expenses e join expense_categories c on c.id=e.category_id where e.outlet_id='3e1f4df8-6dcb-4593-85a4-2bef47468f42' and e.import_ref in ('knote_cp') and e.status='active' and c.group_code='nguyen_lieu') <> 2251000 then raise exception 'Knote chi phí: nhóm nguyen_lieu lệch'; end if;
-  if (select coalesce(sum(e.amount_vnd),0) from expenses e join expense_categories c on c.id=e.category_id where e.outlet_id='3e1f4df8-6dcb-4593-85a4-2bef47468f42' and e.import_ref in ('knote_cp') and e.status='active' and c.group_code='van_hanh') <> 5115000 then raise exception 'Knote chi phí: nhóm van_hanh lệch'; end if;
+  if (select coalesce(sum(e.amount_vnd),0) from expenses e join expense_categories c on c.id=e.category_id where e.outlet_id='3e1f4df8-6dcb-4593-85a4-2bef47468f42' and e.import_ref in ('knote_cp') and e.status='active' and c.group_code='nguyen_lieu') <> 2334000 then raise exception 'Knote chi phí: nhóm nguyen_lieu lệch'; end if;
+  if (select coalesce(sum(e.amount_vnd),0) from expenses e join expense_categories c on c.id=e.category_id where e.outlet_id='3e1f4df8-6dcb-4593-85a4-2bef47468f42' and e.import_ref in ('knote_cp') and e.status='active' and c.group_code='van_hanh') <> 5032000 then raise exception 'Knote chi phí: nhóm van_hanh lệch'; end if;
 end $$;

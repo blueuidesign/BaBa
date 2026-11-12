@@ -52,9 +52,20 @@ for x in ex:
 # ---- Knote chi phí
 kc = list(csv.DictReader(open(DATA + 'BaBa_Chi_phi_Knote_03-11_11-11.csv', encoding='utf-8-sig')))
 krows = []
+DECIDED = {  # Tùng chốt 12/11 14:45
+  'da': ('Phụ liệu', '', 'Tùng 12/11: đá xếp Phụ liệu'),
+  'duong': ('Phụ liệu', 'thot_not', 'Tùng 12/11: đường thốt nốt'),
+}
 for x in kc:
-  note = f"[Knote · {x['Loại trong Knote']}] {x['Nội dung gốc']}" + (f" · {x['Ghi chú']}" if x['Ghi chú'] else '')
-  krows.append(exp_row('knote_cp', int(x['STT']), x['Ngày'], x['Nội dung gốc'], int(x['Số tiền (VND)']), CAT[x['Loại']], x['Mã vật tư'], note))
+  loai, ing, ghichu = x['Loại'], x['Mã vật tư'], x['Ghi chú']
+  ten = x['Nội dung gốc'].lower()
+  if 'đá' in ten: loai, ing, ghichu = DECIDED['da']
+  elif 'đường' in ten: loai, ing, ghichu = DECIDED['duong']
+  elif 'chai mẫu' in ten: ghichu = 'Tùng 12/11: không trùng, mua 2 lần'
+  elif ten == 'nhập hàng': ghichu = 'Tùng 12/11: tạm xếp Nguyên liệu chính, chưa rõ mua gì'
+  note = f"[Knote · {x['Loại trong Knote']}] {x['Nội dung gốc']}" + (f" · {ghichu}" if ghichu else '')
+  x['Loại'] = loai
+  krows.append(exp_row('knote_cp', int(x['STT']), x['Ngày'], x['Nội dung gốc'], int(x['Số tiền (VND)']), CAT[loai], ing, note))
 
 # ---- checks
 def grp_of(code): return {'nl_chinh':'nguyen_lieu','phu_lieu':'nguyen_lieu','nl_khac':'nguyen_lieu','vat_tu':'vat_tu','mat_bang':'van_hanh','luong':'van_hanh','dien_nuoc':'van_hanh','ve_sinh':'van_hanh','thu_cong_thuc':'van_hanh','khac':'van_hanh'}.get(code,'dau_tu')
@@ -84,7 +95,8 @@ refsum = '\n'.join(f"--   {k}: {v:,}".replace(',', '.') for k, v in by_ref.items
 sql19 = (f"""-- 0019 · Nhập chi phí cũ vào cơ sở Phan Văn Hớn
 -- Nguồn: claude/data/BaBa_Doi_chieu_chi_phi_Excel.csv (82 dòng) và claude/data/BaBa_Chi_phi_Knote_03-11_11-11.csv (23 dòng).
 -- Sinh bằng scripts/import/build_import_sql.py. client_id = uuid v5 theo nguồn + STT nên chạy lại không trùng.
--- Chỉ ghi tiền, không tạo phiếu nhập, không cộng kho. Quyết định 12/11: STT 69 là chi phí; STT 82 vào Nguyên liệu khác.
+-- Chỉ ghi tiền, không tạo phiếu nhập, không cộng kho. Quyết định của Tùng 12/11: Excel STT 69 là chi phí; STT 82 vào
+-- Nguyên liệu khác; Knote: đá vào Phụ liệu, đường là đường thốt nốt, 2 dòng "4 chai mẫu" không trùng.
 -- Tổng theo nguồn Excel:
 {refsum}
 """ + expenses_sql(erows, 'Excel') + expenses_sql(krows, 'Knote chi phí')
@@ -108,12 +120,10 @@ for code, lines in sorted(orders.items(), key=lambda kv: (kv[1][0]['Ngày'], kv[
   if h['Ghi chú Knote']: parts.append(h['Ghi chú Knote'])
   if not h['Hình thức TT']: parts.append('Knote không ghi hình thức thanh toán')
   if h['Cờ']: parts.append(h['Cờ'])
-  if disc: parts.append(f"giảm {disc:,} đ".replace(',', '.'))
-  ovals.append(f"({q(str(cid))}::uuid, {q(d)}::date, {seq[d]}, {q(d + ' ' + h['Giờ'] + ':00+07')}::timestamptz, {int(h['Thu thực'])}, {q(PAY.get(h['Hình thức TT']))}, {q(' · '.join(parts))}, {q(h['Khách'])}, {q(code)})")
-  # giảm giá trừ vào dòng có thành tiền lớn nhất
-  big = max(range(len(lines)), key=lambda i: int(lines[i]['Thành tiền dòng']))
+  reason = f"{h['Cờ'].capitalize()} (Knote)" if disc else ''
+  ovals.append(f"({q(str(cid))}::uuid, {q(d)}::date, {seq[d]}, {q(d + ' ' + h['Giờ'] + ':00+07')}::timestamptz, {int(h['Thu thực'])}, {disc}, {q(reason)}, {q(PAY.get(h['Hình thức TT']))}, {q(' · '.join(parts))}, {q(h['Khách'])}, {q(code)})")
   for i, l in enumerate(lines):
-    lt = int(l['Thành tiền dòng']) - (disc if i == big else 0)
+    lt = int(l['Thành tiền dòng'])
     lvals.append(f"({q(str(cid))}::uuid, {q(l['Mã món app'])}, {int(l['Số chai'])}, {int(l['Đơn giá'])}, {lt})")
   assert sum(int(l['Thành tiền dòng']) for l in lines) - disc == int(h['Thu thực']), code
 
@@ -130,16 +140,16 @@ sql20 = f"""-- 0020 · Nhập doanh thu cũ từ Knote vào cơ sở Phan Văn H
 -- Nguồn: claude/data/BaBa_Doanh_thu_Knote_29-10_12-11.csv: {len(orders)} đơn, {len(kr)} dòng, {tot[2]} chai, thu {tot[0]:,} đ.
 -- Đơn có source='import', import_ref='knote', client_id = uuid v5 theo mã đơn Knote. Món ngừng bán (smt, lnb, lvx, lnl)
 -- vẫn gắn được vì order_lines trỏ products theo id, không lọc status; màn Bán không hiện các món này.
--- Giá lấy đúng giá Knote lúc bán. Giảm giá (1 đơn, 2.000 đ) trừ vào dòng có thành tiền lớn nhất, nên tổng dòng = thu thực.
+-- Giá lấy đúng giá Knote lúc bán. Giảm giá (1 đơn, 2.000 đ) ghi ở orders.discount_vnd; total_vnd = thu thực.
 -- Tùng chốt 12/11: mọi đơn có tiền đều là doanh thu, không đơn nào là đơn tặng.
 -- Không tạo bản ghi nấu, không đổi tồn kho.
 
-with v(cid, d, seq, at, total, pay, note, cust, code) as (values
+with v(cid, d, seq, at, total, disc, reason, pay, note, cust, code) as (values
 {',\n'.join(ovals)}
 )
 insert into public.orders (id, outlet_id, client_id, seq_in_day, business_date, placed_at, channel, status, is_gift, total_vnd,
-                           payment_method, note, created_by, source, import_ref, customer_name)
-select v.cid, '{OUT}'::uuid, v.cid, v.seq, v.d, v.at, 'counter', 'active', false, v.total, v.pay, v.note,
+                           discount_vnd, discount_reason, payment_method, note, created_by, source, import_ref, customer_name)
+select v.cid, '{OUT}'::uuid, v.cid, v.seq, v.d, v.at, 'counter', 'active', false, v.total, v.disc, v.reason, v.pay, v.note,
        '{TUNG}'::uuid, 'import', 'knote', v.cust
 from v
 on conflict do nothing;

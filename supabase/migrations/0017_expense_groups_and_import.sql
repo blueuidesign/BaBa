@@ -107,6 +107,30 @@ alter table public.orders
 alter table public.orders drop constraint if exists orders_source_check;
 alter table public.orders add constraint orders_source_check check (source in ('app','import'));
 
+-- 3b. Giảm giá ở cấp đơn (Tùng 12/11). Dòng đơn giữ giá niêm yết; orders.total_vnd = tổng dòng − discount_vnd = tiền thu.
+alter table public.orders
+  add column if not exists discount_vnd int not null default 0,
+  add column if not exists discount_reason text;
+alter table public.orders drop constraint if exists orders_discount_check;
+alter table public.orders add constraint orders_discount_check check (discount_vnd >= 0);
+
+-- Doanh thu theo ngày trừ giảm giá. Giữ nguyên tên và kiểu cột để code cũ đọc như trước.
+create or replace view public.v_daily_sales with (security_invoker = true) as
+with ol as (
+  select order_id, sum(qty) as qty, sum(line_total_vnd) as amt from public.order_lines group by order_id
+)
+select o.outlet_id, o.business_date,
+       count(o.id) filter (where not o.is_gift) as orders_count,
+       coalesce(sum(ol.qty), 0)::int as bottles,
+       coalesce(sum(ol.qty) filter (where o.is_gift), 0)::int as gift_bottles,
+       coalesce(sum(ol.amt - o.discount_vnd) filter (where not o.is_gift), 0)::int as revenue_vnd,
+       coalesce(sum(ol.qty) filter (where o.channel = 'aggregate'), 0)::int as catchup_bottles,
+       count(o.id) filter (where o.is_gift) as gift_orders_count
+from public.orders o
+join ol on ol.order_id = o.id
+where o.status = 'active'
+group by o.outlet_id, o.business_date;
+
 -- 4. View chi phí theo nhóm (đọc được cả khi cờ expense_groups còn tắt)
 create or replace view public.v_daily_expenses_by_group with (security_invoker = true) as
 select e.outlet_id, e.spent_on as business_date, c.group_code, c.code as category_code,

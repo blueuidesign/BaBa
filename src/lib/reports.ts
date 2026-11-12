@@ -54,16 +54,17 @@ export function csvDownload(rows: (string | number | null | undefined)[][], file
 export async function exportOrders(outletId: string, from: string, to: string, product: (id: string) => { name: string } | undefined) {
   const { data, error } = await supabase
     .from('orders')
-    .select('business_date,seq_in_day,placed_at,status,is_gift,channel,total_vnd,order_lines(product_id,qty,unit_price_vnd,line_total_vnd)')
+    .select('business_date,seq_in_day,placed_at,status,is_gift,channel,total_vnd,discount_vnd,discount_reason,source,order_lines(product_id,qty,unit_price_vnd,line_total_vnd)')
     .eq('outlet_id', outletId)
     .eq('status', 'active')
     .gte('business_date', from)
     .lt('business_date', to)
     .order('placed_at');
   if (error) throw error;
-  const rows: (string | number | null)[][] = [['Ngày', 'Đơn', 'Giờ', 'Trạng thái', 'Loại', 'Kênh', 'Món', 'Số chai', 'Đơn giá', 'Thành tiền']];
+  // Giảm giá và Thu của đơn chỉ ghi ở dòng đầu mỗi đơn, để cộng cột không bị tính trùng.
+  const rows: (string | number | null)[][] = [['Ngày', 'Đơn', 'Giờ', 'Trạng thái', 'Loại', 'Kênh', 'Món', 'Số chai', 'Đơn giá', 'Thành tiền', 'Giảm giá (cả đơn)', 'Thu của đơn', 'Lý do giảm', 'Nguồn']];
   (data || []).forEach((o: any) =>
-    (o.order_lines || []).forEach((l: any) =>
+    (o.order_lines || []).forEach((l: any, i: number) =>
       rows.push([
         o.business_date,
         o.seq_in_day,
@@ -74,7 +75,11 @@ export async function exportOrders(outletId: string, from: string, to: string, p
         product(l.product_id)?.name || '',
         l.qty,
         o.is_gift ? 0 : l.unit_price_vnd,
-        o.is_gift ? 0 : l.line_total_vnd
+        o.is_gift ? 0 : l.line_total_vnd,
+        i === 0 ? o.discount_vnd || 0 : null,
+        i === 0 ? (o.is_gift ? 0 : o.total_vnd) : null,
+        i === 0 ? o.discount_reason || '' : '',
+        o.source === 'import' ? 'Knote' : 'App'
       ])
     )
   );

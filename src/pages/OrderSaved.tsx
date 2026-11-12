@@ -63,6 +63,11 @@ export default function OrderSaved() {
             {vnd(state.gift ? 0 : total)}
           </span>
           <span className="small muted">{n} chai{state.gift ? ' · tặng' : ''}</span>
+          {!state.gift && state.discount > 0 && (
+            <span className="small muted num">
+              Tạm tính {vnd(state.gross)} · giảm {vnd(state.discount)}{state.discountReason ? ` (${state.discountReason})` : ''}
+            </span>
+          )}
         </div>
 
         <section className="card">
