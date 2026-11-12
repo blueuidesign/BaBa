@@ -30,6 +30,8 @@ function rangeOf(r: Range, allFrom: string, allTo: string): [string, string, str
 
 type Day = { key: string; revenue: number; sold: number; gift: number; waste: number };
 
+const BAR_H = 116;
+
 export default function Revenue() {
   const { outlet, catalog, canManage, isAdmin } = useApp();
   const thisMonth = vnToday().slice(0, 7) + '-01';
@@ -254,7 +256,8 @@ export default function Revenue() {
                   <div className="bars" style={{ gridTemplateColumns: `repeat(${slots.length}, minmax(0, 1fr))` }} role="img" aria-label={mode === 'revenue' ? 'Biểu đồ doanh thu' : 'Biểu đồ số chai: bán, tặng, hủy'}>
                     {slots.map((s) => {
                       const r = series.get(s);
-                      const h = (v: number) => `${(v / maxV) * 100}%`;
+                      // Chiều cao tính bằng px: Safari (iPhone) không tính được % chiều cao trong ô lưới, cột bị cao 0
+                      const h = (v: number) => `${Math.max(v > 0 ? 2 : 0, Math.round((v / maxV) * BAR_H))}px`;
                       const desc = r ? (mode === 'revenue' ? vnd(r.revenue) : `${r.sold} bán, ${r.gift} tặng, ${r.waste} hủy`) : 'không có';
                       return (
                         <button key={s} className={picked === s ? 'on' : ''} aria-label={`${label(s)}: ${desc}`} onClick={() => setPicked(picked === s ? null : s)}>
@@ -265,7 +268,7 @@ export default function Revenue() {
                               {r.sold > 0 && <span style={{ height: h(r.sold) }} />}
                             </>
                           ) : (
-                            <span style={{ height: h(val(r)), minHeight: val(r) ? 2 : 0 }} />
+                            <span style={{ height: h(val(r)) }} />
                           )}
                         </button>
                       );

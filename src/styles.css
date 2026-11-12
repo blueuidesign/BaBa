@@ -272,9 +272,9 @@ a.list-row { color: inherit; text-decoration: none; }
 .center-load { padding: 60px 0; text-align: center; color: var(--ink-muted); }
 details > summary { list-style: none; cursor: pointer; }
 details > summary::-webkit-details-marker { display: none; }
-.bars { display: grid; gap: 3px; height: 120px; align-items: end; border-bottom: 1px solid var(--border); }
-.bars button { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; border: 0; padding: 0; background: transparent; cursor: pointer; }
-.bars button span { display: block; border-radius: 3px 3px 0 0; background: var(--brand); opacity: 0.55; }
+.bars { display: grid; gap: 3px; height: 120px; grid-template-rows: 120px; align-items: end; border-bottom: 1px solid var(--border); }
+.bars button { height: 120px; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; border: 0; padding: 0; background: transparent; cursor: pointer; }
+.bars button span { display: block; flex-shrink: 0; border-radius: 3px 3px 0 0; background: var(--brand); opacity: 0.55; }
 .bars button.on span { opacity: 1; }
 .progress { height: 6px; border-radius: 3px; background: var(--bg-200); overflow: hidden; }
 .progress > span { display: block; height: 100%; background: var(--brand); }
