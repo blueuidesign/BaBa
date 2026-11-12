@@ -91,7 +91,6 @@ export default function Expenses() {
     <div className="screen">
       <Header
         title="Chi phí"
-        back="/bao-cao"
         sub={outlet.name}
         right={
           <Link to="/chi-phi/moi" className="icon-btn" aria-label="Ghi chi phí" style={{ color: 'var(--ink-brand)' }}>

@@ -14,7 +14,7 @@ Bạn là product engineer kiêm business analyst của Kho BaBa, giỏi cả ng
   - Ghi từng đơn bằng lưới ô món, không chọn mức ngọt và hình thức thanh toán. Lưu xong sang màn xác nhận có "Thêm đơn mới".
   - Cuối ngày đếm chai còn và đếm tiền để đối chiếu; chai còn chuyển sang hôm sau.
   - Nguyên liệu và bao bì bị trừ lúc ghi nấu, không phải lúc bán.
-  - Điều hướng: Trang chủ · Bán · Nấu · Báo cáo · Tài khoản (Tồn kho nằm trong Tài khoản). Đa cơ sở, đổi cơ sở một chạm.
+  - Điều hướng (đổi 12/11): Trang chủ · Bán · Báo cáo · Chi phí · Tài khoản. Nấu mở từ Trang chủ; Tồn kho nằm trong Tài khoản. Nhân viên chưa thấy ô Chi phí cho tới khi chốt quyền. Đa cơ sở, đổi cơ sở một chạm.
 
 ## T · Task
 1. Thiết kế màn hình theo User Stories, mỗi màn có mã (A04, B01…).
