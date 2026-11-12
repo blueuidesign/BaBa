@@ -45,7 +45,8 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
   const toast = useToast();
   const [range, setRange] = useState<Range>('month');
   const [off, setOff] = useState(0);
-  const [group, setGroup] = useState<string | null>(null);
+  const [group, setGroup] = useState<string | null>(null); // bấm nhóm trên biểu đồ: xem theo loại
+  const [listGroup, setListGroup] = useState<string | null>(null); // chip trong Lịch sử chi: chỉ lọc danh sách
   const [sheet, setSheet] = useState<{ row: ExpenseRow | null } | null>(openNew ? { row: null } : null);
   const [cats, setCats] = useState<ExpCat[]>([]);
   const [showAll, setShowAll] = useState(false);
@@ -101,7 +102,7 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
     : GROUP_ORDER.map((g) => ({ id: g, value: sumBy(groupOf, all).get(g) || 0, color: GROUP_COLOR[g], opacity: '1' }));
   const total = parts.reduce((s, p) => s + p.value, 0);
   // Danh sách: chỉ khoản đang có hiệu lực và khoản đã hủy (không hiện dòng đảo)
-  const list = inGroup.filter((r) => r.status !== 'reversal');
+  const list = all.filter((r) => r.status !== 'reversal' && (!listGroup || groupOf(r) === listGroup));
   const shown = showAll ? list : list.slice(0, 40);
   const byDay = new Map<string, ExpenseRow[]>();
   shown.forEach((r) => byDay.set(r.spent_on, [...(byDay.get(r.spent_on) || []), r]));
@@ -127,7 +128,7 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
   return (
     <div className="screen">
       <Header
-        title={group ? GROUP_NAME[group] : 'Chi phí'}
+        title="Chi phí"
         sub={outlet.name}
         right={
           <button className="icon-btn" aria-label="Thêm khoản chi" style={{ color: 'var(--ink-brand)' }} onClick={() => setSheet({ row: null })}>
@@ -169,7 +170,7 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
         ) : (
           <>
             <section className="card">
-              <div className="h2">{group ? 'Theo loại' : 'Chi theo nhóm'}</div>
+              <div className="h2">{group ? `${GROUP_NAME[group]} · theo loại` : 'Chi theo nhóm'}</div>
               <div className="row" style={{ gap: 12, alignItems: 'center' }}>
                 <Donut parts={parts.map((p) => ({ ...p, color: p.opacity === '1' ? p.color : `color-mix(in srgb, ${p.color} ${Math.round(Number(p.opacity) * 100)}%, white)` }))} total={total} caption={group ? GROUP_NAME[group] : 'Tổng chi'} />
                 <div className="grow" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -186,6 +187,7 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
                 </div>
               </div>
               {!group && <p className="xs muted">Bấm một nhóm để xem chi tiết theo loại. Đầu tư thiết bị không trừ vào lãi tháng, chỉ trừ ở báo cáo Toàn bộ.</p>}
+              {group && <button className="btn quiet" style={{ alignSelf: 'flex-start' }} onClick={() => setGroup(null)}><Icon name="back" size={16} sw={2} /> Cả 4 nhóm</button>}
             </section>
 
             <section className="card tight">
@@ -193,9 +195,9 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
                 <span className="h2">Lịch sử chi</span>
               </div>
               <div className="chips" style={{ gap: 6 }}>
-                <button className={`chip ${!group ? 'on' : ''}`} style={{ minHeight: 32, fontSize: 13 }} onClick={() => setGroup(null)}>Tất cả</button>
+                <button className={`chip ${!listGroup ? 'on' : ''}`} style={{ minHeight: 32, fontSize: 13 }} onClick={() => setListGroup(null)}>Tất cả</button>
                 {GROUP_ORDER.map((g) => (
-                  <button key={g} className={`chip ${group === g ? 'on' : ''}`} style={{ minHeight: 32, fontSize: 13 }} onClick={() => setGroup(group === g ? null : g)}>{GROUP_NAME[g]}</button>
+                  <button key={g} className={`chip ${listGroup === g ? 'on' : ''}`} style={{ minHeight: 32, fontSize: 13 }} onClick={() => setListGroup(listGroup === g ? null : g)}>{GROUP_NAME[g]}</button>
                 ))}
               </div>
               {list.length === 0 && <p className="small muted" style={{ padding: '12px 0' }}>Nhóm này chưa có khoản chi nào trong kỳ.</p>}
