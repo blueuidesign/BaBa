@@ -93,7 +93,8 @@ export default function OrderSaved() {
           </div>
         </section>
 
-        {bottles && (
+        {/* Tạm ẩn số chai còn (Tùng 12/11: chưa dùng Nấu) */}
+        {false && bottles && (
           <section className="card">
             <div className="h2">Còn trên quầy sau đơn này</div>
             {lines.map((l: any) => {

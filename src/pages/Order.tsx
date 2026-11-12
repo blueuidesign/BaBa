@@ -42,7 +42,10 @@ export default function Order() {
   }, [data, queue, outlet]);
 
   if (!outlet) return null;
-  const allowNegative = !!outlet.settings?.allow_negative_bottles;
+  // Tạm thời (Tùng 12/11): chưa dùng chức năng Nấu nên không chặn khi hết chai và không hiện số chai còn.
+  // Bật lại bằng cách đổi SHOW_BOTTLES thành true.
+  const SHOW_BOTTLES = false;
+  const allowNegative = !SHOW_BOTTLES || !!outlet.settings?.allow_negative_bottles;
   const products = catalog?.products || [];
   const picked = products.filter((p) => counts[p.id]);
   const bottles = picked.reduce((s, p) => s + counts[p.id], 0);
@@ -140,7 +143,7 @@ export default function Order() {
                         type="button"
                         className={`tile ${n ? 'on' : ''}`}
                         aria-pressed={n > 0}
-                        aria-label={`${p.name}, ${vnd(p.price)}, còn ${left}${n ? `, đã chọn ${n}` : ''}`}
+                        aria-label={`${p.name}, ${vnd(p.price)}${SHOW_BOTTLES ? `, còn ${left}` : ''}${n ? `, đã chọn ${n}` : ''}`}
                         disabled={out || (!allowNegative && left < 0)}
                         onClick={() => (allowNegative || left > 0 ? inc(p.id) : setErr(`${p.short_name} đã hết chai trên quầy.`))}
                       >
@@ -148,7 +151,7 @@ export default function Order() {
                         <Bottle color={p.color} size={40} />
                         <span className="name">{p.short_name}</span>
                         <span className="meta">
-                          {vnd(p.price)} · còn {left}
+                          {vnd(p.price)}{SHOW_BOTTLES ? ` · còn ${left}` : ''}
                         </span>
                       </button>
                     );

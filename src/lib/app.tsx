@@ -36,6 +36,7 @@ type Ctx = {
   outlet: OutletAccess | null;
   canManage: boolean;
   catalog: Catalog | null;
+  reloadCatalog: () => void;
   selectOutlet: (id: string) => void;
   reloadOutlets: () => Promise<void>;
   queue: QueuedCall[];
@@ -80,6 +81,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [outlets, setOutlets] = useState<OutletAccess[]>([]);
   const [outletId, setOutletId] = useState<string | null>(() => localStorage.getItem(OUTLET_KEY));
   const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [catVer, setCatVer] = useState(0);
   const [queue, setQueue] = useState<QueuedCall[]>(readQueue());
   const [online, setOnline] = useState(navigator.onLine);
   const [dataVersion, setDataVersion] = useState(0);
@@ -216,7 +218,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [outlet]);
+  }, [outlet, catVer]);
 
   const selectOutlet = useCallback(
     (id: string) => {
@@ -236,6 +238,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     outlet,
     canManage: !!outlet && (outlet.role === 'owner' || outlet.role === 'admin' || isAdmin),
     catalog,
+    reloadCatalog: () => setCatVer((v) => v + 1),
     selectOutlet,
     reloadOutlets,
     queue,

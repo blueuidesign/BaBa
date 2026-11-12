@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '../lib/app';
 import { errorText, supabase } from '../lib/supabase';
-import { fold, isStockGroup, type ExpCat, type ExpenseRow } from '../lib/expenses';
+import { fold, type ExpCat, type ExpenseRow } from '../lib/expenses';
+import { GROUP_COLOR, GROUP_NAME, GROUP_ORDER } from '../lib/reports';
+import type { Ingredient } from '../lib/app';
 import { num, timeHM, unitLabel, uuid, vnd, vnToday } from '../lib/format';
 import { Icon, MoneyInput, NumberField, confirmDialog, reasonDialog } from './ui';
 
@@ -25,17 +27,16 @@ export default function ExpenseSheet({
   onClose: () => void;
   onDone: (msg: string) => void;
 }) {
-  const { outlet, catalog } = useApp();
+  const { outlet, catalog, reloadCatalog } = useApp();
   const byId = useMemo(() => Object.fromEntries(cats.map((c) => [c.id, c])), [cats]);
-  const top = cats.filter((c) => !c.parent_id);
-  const dauTu = top.find((c) => c.code === 'dau_tu');
-  const subs = cats.filter((c) => dauTu && c.parent_id === dauTu.id);
   const exCat = existing?.category_id ? byId[existing.category_id] : undefined;
+  // Cấp 1: 4 nhóm; cấp 2: các loại trong nhóm (bỏ dòng cha "Đầu tư thiết bị"). Không có cấp 3.
+  const optionsOf = (g: string | null) => cats.filter((c) => c.group_code === g && c.code !== 'dau_tu');
 
-  const [topId, setTopId] = useState<string>(exCat ? exCat.parent_id || exCat.id : top.find((c) => c.code === 'nl_chinh')?.id || '');
-  const [subId, setSubId] = useState<string>(exCat?.parent_id ? exCat.id : subs[0]?.id || '');
+  const [grp, setGrp] = useState<string | null>(exCat?.group_code || null);
+  const [catId, setCatId] = useState<string>(exCat && exCat.code !== 'dau_tu' ? exCat.id : '');
   const [name, setName] = useState(existing?.item_name || '');
-  const [ingId, setIngId] = useState<string | null>(existing?.purchase_id && existing.source === 'manual' ? existing.ingredient_id : null);
+  const [ingId, setIngId] = useState<string | null>(existing && existing.source === 'manual' ? existing.ingredient_id : null);
   const [qty, setQty] = useState(existing?.qty && existing.purchase_id ? String(existing.qty) : '');
   const [amount, setAmount] = useState(existing ? String(existing.amount_vnd) : '');
   const [date, setDate] = useState(existing?.spent_on || vnToday());
@@ -43,39 +44,59 @@ export default function ExpenseSheet({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [clientId] = useState(uuid);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newUnit, setNewUnit] = useState('g');
+  const [created, setCreated] = useState<Ingredient[]>([]);
 
   if (!outlet || !catalog) return null;
-  const cat = byId[topId];
-  const finalCat = cat?.code === 'dau_tu' ? byId[subId] || cat : cat;
-  const ing = ingId ? catalog.ingredientById[ingId] : undefined;
+  const finalCat = catId ? byId[catId] : undefined;
+  const stockMode = !!finalCat?.ingredient_grp;
+  const allIngs = [...catalog.ingredients, ...created.filter((c) => !catalog.ingredientById[c.id])];
+  const ing = ingId ? allIngs.find((i) => i.id === ingId) : undefined;
   const fromPurchase = existing?.source === 'purchase';
+  const stockOpts = stockMode ? allIngs.filter((i) => i.kind === 'purchased' && i.grp === finalCat!.ingredient_grp) : [];
 
-  // Gợi ý: món trong kho đúng nhóm kho của loại đang chọn, rồi tên đã dùng
+  // Gợi ý tên đã dùng (chỉ cho loại không vào kho)
   const q = fold(name);
-  const stockOpts = cat?.ingredient_grp ? catalog.ingredients.filter((i) => i.kind === 'purchased' && i.grp === cat.ingredient_grp) : [];
-  const sugStock = q ? stockOpts.filter((i) => fold(i.name).includes(q)).slice(0, 4) : [];
-  const sugUsed = q ? usedNames.filter((n) => fold(n).includes(q) && fold(n) !== q && !sugStock.some((i) => fold(i.name) === fold(n))).slice(0, 3) : [];
-  const showSug = focus && q.length > 0 && !ing;
+  const sugUsed = q ? usedNames.filter((n) => fold(n).includes(q) && fold(n) !== q).slice(0, 4) : [];
+  const showSug = focus && !stockMode && sugUsed.length > 0;
 
-  function pickCat(id: string) {
-    setTopId(id);
+  function pickGroup(g: string) {
+    setGrp(g);
     setErr(null);
-    // đổi loại thì món trong kho cũ có thể không còn đúng nhóm
+    const opts = optionsOf(g);
+    const next = opts[0]?.id || '';
+    setCatId(next);
+    if (ing && byId[next]?.ingredient_grp !== ing.grp) setIngId(null);
+  }
+  function pickCat(id: string) {
+    setCatId(id);
+    setErr(null);
     if (ing && byId[id]?.ingredient_grp !== ing.grp) setIngId(null);
   }
-  function typeName(v: string) {
-    setName(v);
-    // tên gõ khớp đúng một món trong kho thì tự gắn
-    const exact = stockOpts.find((i) => fold(i.name) === fold(v));
-    setIngId(exact ? exact.id : null);
+  async function addIngredient() {
+    if (!newName.trim()) return setErr('Nhập tên món mới.');
+    setBusy(true);
+    const { data, error } = await supabase.rpc('fn_create_ingredient', { p_outlet: outlet!.id, p_name: newName.trim(), p_grp: finalCat!.ingredient_grp, p_unit: newUnit });
+    setBusy(false);
+    if (error) return setErr(errorText(error));
+    const id = (data as any).id as string;
+    setCreated((c) => [...c, { id, code: '', name: newName.trim(), grp: finalCat!.ingredient_grp!, unit: newUnit, purchase_unit: newUnit, purchase_factor: 1, kind: 'purchased', shelf_days: null, storage_note: null, sort_order: 90 }]);
+    setIngId(id);
+    setAdding(false);
+    setNewName('');
+    setErr(null);
+    reloadCatalog();
   }
 
   const stockApplied = !!ing && Number(qty) > 0;
-  const needsStockWarn = isStockGroup(cat) && !stockApplied;
+  const needsStockWarn = stockMode && !stockApplied;
 
   async function save() {
     setErr(null);
-    if (!finalCat) return setErr('Chọn loại chi.');
+    if (!finalCat) return setErr('Chọn nhóm và loại chi.');
+    if (stockMode && !ing) return setErr('Chọn món trong kho, hoặc bấm "Thêm món mới".');
     const amt = Number(amount);
     if (!amt) return setErr('Nhập số tiền lớn hơn 0.');
     if (date > vnToday()) return setErr('Không ghi chi phí cho ngày chưa tới.');
@@ -98,7 +119,7 @@ export default function ExpenseSheet({
         title: 'Khoản này không vào tồn kho',
         text: ing
           ? `Chưa ghi số lượng nên app chỉ ghi ${vnd(amt)} vào chi phí ${finalCat.name}. ${ing.name} trong kho cập nhật khi kiểm kê.`
-          : `"${name.trim() || finalCat.name}" không có trong danh sách kho. App chỉ ghi ${vnd(amt)} vào chi phí ${finalCat.name}. Muốn cộng kho thì chọn tên có nhãn "trong kho" và ghi số lượng.`,
+          : `App chỉ ghi ${vnd(amt)} vào chi phí ${finalCat.name}.`,
         ok: 'Vẫn lưu',
         cancel: 'Sửa lại',
         tone: 'warn'
@@ -110,7 +131,7 @@ export default function ExpenseSheet({
       outlet_id: outlet!.id,
       client_id: clientId,
       category_id: finalCat.id,
-      item_name: name.trim() || null,
+      item_name: stockMode ? ing!.name : name.trim() || null,
       ingredient_id: stockApplied ? ingId : null,
       qty: stockApplied ? Number(qty) : null,
       amount_vnd: amt,
@@ -124,7 +145,7 @@ export default function ExpenseSheet({
 
   function negMsg(neg: any[] | undefined) {
     if (!neg || !neg.length) return '';
-    const names = neg.map((n) => catalog!.ingredientById[n.ingredient_id]?.name).filter(Boolean).join(', ');
+    const names = neg.map((n) => allIngs.find((i) => i.id === n.ingredient_id)?.name).filter(Boolean).join(', ');
     return `Tồn kho ${names} đang âm, nhớ kiểm kê.`;
   }
 
@@ -150,8 +171,6 @@ export default function ExpenseSheet({
     onDone(negMsg((data as any)?.negative_stock) || (fromPurchase ? 'Đã hủy phiếu nhập' : 'Đã hủy khoản chi'));
   }
 
-  const row1 = top.filter((c) => isStockGroup(c));
-  const rest = top.filter((c) => !isStockGroup(c));
   const chipStyle = { minHeight: 34, fontSize: 13, padding: '0 10px' };
 
   return (
@@ -178,106 +197,100 @@ export default function ExpenseSheet({
                 <span>Khoản này đã cộng hàng vào kho. Sửa số lượng hoặc số tiền thì kho được chỉnh theo.</span>
               </div>
             )}
-            <span className="small strong">Loại chi</span>
+            <span className="small strong">Nhóm chi phí</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}>
-              {row1.map((c) => (
-                <button key={c.id} type="button" className={`chip ${topId === c.id ? 'on' : ''}`} onClick={() => pickCat(c.id)}
-                  style={{ minHeight: 48, flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 0, borderRadius: 'var(--radius-md)', whiteSpace: 'normal', textAlign: 'left', padding: '4px 10px' }}>
-                  <span style={{ fontSize: 13 }}>{c.name}</span>
-                  {c.example_text && <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.75 }}>{c.example_text}</span>}
+              {GROUP_ORDER.map((g) => (
+                <button key={g} type="button" className={`chip ${grp === g ? 'on' : ''}`} style={{ justifyContent: 'flex-start', gap: 8, minHeight: 42 }} onClick={() => pickGroup(g)}>
+                  <span style={{ width: 10, height: 10, borderRadius: 3, background: GROUP_COLOR[g], flexShrink: 0 }} />
+                  {GROUP_NAME[g]}
                 </button>
               ))}
             </div>
-            <div className="chips wrap" style={{ gap: 6 }}>
-              {rest.map((c) => (
-                <button key={c.id} type="button" className={`chip ${topId === c.id ? 'on' : ''}`} style={chipStyle} onClick={() => pickCat(c.id)}>
-                  {c.name}
-                </button>
-              ))}
-            </div>
-            {cat?.code === 'dau_tu' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 10, background: 'var(--bg-000)', borderRadius: 'var(--radius-md)' }}>
-                <span className="xs muted">Đầu tư cho gì</span>
+            {grp && optionsOf(grp).length > 1 && (
+              <>
+                <span className="small strong">Loại</span>
                 <div className="chips wrap" style={{ gap: 6 }}>
-                  {subs.map((c) => (
-                    <button key={c.id} type="button" className={`chip ${subId === c.id ? 'on' : ''}`} style={chipStyle} onClick={() => setSubId(c.id)}>
+                  {optionsOf(grp).map((c) => (
+                    <button key={c.id} type="button" className={`chip ${catId === c.id ? 'on' : ''}`} style={chipStyle} onClick={() => pickCat(c.id)}>
                       {c.name}
                     </button>
                   ))}
                 </div>
-                <span className="xs muted">Khoản đầu tư không trừ vào lãi tháng. Báo cáo Toàn bộ sẽ trừ và cho biết đã thu hồi được bao nhiêu phần trăm.</span>
-              </div>
+              </>
             )}
+            {grp === 'dau_tu' && <span className="xs muted">Khoản đầu tư không trừ vào lãi tháng. Báo cáo Toàn bộ sẽ trừ và cho biết đã thu hồi được bao nhiêu phần trăm.</span>}
 
-            <label className="field" style={{ position: 'relative' }}>
-              <span className="label small strong">Tên khoản chi</span>
-              <span className="input-wrap">
-                <input
-                  value={name}
-                  onChange={(e) => typeName(e.target.value)}
-                  onFocus={() => setFocus(true)}
-                  onBlur={() => setTimeout(() => setFocus(false), 150)}
-                  placeholder={cat?.ingredient_grp ? 'Gõ tên, vd: óc chó' : 'Vd: tiền điện tháng 10'}
-                  maxLength={120}
-                  style={{ textAlign: 'left', fontSize: 16 }}
-                  aria-label="Tên khoản chi"
-                />
-                {ing ? <span className="badge ok">trong kho</span> : name.trim() && isStockGroup(cat) ? <span className="badge warn">tên tự do</span> : null}
-              </span>
-            </label>
-            {showSug && (sugStock.length > 0 || sugUsed.length > 0 || name.trim()) && (
-              <div className="card tight" role="listbox" style={{ marginTop: -6, padding: 0, gap: 0, boxShadow: 'var(--shadow-soft)' }}>
-                {sugStock.map((i) => (
-                  <button key={i.id} type="button" className="list-row" style={{ border: 0, background: 'transparent', width: '100%', textAlign: 'left', padding: '8px 12px' }}
-                    onMouseDown={(e) => e.preventDefault()} onClick={() => { setName(i.name); setIngId(i.id); setFocus(false); }}>
-                    <Icon name="box" size={18} style={{ color: 'var(--ink-brand)' }} />
-                    <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span className="strong">{i.name}</span>
-                      <span className="xs muted">trong kho · cộng kho được</span>
-                    </span>
-                  </button>
-                ))}
-                {sugUsed.map((n) => (
-                  <button key={n} type="button" className="list-row" style={{ border: 0, background: 'transparent', width: '100%', textAlign: 'left', padding: '8px 12px' }}
-                    onMouseDown={(e) => e.preventDefault()} onClick={() => { typeName(n); setFocus(false); }}>
-                    <Icon name="history" size={18} style={{ color: 'var(--ink-muted)' }} />
-                    <span className="grow"><span className="strong">{n}</span> <span className="xs muted">· đã dùng</span></span>
-                  </button>
-                ))}
-                {isStockGroup(cat) && name.trim() && !stockOpts.some((i) => fold(i.name) === q) && (
-                  <button type="button" className="list-row" style={{ border: 0, background: 'transparent', width: '100%', textAlign: 'left', padding: '8px 12px' }}
-                    onMouseDown={(e) => e.preventDefault()} onClick={() => setFocus(false)}>
-                    <Icon name="plus" size={18} style={{ color: 'var(--ink-muted)' }} />
-                    <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span className="strong">Dùng tên "{name.trim()}"</span>
-                      <span className="xs muted">Chỉ ghi tiền, không vào tồn kho</span>
-                    </span>
-                  </button>
+            {finalCat && stockMode && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10, background: 'var(--bg-000)', borderRadius: 'var(--radius-md)' }}>
+                <label className="field">
+                  <span className="label small strong">Món trong kho</span>
+                  <select className="input sm" value={ingId || ''} aria-label="Món trong kho"
+                    onChange={(e) => { if (e.target.value === '__new') { setAdding(true); } else { setIngId(e.target.value || null); setAdding(false); } }}>
+                    <option value="">Chọn {finalCat.name.toLowerCase()}…</option>
+                    {stockOpts.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                    <option value="__new">+ Thêm món mới…</option>
+                  </select>
+                </label>
+                {adding && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 10, background: 'var(--bg-100)', borderRadius: 'var(--radius-md)' }}>
+                    <span className="xs muted">Món mới sẽ có trong Tồn kho, nhóm {finalCat.name.toLowerCase()}.</span>
+                    <span className="input-wrap"><input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Tên món, vd: hạt bí" maxLength={60} style={{ textAlign: 'left', fontSize: 16 }} aria-label="Tên món mới" /></span>
+                    <div className="row" style={{ gap: 6 }}>
+                      <span className="xs muted">Đơn vị</span>
+                      {['g', 'ml', 'cai'].map((u) => (
+                        <button key={u} type="button" className={`chip ${newUnit === u ? 'on' : ''}`} style={{ minHeight: 32, fontSize: 13 }} onClick={() => setNewUnit(u)}>{unitLabel(u)}</button>
+                      ))}
+                    </div>
+                    <div className="row" style={{ gap: 6 }}>
+                      <button type="button" className="btn sm" disabled={busy} onClick={addIngredient}>Thêm vào kho</button>
+                      <button type="button" className="btn quiet sm" onClick={() => setAdding(false)}>Thôi</button>
+                    </div>
+                  </div>
                 )}
+                {ing && (
+                  <div className="field">
+                    <span className="label small strong">Số lượng</span>
+                    <NumberField value={qty} onChange={setQty} unit={unitLabel(ing.purchase_unit)} label="Số lượng" width={160} decimals />
+                  </div>
+                )}
+                <div className="row small" style={{ gap: 8, padding: '8px 10px', background: stockApplied ? 'var(--bg-brand-soft)' : 'var(--bg-200)', borderRadius: 'var(--radius-md)', alignItems: 'flex-start' }}>
+                  <Icon name={stockApplied ? 'box' : 'scale'} size={18} style={{ color: 'var(--ink-brand)', flexShrink: 0 }} />
+                  <span>
+                    {stockApplied ? (
+                      <>Sẽ cộng vào kho: <strong>{num(Number(qty), 2)} {unitLabel(ing!.purchase_unit)} {ing!.name}</strong>{ing!.purchase_factor !== 1 ? ` (${num(Number(qty) * ing!.purchase_factor)} ${unitLabel(ing!.unit)})` : ''}, giống Nhập hàng.</>
+                    ) : ing ? (
+                      <>Chưa có số lượng nên <strong>chỉ ghi tiền</strong>. {ing.name} trong kho cập nhật khi kiểm kê.</>
+                    ) : (
+                      'Chọn món rồi ghi số lượng để cộng vào kho, giống Nhập hàng.'
+                    )}
+                  </span>
+                </div>
               </div>
             )}
 
-            {cat?.ingredient_grp && ing && (
-              <div className="field">
-                <span className="label small strong">Số lượng (bỏ trống nếu chỉ ghi tiền)</span>
-                <NumberField value={qty} onChange={setQty} unit={unitLabel(ing.purchase_unit)} label="Số lượng" width={160} decimals />
-              </div>
-            )}
-            {isStockGroup(cat) && (
-              <div className="row small" style={{ gap: 8, padding: '8px 10px', background: stockApplied ? 'var(--bg-brand-soft)' : 'var(--bg-200)', borderRadius: 'var(--radius-md)', alignItems: 'flex-start' }}>
-                <Icon name={stockApplied ? 'box' : 'scale'} size={18} style={{ color: 'var(--ink-brand)', flexShrink: 0 }} />
-                <span>
-                  {stockApplied ? (
-                    <>Sẽ cộng vào kho: <strong>{num(Number(qty), 2)} {unitLabel(ing!.purchase_unit)} {ing!.name}</strong>{ing!.purchase_factor !== 1 ? ` (${num(Number(qty) * ing!.purchase_factor)} ${unitLabel(ing!.unit)})` : ''}.</>
-                  ) : cat?.ingredient_grp == null ? (
-                    'Loại này không vào kho, chỉ ghi tiền.'
-                  ) : ing ? (
-                    <>Chưa có số lượng nên <strong>chỉ ghi tiền</strong>. {ing.name} trong kho cập nhật khi kiểm kê.</>
-                  ) : (
-                    <>Chọn tên có nhãn "trong kho" và ghi số lượng để cộng vào kho. Để vậy thì <strong>chỉ ghi tiền</strong>.</>
-                  )}
-                </span>
-              </div>
+            {finalCat && !stockMode && (
+              <>
+                <label className="field">
+                  <span className="label small strong">Tên khoản chi</span>
+                  <span className="input-wrap">
+                    <input value={name} onChange={(e) => setName(e.target.value)} onFocus={() => setFocus(true)} onBlur={() => setTimeout(() => setFocus(false), 150)}
+                      placeholder={grp === 'nguyen_lieu' ? 'Vd: hạt óc chó, dây thừng' : grp === 'dau_tu' ? 'Vd: máy xay thứ 2' : 'Vd: tiền điện tháng 10'}
+                      maxLength={120} style={{ textAlign: 'left', fontSize: 16 }} aria-label="Tên khoản chi" />
+                  </span>
+                </label>
+                {showSug && (
+                  <div className="card tight" role="listbox" style={{ marginTop: -6, padding: 0, gap: 0, boxShadow: 'var(--shadow-soft)' }}>
+                    {sugUsed.map((n) => (
+                      <button key={n} type="button" className="list-row" style={{ border: 0, background: 'transparent', width: '100%', textAlign: 'left', padding: '8px 12px' }}
+                        onMouseDown={(e) => e.preventDefault()} onClick={() => { setName(n); setFocus(false); }}>
+                        <Icon name="history" size={18} style={{ color: 'var(--ink-muted)' }} />
+                        <span className="grow"><span className="strong">{n}</span> <span className="xs muted">· đã dùng</span></span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {grp === 'nguyen_lieu' && <span className="xs muted">Loại này chỉ ghi tiền, không vào tồn kho.</span>}
+              </>
             )}
 
             <div className="field">
