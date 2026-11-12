@@ -111,7 +111,7 @@ cross join lateral (values
 ('f29422e4-ce61-5dc3-92cf-2814d2e7d121'::uuid, '2026-11-03'::date, 'nước đá', 30000, 'phu_lieu', null, '[Knote · Nước] nước đá · Tùng 12/11: đá xếp Phụ liệu', 'knote_cp', 1),
 ('2a23e89c-eba3-5275-821b-7e957d11430a'::uuid, '2026-11-04'::date, 'đường', 231000, 'phu_lieu', (select id from ingredients where code = 'thot_not' and org_id = o.org_id), '[Knote · Nhập hàng] đường · Tùng 12/11: đường thốt nốt', 'knote_cp', 2),
 ('df08819e-c031-512b-8608-e849f792c9fc'::uuid, '2026-11-04'::date, 'Dù', 880000, 'dt_xe_quay', null, '[Knote · Khác] Dù', 'knote_cp', 3),
-('c2c7867d-5114-5ba4-8660-f6c4db74dff0'::uuid, '2026-11-04'::date, 'mặt bằng', 5000000, 'mat_bang', null, '[Knote · Mặt bằng] mặt bằng · CHỜ HỎI: tiền thuê tháng 11 hay tiền cọc', 'knote_cp', 4),
+('c2c7867d-5114-5ba4-8660-f6c4db74dff0'::uuid, '2026-11-04'::date, 'mặt bằng', 5000000, 'mat_bang', null, '[Knote · Mặt bằng] mặt bằng · Tùng 12/11: tạm tính là tiền thuê tháng 11', 'knote_cp', 4),
 ('e377ad0f-f90f-5c1a-b660-2ce3a1230db1'::uuid, '2026-11-05'::date, '4 chai mẫu', 35000, 'dt_dung_cu', null, '[Knote · Khác] 4 chai mẫu · Tùng 12/11: không trùng, mua 2 lần', 'knote_cp', 5),
 ('7ded5348-0129-5f4b-a10a-d89d2cd3eda5'::uuid, '2026-11-05'::date, '4 chai mẫu', 35000, 'dt_dung_cu', null, '[Knote · Khác] 4 chai mẫu · Tùng 12/11: không trùng, mua 2 lần', 'knote_cp', 6),
 ('03423be7-9c0d-55f2-a680-0109f2dca674'::uuid, '2026-11-05'::date, 'matcha', 128000, 'phu_lieu', (select id from ingredients where code = 'matcha' and org_id = o.org_id), '[Knote · Nhập hàng] matcha', 'knote_cp', 7),

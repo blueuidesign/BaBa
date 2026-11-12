@@ -63,6 +63,7 @@ for x in kc:
   elif 'đường' in ten: loai, ing, ghichu = DECIDED['duong']
   elif 'chai mẫu' in ten: ghichu = 'Tùng 12/11: không trùng, mua 2 lần'
   elif ten == 'nhập hàng': ghichu = 'Tùng 12/11: tạm xếp Nguyên liệu chính, chưa rõ mua gì'
+  elif ten == 'mặt bằng': ghichu = 'Tùng 12/11: tạm tính là tiền thuê tháng 11'
   note = f"[Knote · {x['Loại trong Knote']}] {x['Nội dung gốc']}" + (f" · {ghichu}" if ghichu else '')
   x['Loại'] = loai
   krows.append(exp_row('knote_cp', int(x['STT']), x['Ngày'], x['Nội dung gốc'], int(x['Số tiền (VND)']), CAT[loai], ing, note))
