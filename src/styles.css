@@ -301,3 +301,11 @@ input[aria-invalid="true"] { color: var(--danger); }
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; background: var(--bg-200); border-radius: var(--radius-pill); padding: 4px; }
 .seg button { border: 0; background: transparent; border-radius: var(--radius-pill); min-height: 36px; font-weight: 600; font-size: 14px; color: var(--ink-muted); cursor: pointer; }
 .seg button.on { background: var(--bg-100); color: var(--ink-brand); box-shadow: var(--shadow-soft); }
+
+/* Biểu đồ cột chồng: đã bán (xanh) dưới, tặng (vàng) giữa, hủy (đỏ) trên */
+:root { --gift: #E8B931; }
+.bars button span + span { border-radius: 0; }
+.bars button span.gift { background: var(--gift); opacity: 0.8; }
+.bars button span.waste { background: var(--danger); opacity: 0.8; }
+.bars button.on span.gift, .bars button.on span.waste { opacity: 1; }
+select.input { appearance: auto; }

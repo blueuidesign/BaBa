@@ -7,93 +7,152 @@ import { useLoad } from '../lib/data';
 import { ddmm, num, vnd, vndShort, vnToday } from '../lib/format';
 import { BellLink, Header, Icon, Loading, Nav } from '../components/ui';
 
-type Range = 'today' | 'month' | 'prev';
+type Range = 'today' | 'month' | 'prev' | 'all';
+type Mode = 'revenue' | 'bottles';
 
-function rangeOf(r: Range): [string, string, string, string] {
-  const today = vnToday();
-  const [y, m] = today.split('-').map(Number);
-  const first = (yy: number, mm: number) => `${yy}-${String(mm).padStart(2, '0')}-01`;
-  const prevY = m === 1 ? y - 1 : y;
-  const prevM = m === 1 ? 12 : m - 1;
-  const nextY = m === 12 ? y + 1 : y;
-  const nextM = m === 12 ? 1 : m + 1;
-  const pp = prevM === 1 ? [prevY - 1, 12] : [prevY, prevM - 1];
-  if (r === 'today') return [today, vnToday(1), vnToday(-1), today];
-  if (r === 'month') return [first(y, m), first(nextY, nextM), first(prevY, prevM), first(y, m)];
-  return [first(prevY, prevM), first(y, m), first(pp[0], pp[1]), first(prevY, prevM)];
+const first = (yy: number, mm: number) => `${yy}-${String(mm).padStart(2, '0')}-01`;
+/** '2026-11-01' + n tháng */
+function addMonths(m: string, n: number) {
+  const [y, mm] = m.split('-').map(Number);
+  const d = new Date(Date.UTC(y, mm - 1 + n, 1));
+  return d.toISOString().slice(0, 10);
 }
+
+/** [từ, tới (không gồm), kỳ trước từ, kỳ trước tới] */
+function rangeOf(r: Range, allFrom: string, allTo: string): [string, string, string | null, string | null] {
+  const today = vnToday();
+  const thisMonth = today.slice(0, 7) + '-01';
+  if (r === 'today') return [today, vnToday(1), vnToday(-1), today];
+  if (r === 'month') return [thisMonth, addMonths(thisMonth, 1), addMonths(thisMonth, -1), thisMonth];
+  if (r === 'prev') return [addMonths(thisMonth, -1), thisMonth, addMonths(thisMonth, -2), addMonths(thisMonth, -1)];
+  return [allFrom, addMonths(allTo, 1), null, null];
+}
+
+type Day = { key: string; revenue: number; sold: number; gift: number; waste: number };
 
 export default function Revenue() {
   const { outlet, catalog, canManage, isAdmin } = useApp();
+  const thisMonth = vnToday().slice(0, 7) + '-01';
   const [range, setRange] = useState<Range>('today');
   const [picked, setPicked] = useState<string | null>(null);
-  const [from, to, pFrom, pTo] = rangeOf(range);
+  const [mode, setMode] = useState<Mode>('revenue');
+  const [allFrom, setAllFrom] = useState<string | null>(null);
+  const [allTo, setAllTo] = useState(thisMonth);
+
+  // Tháng đầu tiên có số liệu (kể cả số nhập tay tháng cũ) để làm khung cho tab Tất cả
+  const { data: firstMonth } = useLoad(async (oid) => {
+    const [pnl, sales] = await Promise.all([
+      canManage ? supabase.from('v_monthly_pnl').select('month').eq('outlet_id', oid).order('month').limit(1) : Promise.resolve({ data: [] as any[] }),
+      supabase.from('v_daily_sales').select('business_date').eq('outlet_id', oid).order('business_date').limit(1)
+    ]);
+    const a = (pnl.data || [])[0]?.month as string | undefined;
+    const b = ((sales.data || [])[0]?.business_date as string | undefined)?.slice(0, 7);
+    const cands = [a, b && `${b}-01`].filter(Boolean) as string[];
+    return cands.length ? cands.sort()[0] : thisMonth;
+  });
+  const monthsAvail: string[] = [];
+  for (let m = firstMonth || thisMonth; m <= thisMonth; m = addMonths(m, 1)) monthsAvail.push(m);
+  const aFrom = allFrom || firstMonth || thisMonth;
+  const [from, to, pFrom, pTo] = rangeOf(range, aFrom, allTo < aFrom ? aFrom : allTo);
 
   const { data } = useLoad(
     async (oid) => {
-      const monthFrom = range === 'today' ? from.slice(0, 7) + '-01' : from;
-      const [days, prods, prev, closes, pnlDay, pnlMonth, months] = await Promise.all([
+      const monthly = range === 'month' || range === 'prev' || range === 'all';
+      const [days, prods, prev, closes, pnlDay, pnlMonths] = await Promise.all([
         supabase.from('v_daily_sales').select('*').eq('outlet_id', oid).gte('business_date', from).lt('business_date', to).order('business_date'),
         supabase.from('v_sales_by_product').select('*').eq('outlet_id', oid).gte('business_date', from).lt('business_date', to),
-        supabase.from('v_daily_sales').select('revenue_vnd').eq('outlet_id', oid).gte('business_date', pFrom).lt('business_date', pTo),
+        pFrom ? supabase.from('v_daily_sales').select('revenue_vnd').eq('outlet_id', oid).gte('business_date', pFrom).lt('business_date', pTo!) : Promise.resolve({ data: [] as any[] }),
         supabase.from('day_closes').select('business_date,waste_total,gift_total,day_close_lines(cooked_qty,carried_qty)').eq('outlet_id', oid).eq('is_current', true).gte('business_date', from).lt('business_date', to),
-        canManage ? supabase.from('v_daily_pnl').select('*').eq('outlet_id', oid).gte('business_date', from).lt('business_date', to) : Promise.resolve({ data: [] as any[] }),
-        canManage && range !== 'today' ? supabase.from('v_monthly_pnl').select('*').eq('outlet_id', oid).eq('month', monthFrom).maybeSingle() : Promise.resolve({ data: null as any }),
-        canManage ? supabase.from('v_monthly_pnl').select('*').eq('outlet_id', oid).order('month', { ascending: false }).limit(12) : Promise.resolve({ data: [] as any[] })
+        canManage && range === 'today' ? supabase.from('v_daily_pnl').select('*').eq('outlet_id', oid).gte('business_date', from).lt('business_date', to) : Promise.resolve({ data: [] as any[] }),
+        canManage && monthly ? supabase.from('v_monthly_pnl').select('*').eq('outlet_id', oid).gte('month', from).lt('month', to).order('month') : Promise.resolve({ data: [] as any[] })
       ]);
-      const dayPnl = (pnlDay.data || []) as any[];
-      const pnl = range === 'today' || !pnlMonth.data
-        ? {
-            revenue_vnd: dayPnl.reduce((s, r) => s + r.revenue_vnd, 0),
-            expense_vnd: dayPnl.reduce((s, r) => s + r.expense_vnd, 0),
-            profit_vnd: dayPnl.reduce((s, r) => s + r.profit_vnd, 0),
-            historical_revenue_vnd: 0,
-            has_historical: false
-          }
-        : (pnlMonth.data as any);
+      const src = (range === 'today' ? pnlDay.data : pnlMonths.data) || [];
+      const pnl = {
+        revenue_vnd: src.reduce((s: number, r: any) => s + r.revenue_vnd, 0),
+        expense_vnd: src.reduce((s: number, r: any) => s + r.expense_vnd, 0),
+        profit_vnd: src.reduce((s: number, r: any) => s + r.profit_vnd, 0),
+        has_historical: src.some((r: any) => r.has_historical)
+      };
       return {
-        days: days.data || [], prods: prods.data || [], prevRev: (prev.data || []).reduce((s: number, r: any) => s + r.revenue_vnd, 0),
-        closes: closes.data || [], pnl, months: (months.data || []) as any[]
+        days: (days.data || []) as any[], prods: (prods.data || []) as any[], prevRev: (prev.data || []).reduce((s: number, r: any) => s + r.revenue_vnd, 0),
+        closes: (closes.data || []) as any[], pnl, pnlMonths: (pnlMonths.data || []) as any[]
       };
     },
-    [range]
+    [range, from, to]
   );
+
+  // Gom theo ngày (tháng) hoặc theo tháng (tab Tất cả): đã bán, tặng, hủy, doanh thu
+  const byMonth = range === 'all';
+  const series = useMemo(() => {
+    const keyOf = (d: string) => (byMonth ? d.slice(0, 7) + '-01' : d);
+    const m = new Map<string, Day>();
+    const get = (k: string) => m.get(k) || (m.set(k, { key: k, revenue: 0, sold: 0, gift: 0, waste: 0 }), m.get(k)!);
+    (data?.days || []).forEach((d) => {
+      const x = get(keyOf(d.business_date));
+      x.revenue += d.revenue_vnd;
+      x.sold += d.bottles - d.gift_bottles;
+      x.gift += d.gift_bottles;
+    });
+    (data?.closes || []).forEach((c) => {
+      const x = get(keyOf(c.business_date));
+      x.gift += c.gift_total;
+      x.waste += c.waste_total;
+    });
+    // Tab Tất cả: doanh thu tháng lấy từ báo cáo tháng để gồm cả số nhập tay tháng cũ
+    if (byMonth) (data?.pnlMonths || []).forEach((p) => (get(p.month).revenue = p.revenue_vnd));
+    return m;
+  }, [data, byMonth]);
 
   const view = useMemo(() => {
     if (!data) return null;
-    const days = picked ? data.days.filter((d: any) => d.business_date === picked) : data.days;
-    const prods = picked ? data.prods.filter((d: any) => d.business_date === picked) : data.prods;
-    const revenue = days.reduce((s: number, d: any) => s + d.revenue_vnd, 0);
-    const bottles = days.reduce((s: number, d: any) => s + d.bottles, 0);
-    const gift = days.reduce((s: number, d: any) => s + d.gift_bottles, 0) + data.closes.reduce((s: number, c: any) => s + (picked && c.business_date !== picked ? 0 : c.gift_total), 0);
-    const closes = data.closes.filter((c: any) => !picked || c.business_date === picked);
-    const waste = closes.reduce((s: number, c: any) => s + c.waste_total, 0);
+    const rows = [...series.values()].filter((r) => !picked || r.key === picked);
+    const revenue = rows.reduce((s, r) => s + r.revenue, 0);
+    const sold = rows.reduce((s, r) => s + r.sold, 0);
+    const gift = rows.reduce((s, r) => s + r.gift, 0);
+    const waste = rows.reduce((s, r) => s + r.waste, 0);
+    const inPick = (d: string) => !picked || (byMonth ? d.slice(0, 7) + '-01' === picked : d === picked);
+    const closes = data.closes.filter((c) => inPick(c.business_date));
     // Tỉ lệ hủy = chai hủy ÷ (chai nấu + chai tồn qua) của các ngày đã chốt
     const madeAvail = closes.reduce((s: number, c: any) => s + (c.day_close_lines || []).reduce((t: number, l: any) => t + l.cooked_qty + l.carried_qty, 0), 0);
-    const catchup = days.reduce((s: number, d: any) => s + d.catchup_bottles, 0);
+    const salesDays = data.days.filter((d) => inPick(d.business_date));
+    const catchup = salesDays.reduce((s, d) => s + d.catchup_bottles, 0);
     const byProduct = new Map<string, { qty: number; rev: number }>();
-    prods.forEach((r: any) => {
+    data.prods.filter((r) => inPick(r.business_date)).forEach((r) => {
       const x = byProduct.get(r.product_id) || { qty: 0, rev: 0 };
       x.qty += r.qty;
       x.rev += r.revenue_vnd;
       byProduct.set(r.product_id, x);
     });
     const ranked = [...byProduct.entries()].sort((a, b) => b[1].rev - a[1].rev);
-    return { revenue, bottles, gift, waste, madeAvail, catchup, ranked, nDays: days.length };
-  }, [data, picked]);
+    return { revenue, sold, gift, waste, total: sold + gift + waste, madeAvail, catchup, ranked, nSalesDays: salesDays.length };
+  }, [data, series, picked, byMonth]);
 
   if (!outlet) return null;
   const staffLimited = !canManage;
   const product = (pid: string) => catalog?.allProducts.find((p) => p.id === pid);
 
-  // Biểu đồ: mọi ngày trong khoảng
-  const allDays: string[] = [];
+  // Trục ngang: mọi ngày trong tháng, hoặc mọi tháng trong khoảng đã chọn
+  const slots: string[] = [];
   if (range !== 'today') {
-    for (let d = new Date(`${from}T12:00:00Z`); d.toISOString().slice(0, 10) < to; d.setUTCDate(d.getUTCDate() + 1)) allDays.push(d.toISOString().slice(0, 10));
+    if (byMonth) for (let m = from; m < to; m = addMonths(m, 1)) slots.push(m);
+    else for (let d = new Date(`${from}T12:00:00Z`); d.toISOString().slice(0, 10) < to; d.setUTCDate(d.getUTCDate() + 1)) slots.push(d.toISOString().slice(0, 10));
   }
-  const byDay = new Map((data?.days || []).map((d: any) => [d.business_date, d]));
-  const maxB = Math.max(1, ...((data?.days || []) as any[]).map((d) => d.bottles));
-  const delta = data && data.prevRev ? Math.round(((view!.revenue - data.prevRev) / data.prevRev) * 100) : null;
+  const val = (r?: Day) => (!r ? 0 : mode === 'revenue' ? r.revenue : r.sold + r.gift + r.waste);
+  const maxV = Math.max(1, ...slots.map((s) => val(series.get(s))));
+  const label = (k: string) => (byMonth ? monthLabel(k, true) : ddmm(k));
+  const delta = data && data.prevRev && !picked && range !== 'all' ? Math.round(((view!.revenue - data.prevRev) / data.prevRev) * 100) : null;
+  const activeSlots = slots.filter((s) => {
+    const r = series.get(s);
+    return r && (r.revenue || r.sold || r.gift || r.waste);
+  }).length;
+  // Trung bình chai chỉ tính các ngày/tháng có bán (tháng nhập tay từ sổ cũ chỉ có tiền, không có chai)
+  const soldSlots = slots.filter((s) => (series.get(s)?.sold || 0) > 0).length;
+  const revSlots = slots.filter((s) => (series.get(s)?.revenue || 0) > 0).length;
+  const avgSold = soldSlots ? slots.reduce((s, k) => s + (series.get(k)?.sold || 0), 0) / soldSlots : 0;
+  const avgRev = revSlots ? slots.reduce((s, k) => s + (series.get(k)?.revenue || 0), 0) / revSlots : 0;
+  const unit = byMonth ? 'tháng' : 'ngày';
+  const pickedRow = picked ? series.get(picked) : undefined;
+  const periodLabel = range === 'today' ? 'hôm nay' : range === 'all' ? `${monthLabel(from, true)} → ${monthLabel(addMonths(to, -1), true)}` : monthLabel(from);
 
   return (
     <div className="screen">
@@ -104,7 +163,8 @@ export default function Revenue() {
             [
               ['today', 'Hôm nay'],
               ['month', `Tháng ${Number(vnToday().slice(5, 7))}`],
-              ['prev', 'Tháng trước']
+              ['prev', 'Tháng trước'],
+              ['all', 'Tất cả']
             ] as [Range, string][]
           ).map(([k, l]) => (
             <button
@@ -122,67 +182,117 @@ export default function Revenue() {
           ))}
         </div>
         {staffLimited && <p className="xs muted">Các kỳ khác chỉ chủ cơ sở xem được.</p>}
+
+        {range === 'all' && (
+          <div className="row" style={{ gap: 8 }}>
+            <label className="field grow">
+              <span className="xs muted">Từ tháng</span>
+              <select className="input sm" value={aFrom} onChange={(e) => { setAllFrom(e.target.value); setPicked(null); }}>
+                {monthsAvail.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+              </select>
+            </label>
+            <label className="field grow">
+              <span className="xs muted">Đến tháng</span>
+              <select className="input sm" value={allTo < aFrom ? aFrom : allTo} onChange={(e) => { setAllTo(e.target.value); setPicked(null); }}>
+                {monthsAvail.filter((m) => m >= aFrom).map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+              </select>
+            </label>
+          </div>
+        )}
+
         {!view ? (
           <Loading />
         ) : (
           <>
             <div className="grid2">
               <section className="card" style={{ gap: 2 }}>
-                <span className="small strong muted">{picked ? `Doanh thu ${ddmm(picked)}` : 'Doanh thu'}</span>
+                <span className="small strong muted">{picked ? `Doanh thu ${label(picked)}` : 'Doanh thu'}</span>
                 <span style={{ fontSize: 26, fontWeight: 700 }} className="num">{vndShort(view.revenue)}</span>
-                <span className="xs muted">{delta == null || picked ? ' ' : `${delta >= 0 ? '+' : ''}${delta}% so với kỳ trước`}</span>
+                <span className="xs muted">{delta == null ? ' ' : `${delta >= 0 ? '+' : ''}${delta}% so với kỳ trước`}</span>
               </section>
               <section className="card" style={{ gap: 2 }}>
-                <span className="small strong muted">Chai đã bán</span>
-                <span style={{ fontSize: 26, fontWeight: 700 }} className="num">{num(view.bottles)}</span>
-                <span className="xs muted">{range === 'today' || picked ? `${view.gift} tặng` : `TB ${num(view.bottles / Math.max(1, view.nDays), 1)} chai/ngày · ${view.nDays} ngày`}</span>
+                <span className="small strong muted">{picked ? `Tổng số chai ${label(picked)}` : 'Tổng số chai'}</span>
+                <span style={{ fontSize: 26, fontWeight: 700 }} className="num">{num(view.total)}</span>
+                <span className="xs muted">{view.sold} bán · {view.gift} tặng · {view.waste} hủy</span>
               </section>
             </div>
 
             {canManage && !picked && (
               <section className="card">
                 <div className="row between">
-                  <span className="h2">Lợi nhuận {range === 'today' ? 'hôm nay' : monthLabel(from)}</span>
+                  <span className="h2">Lợi nhuận {periodLabel}</span>
                   <Link to="/chi-phi" className="small strong" style={{ textDecoration: 'none' }}>Chi phí →</Link>
                 </div>
-                <div className="grid3" style={{ textAlign: 'center' }}>
-                  <div className="kpi"><span className="l">Doanh thu</span><span className="v num" style={{ fontSize: 18 }}>{vndShort(data!.pnl.revenue_vnd)}</span></div>
-                  <div className="kpi"><span className="l">Chi phí</span><span className="v num" style={{ fontSize: 18 }}>{vndShort(data!.pnl.expense_vnd)}</span></div>
-                  <div className="kpi">
-                    <span className="l">Lợi nhuận</span>
-                    <span className="v num" style={{ fontSize: 18, color: data!.pnl.profit_vnd < 0 ? 'var(--danger)' : undefined }}>{vndShort(data!.pnl.profit_vnd)}</span>
-                  </div>
+                {/* Mỗi số một dòng, ghi đủ tiền: số dài cỡ nào cũng không bị cắt */}
+                <div className="row between small"><span>Doanh thu</span><span className="num strong">{vnd(data!.pnl.revenue_vnd)}</span></div>
+                <div className="row between small"><span>Chi phí</span><span className="num strong">− {vnd(data!.pnl.expense_vnd)}</span></div>
+                <div className="row between" style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                  <span className="strong">Lợi nhuận</span>
+                  <span className="num" style={{ fontSize: 20, fontWeight: 700, color: data!.pnl.profit_vnd < 0 ? 'var(--danger)' : 'var(--ink-brand)' }}>{vnd(data!.pnl.profit_vnd)}</span>
                 </div>
-                {data!.pnl.has_historical && <p className="xs muted">Có số liệu nhập tay cho tháng này (từ sổ cũ).</p>}
+                {data!.pnl.has_historical && <p className="xs muted">Có số liệu nhập tay từ sổ cũ.</p>}
                 {range === 'today' && <p className="xs muted">Chi phí hôm nay gồm các khoản ghi trong ngày và tiền nhập hàng.</p>}
+                {range === 'all' && (
+                  <Link to="/thang-cu" className="small strong" style={{ textDecoration: 'none' }}>Nhập doanh thu, chi phí tháng cũ →</Link>
+                )}
               </section>
             )}
 
             {range !== 'today' && (
               <section className="card">
                 <div className="row between">
-                  <span className="h2">Chai theo ngày</span>
-                  <span className="xs muted">{picked ? <button className="btn quiet" style={{ minHeight: 24 }} onClick={() => setPicked(null)}>Cả kỳ</button> : 'Bấm cột để xem ngày'}</span>
+                  <span className="h2">{byMonth ? 'Theo tháng' : 'Theo ngày'}</span>
+                  {picked && <button className="btn quiet" style={{ minHeight: 28 }} onClick={() => setPicked(null)}>Cả kỳ</button>}
                 </div>
-                {data!.days.length === 0 ? (
-                  <p className="small muted">Chưa có đơn trong khoảng này.</p>
+                <div className="seg" role="tablist" aria-label="Chế độ biểu đồ">
+                  <button className={mode === 'revenue' ? 'on' : ''} onClick={() => setMode('revenue')}>Doanh thu</button>
+                  <button className={mode === 'bottles' ? 'on' : ''} onClick={() => setMode('bottles')}>Số chai</button>
+                </div>
+                {activeSlots === 0 ? (
+                  <p className="small muted">Chưa có số liệu trong khoảng này.</p>
                 ) : (
-                  <div className="bars" style={{ gridTemplateColumns: `repeat(${allDays.length}, minmax(0, 1fr))` }} role="img" aria-label="Biểu đồ số chai bán theo ngày">
-                    {allDays.map((d) => {
-                      const b = (byDay.get(d) as any)?.bottles || 0;
+                  <div className="bars" style={{ gridTemplateColumns: `repeat(${slots.length}, minmax(0, 1fr))` }} role="img" aria-label={mode === 'revenue' ? 'Biểu đồ doanh thu' : 'Biểu đồ số chai: bán, tặng, hủy'}>
+                    {slots.map((s) => {
+                      const r = series.get(s);
+                      const h = (v: number) => `${(v / maxV) * 100}%`;
+                      const desc = r ? (mode === 'revenue' ? vnd(r.revenue) : `${r.sold} bán, ${r.gift} tặng, ${r.waste} hủy`) : 'không có';
                       return (
-                        <button key={d} className={picked === d ? 'on' : ''} aria-label={`${ddmm(d)}: ${b} chai`} onClick={() => setPicked(d)}>
-                          <span style={{ height: `${(b / maxB) * 100}%`, minHeight: b ? 2 : 0 }} />
+                        <button key={s} className={picked === s ? 'on' : ''} aria-label={`${label(s)}: ${desc}`} onClick={() => setPicked(picked === s ? null : s)}>
+                          {r && mode === 'bottles' ? (
+                            <>
+                              {r.waste > 0 && <span className="waste" style={{ height: h(r.waste) }} />}
+                              {r.gift > 0 && <span className="gift" style={{ height: h(r.gift) }} />}
+                              {r.sold > 0 && <span style={{ height: h(r.sold) }} />}
+                            </>
+                          ) : (
+                            <span style={{ height: h(val(r)), minHeight: val(r) ? 2 : 0 }} />
+                          )}
                         </button>
                       );
                     })}
                   </div>
                 )}
                 <div className="row between xs muted">
-                  <span>{ddmm(from)}</span>
-                  {picked && <span>{ddmm(picked)}: {(byDay.get(picked) as any)?.bottles || 0} chai · {vnd((byDay.get(picked) as any)?.revenue_vnd || 0)}</span>}
-                  <span>{ddmm(allDays[allDays.length - 1] || from)}</span>
+                  <span>{label(slots[0] || from)}</span>
+                  {pickedRow && (
+                    <span className="strong" style={{ color: 'var(--ink)' }}>
+                      {label(picked!)}: {mode === 'revenue' ? vnd(pickedRow.revenue) : `${pickedRow.sold} bán · ${pickedRow.gift} tặng · ${pickedRow.waste} hủy`}
+                    </span>
+                  )}
+                  <span>{label(slots[slots.length - 1] || from)}</span>
                 </div>
+                {mode === 'bottles' && (
+                  <div className="row xs muted" style={{ gap: 12 }}>
+                    <span className="row" style={{ gap: 4 }}><span className="sw" style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--brand)' }} />Đã bán</span>
+                    <span className="row" style={{ gap: 4 }}><span className="sw" style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--gift)' }} />Tặng</span>
+                    <span className="row" style={{ gap: 4 }}><span className="sw" style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--danger)' }} />Hủy</span>
+                  </div>
+                )}
+                {activeSlots > 0 && (
+                  <p className="small" style={{ margin: 0 }}>
+                    Trung bình bán <strong>{num(avgSold, 1)} chai/{unit}</strong> ({soldSlots} {unit} có bán) · {vndShort(Math.round(avgRev))}/{unit}.
+                  </p>
+                )}
               </section>
             )}
 
@@ -213,40 +323,6 @@ export default function Revenue() {
               <p className="xs muted">Tỉ lệ hủy = chai hủy ÷ (chai nấu + chai tồn qua) của các ngày đã chốt.</p>
               <div className="row between small"><span>Đơn bổ sung cuối ngày</span><span className="num strong">{view.catchup} chai</span></div>
             </section>
-
-            {canManage && data!.months.length > 0 && (
-              <section className="card tight">
-                <div className="row between" style={{ padding: '12px 0 4px' }}>
-                  <span className="h2">Theo tháng</span>
-                  <Link to="/thang-cu" className="small strong" style={{ textDecoration: 'none' }}>Nhập tháng cũ →</Link>
-                </div>
-                <div className="list-row xs muted" style={{ minHeight: 32 }}>
-                  <span style={{ width: 64 }}>Tháng</span>
-                  <span className="grow" style={{ textAlign: 'right' }}>Doanh thu</span>
-                  <span style={{ width: 84, textAlign: 'right' }}>Chi phí</span>
-                  <span style={{ width: 84, textAlign: 'right' }}>Lợi nhuận</span>
-                </div>
-                {data!.months.map((m: any) => (
-                  <div key={m.month} className="list-row small" style={{ minHeight: 40 }}>
-                    <span style={{ width: 64 }} className="strong">{monthLabel(m.month, true)}</span>
-                    <span className="grow num" style={{ textAlign: 'right' }}>{vndShort(m.revenue_vnd)}</span>
-                    <span className="num" style={{ width: 84, textAlign: 'right' }}>{vndShort(m.expense_vnd)}</span>
-                    <strong className="num" style={{ width: 84, textAlign: 'right', color: m.profit_vnd < 0 ? 'var(--danger)' : undefined }}>{vndShort(m.profit_vnd)}</strong>
-                  </div>
-                ))}
-              </section>
-            )}
-
-            {canManage && data!.months.length === 0 && (
-              <Link to="/thang-cu" className="list-row card tight" style={{ textDecoration: 'none', color: 'inherit' }}>
-                <span className="ico-box"><Icon name="history" size={20} /></span>
-                <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span className="strong">Nhập doanh thu, chi phí tháng cũ</span>
-                  <span className="small muted">Chuyển số từ sổ cũ để thống kê đủ các tháng</span>
-                </span>
-                <Icon name="chev" size={20} style={{ color: 'var(--ink-muted)' }} />
-              </Link>
-            )}
 
             {canManage && (
               <Link to="/bao-cao/xuat" className="list-row card tight" style={{ textDecoration: 'none', color: 'inherit' }}>
