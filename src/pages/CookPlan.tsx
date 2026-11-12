@@ -60,12 +60,16 @@ export default function CookPlan() {
     } catch {
       q = {};
     }
-    if (!Object.keys(q).length && data.plan?.cook_plan_lines?.length) data.plan.cook_plan_lines.forEach((l: any) => (q[l.product_id] = l.planned_qty));
+    // Kế hoạch đã ghi nấu (status 'cooked') thì về 0, tránh bấm ghi nấu lần nữa thành nấu trùng (T052).
+    // Hoàn tác mẻ nấu đưa kế hoạch về 'draft', nên lần nào hoàn tác cũng hiện lại đúng số của kế hoạch.
+    if (!Object.keys(q).length && data.plan?.status === 'draft' && data.plan?.cook_plan_lines?.length)
+      data.plan.cook_plan_lines.forEach((l: any) => (q[l.product_id] = l.planned_qty));
     setQty(q);
     setLoadedKey(draftKey);
-    // chỉ chạy khi đổi ngày/loại hoặc tải xong, không chạy lại khi dữ liệu nền làm mới
+    // chạy lại khi đổi ngày/loại, hoặc khi kế hoạch đổi trạng thái (ghi nấu, hoàn tác);
+    // không chạy lại khi dữ liệu nền làm mới, để không xóa số đang nhập
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!data, !!catalog, draftKey]);
+  }, [!!data, !!catalog, draftKey, data?.plan?.id, data?.plan?.status, data?.recent?.id, data?.recent?.status]);
 
   useEffect(() => {
     if (!draftKey || loadedKey !== draftKey) return;

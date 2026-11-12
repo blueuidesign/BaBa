@@ -40,7 +40,8 @@ export default function StockItem() {
   if (!data || !catalog) return (<div className="screen"><Header title="Vật tư" back="/kho" /><Loading /><Nav /></div>);
   const s = data.row;
   if (!s) return (<div className="screen"><Header title="Vật tư" back="/kho" /><p className="center-load">Không tìm thấy vật tư.</p><Nav /></div>);
-  const usedIn = catalog.allProducts.filter((p) => p.recipe.some((r) => r.ingredient_id === s.ingredient_id));
+  // Chỉ món đang bán ở cơ sở này (bỏ món đã ngừng bán hoặc đang tắt) — T033
+  const usedIn = catalog.products.filter((p) => p.recipe.some((r) => r.ingredient_id === s.ingredient_id));
   const lateRisk = s.kind === 'purchased' && s.days_of_cover != null && s.lead_days != null && s.days_of_cover < s.lead_days;
 
   // Gom biến động theo ngày + loại để dễ đọc
