@@ -319,3 +319,11 @@ select.input { appearance: auto; }
 .list-row.card { flex-direction: row; align-items: center; gap: 12px; padding: 8px 16px; min-height: 60px; text-align: left; border-bottom: 0; }
 .list-row.card > .grow { min-width: 0; }
 .btn.sm { min-height: 38px; padding: 0 14px; font-size: 14px; }
+
+/* Màn toàn màn hình (Thêm khoản chi): đầu và chân cố định, giữa cuộn, chiều cao không nhảy */
+.fullpage { position: fixed; inset: 0; z-index: 41; background: var(--bg-100); display: flex; flex-direction: column; max-width: 560px; margin: 0 auto; }
+.fp-head { display: flex; align-items: center; gap: 8px; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.fp-body { flex: 1; overflow-y: auto; scrollbar-width: none; padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 12px; }
+.fp-body::-webkit-scrollbar { display: none; }
+.fp-foot { flex-shrink: 0; padding: 12px 20px calc(12px + var(--safe-b)); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; background: var(--bg-100); }
+@media (min-width: 600px) { .fullpage { border-left: 1px solid var(--border); border-right: 1px solid var(--border); } }
