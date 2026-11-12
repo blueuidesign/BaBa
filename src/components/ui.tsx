@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../lib/app';
 
 const PATHS: Record<string, string> = {
@@ -129,24 +129,32 @@ export function BellLink() {
   );
 }
 
+/** Thanh dưới (quyết định 12/11): Trang chủ · Bán · Báo cáo · Chi phí · Tài khoản.
+ *  Nấu mở từ Trang chủ nên các màn /nau sáng ô Trang chủ. Chi phí chỉ hiện cho chủ cơ sở và admin,
+ *  vì DB hiện chỉ cho họ ghi và xem chi phí (fn_post_expense, RLS expenses_read). */
 export function Nav() {
+  const { canManage } = useApp();
+  const { pathname } = useLocation();
   const items = [
-    { to: '/', icon: 'home', label: 'Trang chủ', end: true },
+    { to: '/', icon: 'home', label: 'Trang chủ', active: pathname === '/' || pathname.startsWith('/nau') },
     { to: '/ban', icon: 'cart', label: 'Bán' },
-    { to: '/nau', icon: 'blender', label: 'Nấu' },
     { to: '/bao-cao', icon: 'chart', label: 'Báo cáo' },
+    ...(canManage ? [{ to: '/chi-phi', icon: 'coin', label: 'Chi phí' }] : []),
     { to: '/tai-khoan', icon: 'user', label: 'Tài khoản' }
   ];
   return (
-    <nav className="nav" aria-label="Điều hướng chính">
+    <nav className="nav" aria-label="Điều hướng chính" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
       {items.map((it) => (
-        <NavLink key={it.to} to={it.to} end={it.end} className={({ isActive }) => (isActive ? 'active' : '')}>
-          {({ isActive }) => (
-            <>
-              <Icon name={it.icon} size={22} sw={isActive ? 2 : 1.8} />
-              {it.label}
-            </>
-          )}
+        <NavLink key={it.to} to={it.to} end={it.to === '/'} className={({ isActive }) => ((it.active ?? isActive) ? 'active' : '')}>
+          {({ isActive }) => {
+            const on = it.active ?? isActive;
+            return (
+              <>
+                <Icon name={it.icon} size={22} sw={on ? 2 : 1.8} />
+                {it.label}
+              </>
+            );
+          }}
         </NavLink>
       ))}
     </nav>

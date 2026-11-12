@@ -123,7 +123,7 @@ export default function CookPlan() {
 
   return (
     <div className="screen">
-      <Header title="Kế hoạch nấu" sub={`${weekdayLabel(planDate)} · ${outlet.name}`} right={<BellLink />} />
+      <Header title="Kế hoạch nấu" back="/" sub={`${weekdayLabel(planDate)} · ${outlet.name}`} right={<BellLink />} />
       <main className="main with-bar">
         {data?.recent && (
           <div className="alert ok" role="status">

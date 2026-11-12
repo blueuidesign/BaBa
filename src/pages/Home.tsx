@@ -164,6 +164,15 @@ export default function Home() {
           <Icon name="cart" size={22} sw={2} /> Ghi đơn mới
         </Link>
 
+        <Link to="/nau" className="list-row card">
+          <span className="ico-box"><Icon name="blender" size={22} /></span>
+          <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
+            <span className="strong">Nấu</span>
+            <span className="small muted">Kế hoạch nấu, ghi mẻ đã nấu, mẻ syrup</span>
+          </span>
+          <Icon name="chev" size={20} style={{ color: 'var(--ink-muted)' }} />
+        </Link>
+
         {!data.closed.has(today) && (
           <button
             className="list-row card tight"
