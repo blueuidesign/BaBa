@@ -5,7 +5,7 @@ import { fetchStock, useLoad, type StockRow } from '../lib/data';
 import { ddmm, num, qty as fq } from '../lib/format';
 import { Header, Icon, Loading, Nav } from '../components/ui';
 
-export function StockLine({ s }: { s: StockRow }) {
+export function StockLine({ s, countOnly = false }: { s: StockRow; countOnly?: boolean }) {
   const scale = Math.max(s.min_qty * 3, s.qty_on_hand, 1);
   const pct = Math.max(0, Math.min(100, (s.qty_on_hand / scale) * 100));
   const mark = Math.min(100, (s.min_qty / scale) * 100);
@@ -18,6 +18,7 @@ export function StockLine({ s }: { s: StockRow }) {
         {s.name}
         {s.on_order && <span className="badge info" style={{ marginLeft: 6 }}>Đang về</span>}
         {s.expiring && <span className="badge warn" style={{ marginLeft: 6 }}>Hạn {ddmm(s.nearest_expiry!)}</span>}
+        {countOnly && <span className="badge info" style={{ marginLeft: 6 }}>đếm khi kiểm kê</span>}
       </span>
       <span className="d">{days}</span>
       <span className="track">
@@ -35,7 +36,7 @@ export function StockLine({ s }: { s: StockRow }) {
 }
 
 export default function Stock() {
-  const { outlet } = useApp();
+  const { outlet, catalog } = useApp();
   const [params] = useSearchParams();
   const [filter, setFilter] = useState<string>(params.get('loc') === 'can-dat' ? 'need' : 'all');
   const { data, loading } = useLoad((oid) => fetchStock(oid));
@@ -43,6 +44,8 @@ export default function Stock() {
 
   const rows = (data || []).filter((s) => s.enabled);
   const needs = rows.filter((s) => s.needs_order);
+  // Bao bì không nằm trong quy tắc trừ bao bì (ly, ống hút, nắp…): chỉ cập nhật khi kiểm kê
+  const countOnly = (x: StockRow) => x.grp === 'packaging' && !(catalog?.packaging || []).some((r) => r.ingredient_id === x.ingredient_id);
   const visible = rows.filter((s) => (filter === 'all' ? true : filter === 'need' ? s.needs_order : s.grp === filter));
   const bySupplier = new Map<string, StockRow[]>();
   needs.forEach((s) => {
@@ -123,8 +126,11 @@ export default function Stock() {
                 <section key={g.id} className="card tight">
                   <div className="h2" style={{ padding: '12px 0 0' }}>{g.name}</div>
                   {items.map((s) => (
-                    <StockLine key={s.ingredient_id} s={s} />
+                    <StockLine key={s.ingredient_id} s={s} countOnly={countOnly(s)} />
                   ))}
+                  {g.id === 'packaging' && items.some(countOnly) && (
+                    <p className="xs muted" style={{ paddingBottom: 10 }}>Món có nhãn "đếm khi kiểm kê" chưa có trong công thức nên app không tự trừ khi nấu, bán. Số còn lại cập nhật khi Kiểm kê kho.</p>
+                  )}
                 </section>
               );
             })}

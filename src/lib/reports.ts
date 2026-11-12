@@ -11,6 +11,11 @@ export const EXPENSE_CATS: { id: string; name: string; color: string }[] = [
 export const catName = (id: string | null | undefined) => EXPENSE_CATS.find((c) => c.id === id)?.name || 'Khác';
 export const catColor = (id: string | null | undefined) => EXPENSE_CATS.find((c) => c.id === id)?.color || '#9A9A9A';
 
+/** 4 nhóm chi phí (0017) */
+export const GROUP_COLOR: Record<string, string> = { nguyen_lieu: '#296241', vat_tu: '#C9A24A', van_hanh: '#B85F3A', dau_tu: '#1F6F9C' };
+export const GROUP_NAME: Record<string, string> = { nguyen_lieu: 'Nguyên liệu', vat_tu: 'Vật tư tiêu hao', van_hanh: 'Vận hành', dau_tu: 'Đầu tư thiết bị' };
+export const GROUP_ORDER = ['nguyen_lieu', 'vat_tu', 'van_hanh', 'dau_tu'];
+
 /** '2026-11-01' → 'tháng 11/2026'; short → 'T11/26' */
 export function monthLabel(d: string, short = false) {
   const [y, m] = d.split('-');
