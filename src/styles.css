@@ -301,3 +301,16 @@ input[aria-invalid="true"] { color: var(--danger); }
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; background: var(--bg-200); border-radius: var(--radius-pill); padding: 4px; }
 .seg button { border: 0; background: transparent; border-radius: var(--radius-pill); min-height: 36px; font-weight: 600; font-size: 14px; color: var(--ink-muted); cursor: pointer; }
 .seg button.on { background: var(--bg-100); color: var(--ink-brand); box-shadow: var(--shadow-soft); }
+
+/* Biểu đồ cột chồng: đã bán (xanh) dưới, tặng (vàng) giữa, hủy (đỏ) trên */
+:root { --gift: #E8B931; }
+.bars button span + span { border-radius: 0; }
+.bars button span.gift { background: var(--gift); opacity: 0.8; }
+.bars button span.waste { background: var(--danger); opacity: 0.8; }
+.bars button.on span.gift, .bars button.on span.waste { opacity: 1; }
+select.input { appearance: auto; }
+/* Nút gạt nhỏ đặt cùng dòng với tiêu đề card */
+.seg.sm { padding: 3px; flex-shrink: 0; }
+.seg.sm button { min-height: 30px; padding: 0 12px; font-size: 13px; }
+.chips.fit4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; overflow: visible; }
+.chips.fit4 .chip { justify-content: center; padding: 0 4px; font-size: 13px; white-space: nowrap; min-width: 0; }
