@@ -44,6 +44,8 @@ for x in ex:
   if stt == 69: note_extra = 'Tùng chốt 12/11: tính là chi phí'
   ing = x['Mã vật tư'].rstrip('*')
   label = f"[Excel {x['Nguồn']}]"
+  # Cột Ghi chú của CSV hay lặp lại "[Excel Phần I] <nội dung>"; bỏ phần lặp, giữ phần thêm
+  note_extra = note_extra.replace(f"{label} {x['Nội dung gốc']}", '').replace(x['Nội dung gốc'] + ';', '').strip(' ;·')
   sl = f" · SL gốc {x['Số lượng gốc']}" if x['Số lượng gốc'] else ''
   note = f"{label} {x['Nội dung gốc']}{sl}" + (f" · {note_extra}" if note_extra and note_extra != x['Nội dung gốc'] else '')
   d = '2026-10-01' if x['Nguồn'] != 'Theo ngày' else x['Ngày']
