@@ -178,16 +178,32 @@
    "title": "E03 · Kết quả đối chiếu",
    "is_interactive": true
   },
-  "F01.dc.html": {
+  "F05.dc.html": {
    "x": 0,
    "y": 7344,
    "w": 390,
    "h": 844,
-   "title": "F01 · Báo cáo: 4 tab bấm được",
+   "title": "F05 · Báo cáo hôm nay",
+   "is_interactive": true
+  },
+  "F01.dc.html": {
+   "x": 470,
+   "y": 7344,
+   "w": 390,
+   "h": 844,
+   "title": "F01 · Báo cáo tháng (Số chai)",
+   "is_interactive": true
+  },
+  "F06.dc.html": {
+   "x": 940,
+   "y": 7344,
+   "w": 390,
+   "h": 844,
+   "title": "F06 · Báo cáo tất cả (Theo tháng)",
    "is_interactive": true
   },
   "F04.dc.html": {
-   "x": 470,
+   "x": 1410,
    "y": 7344,
    "w": 390,
    "h": 844,
@@ -195,7 +211,7 @@
    "is_interactive": true
   },
   "H01.dc.html": {
-   "x": 940,
+   "x": 1880,
    "y": 7344,
    "w": 390,
    "h": 844,
@@ -203,7 +219,7 @@
    "is_interactive": true
   },
   "H02.dc.html": {
-   "x": 1410,
+   "x": 2350,
    "y": 7344,
    "w": 390,
    "h": 844,
@@ -211,7 +227,7 @@
    "is_interactive": true
   },
   "H03.dc.html": {
-   "x": 1880,
+   "x": 2820,
    "y": 7344,
    "w": 390,
    "h": 844,
@@ -337,7 +353,9 @@
   "E01.dc.html",
   "E02.dc.html",
   "E03.dc.html",
+  "F05.dc.html",
   "F01.dc.html",
+  "F06.dc.html",
   "F04.dc.html",
   "H01.dc.html",
   "H02.dc.html",
