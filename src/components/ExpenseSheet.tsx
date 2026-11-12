@@ -8,7 +8,7 @@ import { num, timeHM, unitLabel, uuid, vnd, vnToday } from '../lib/format';
 import { Icon, MoneyInput, NumberField, confirmDialog, reasonDialog } from './ui';
 
 /**
- * Bottom sheet thêm / sửa khoản chi (H02, H04, H07, H08, H09, W03, W04).
+ * Màn toàn màn hình thêm / sửa khoản chi (H02, H04, H07, H08, H09, W03, W04).
  * - Chip loại: hàng đầu 4 loại nhóm Nguyên liệu, Vật tư (có dòng ví dụ); Đầu tư thiết bị có chip con.
  * - Tên khoản chi gõ tự do; gợi ý tên trong kho (đúng nhóm kho của loại) và tên đã dùng.
  * - Cộng kho khi tên chọn từ kho và có số lượng; ngược lại chỉ ghi tiền, hỏi lại trước khi lưu (W04).
@@ -176,11 +176,12 @@ export default function ExpenseSheet({
   return (
     <>
       <div className="sheet-back" onClick={onClose} />
-      <div className="sheet" role="dialog" aria-labelledby="exp-t" style={{ maxHeight: '92vh', overflowY: 'auto', scrollbarWidth: 'none' }}>
-        <div className="row between">
+      <div className="fullpage" role="dialog" aria-modal="true" aria-labelledby="exp-t">
+        <div className="fp-head">
+          <button className="icon-btn" aria-label="Đóng" onClick={onClose}><Icon name="x" size={22} /></button>
           <h2 id="exp-t" style={{ fontSize: 18, margin: 0 }}>{existing ? `Sửa khoản chi` : 'Thêm khoản chi'}</h2>
-          <button className="icon-btn" aria-label="Đóng" onClick={onClose}><Icon name="x" size={20} /></button>
         </div>
+        <div className="fp-body">
 
         {fromPurchase ? (
           <>
@@ -307,6 +308,8 @@ export default function ExpenseSheet({
           </>
         )}
 
+        </div>
+        <div className="fp-foot">
         {err && <span className="err">{err}</span>}
         {!fromPurchase && (
           <button className="btn lg block" disabled={busy} onClick={save}>
@@ -318,6 +321,7 @@ export default function ExpenseSheet({
             <Icon name="trash" size={18} sw={2} /> {fromPurchase ? 'Hủy phiếu nhập…' : 'Hủy khoản chi…'}
           </button>
         )}
+        </div>
       </div>
     </>
   );
