@@ -41,14 +41,15 @@ Bản thiết kế gốc là artifact Design `5a78cd59-3e4a-4a15-b6be-f7d2cb82e6
 | D04 | Chai đang có | `/kho/chai` | `src/pages/Bottles.tsx` |
 | D05 | Kiểm kê | `/kho/kiem-ke` | `src/pages/StockCount.tsx` |
 | E01–E03 | Đối chiếu cuối ngày (3 bước trong một trang) | `/doi-chieu?ngay=` | `src/pages/DayClose.tsx` |
-| F01 | Báo cáo: doanh thu, lợi nhuận, theo tháng | `/bao-cao` | `src/pages/Revenue.tsx` |
+| F01, F05, F06, F07 | Báo cáo Ngày · Tuần · Tháng · Toàn bộ, lãi lỗ theo nhóm, hoàn vốn | `/bao-cao` | `src/pages/Revenue.tsx` |
 | F04 | Xuất file Excel (CSV) | `/bao-cao/xuat` | `src/pages/Export.tsx` (CSV ở `src/lib/reports.ts`) |
-| H01 | Chi phí (biểu đồ tròn, lịch sử) | `/chi-phi` | `src/pages/Expenses.tsx` |
-| H02 | Ghi chi phí | `/chi-phi/moi` | `src/pages/ExpenseNew.tsx` |
+| H01, H05, H06 | Chi phí theo 4 nhóm, theo loại, trống (ô trên thanh dưới) | `/chi-phi` | `src/pages/Expenses.tsx` |
+| H02, H04, H07, H08, H09, W03, W04 | Thêm, sửa, hủy khoản chi (bottom sheet) | `/chi-phi/moi` | `src/components/ExpenseSheet.tsx` |
+| B03, B04 | Giảm giá khi ghi đơn | `/ban` | `src/pages/Order.tsx`, `OrderSaved.tsx` |
 | H03 | Số liệu tháng cũ | `/thang-cu` | `src/pages/Historical.tsx` |
 | P01 | Nhà cung cấp | `/nha-cung-cap?id=` | `src/pages/Suppliers.tsx` |
 | Q01 | Nhân viên (chủ cơ sở; admin gán chủ cơ sở) | `/nhan-vien` | `src/pages/Members.tsx` |
-| K01 | Quản trị (admin) | `/quan-tri` | `src/pages/AdminOverview.tsx` |
+| K01, K02 | Quản trị (admin) | `/quan-tri` | `src/pages/AdminOverview.tsx` |
 | W01, W02 | Popup xác nhận, ô số âm | (dùng chung) | `confirmDialog`, `reasonDialog`, `DialogHost`, `NumberField`, `MoneyInput` trong `src/components/ui.tsx` |
 | E04 | Ngày đã chốt, mở khóa | `/doi-chieu?ngay=` | `src/pages/DayClose.tsx` |
 | F02 | Thông báo | `/thong-bao` | `src/pages/Notifications.tsx` |

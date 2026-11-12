@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GROUPS, useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { useLoad } from '../lib/data';
-import { num, unitLabel, uuid, vnd } from '../lib/format';
+import { num, unitLabel, uuid, vnd, vnToday } from '../lib/format';
 import { Header, Icon, Nav, NumberField, confirmDialog } from '../components/ui';
 
 type Line = { key: string; ingredient_id: string; qty: string; price: string; expires: string };
@@ -15,6 +15,7 @@ export default function Purchase() {
   const [supplier, setSupplier] = useState<string>('');
   const [lines, setLines] = useState<Line[]>([]);
   const [note, setNote] = useState('');
+  const [date, setDate] = useState(vnToday());
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [lastSaved, setLastSaved] = useState<{ sig: string; at: number } | null>(() => JSON.parse(sessionStorage.getItem('kho-baba-last-purchase') || 'null'));
@@ -52,7 +53,7 @@ export default function Purchase() {
     }
     setBusy(true);
     const { error } = await supabase.rpc('fn_post_purchase', {
-      p: { outlet_id: outlet!.id, client_id: uuid(), supplier_id: supplier || null, note: note || null, total_vnd: total || null, lines: payloadLines }
+      p: { outlet_id: outlet!.id, client_id: uuid(), business_date: date, supplier_id: supplier || null, note: note || null, total_vnd: total || null, lines: payloadLines }
     });
     setBusy(false);
     if (error) return setErr(errorText(error));
@@ -121,10 +122,14 @@ export default function Purchase() {
           <button className="btn secondary block" onClick={() => setLines((ls) => [...ls, { key: uuid(), ingredient_id: '', qty: '', price: '', expires: '' }])}>
             <Icon name="plus" size={20} sw={2.2} /> Thêm vật tư
           </button>
-          <p className="xs muted">Giá mua không bắt buộc, dùng để tính giá vốn sau này.</p>
+          <p className="xs muted">Thành tiền không bắt buộc. Dòng có thành tiền sẽ tự ghi vào Chi phí theo nhóm của món: nguyên liệu chính, phụ liệu hoặc vật tư tiêu hao. Không cần ghi lại ở màn Chi phí.</p>
         </section>
 
         <section className="card">
+          <label className="field">
+            <span className="label">Ngày nhập</span>
+            <input type="date" className="input sm" value={date} max={vnToday()} onChange={(e) => setDate(e.target.value)} />
+          </label>
           <label className="field">
             <span className="label">Ghi chú</span>
             <input className="input sm" placeholder="Số lô, người giao, chứng từ…" value={note} onChange={(e) => setNote(e.target.value)} />
