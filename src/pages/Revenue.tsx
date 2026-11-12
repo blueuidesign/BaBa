@@ -158,7 +158,8 @@ export default function Revenue() {
     <div className="screen">
       <Header title="Báo cáo" sub={outlet.name} right={<BellLink />} />
       <main className="main">
-        <div className="chips">
+        {/* 4 chip chia đều một dòng, không phải cuộn ngang */}
+        <div className="chips fit4">
           {(
             [
               ['today', 'Hôm nay'],
