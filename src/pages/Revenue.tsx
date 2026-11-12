@@ -240,13 +240,12 @@ export default function Revenue() {
 
             {range !== 'today' && (
               <section className="card">
-                <div className="row between">
+                <div className="row between" style={{ gap: 8 }}>
                   <span className="h2">{byMonth ? 'Theo tháng' : 'Theo ngày'}</span>
-                  {picked && <button className="btn quiet" style={{ minHeight: 28 }} onClick={() => setPicked(null)}>Cả kỳ</button>}
-                </div>
-                <div className="seg" role="tablist" aria-label="Chế độ biểu đồ">
-                  <button className={mode === 'revenue' ? 'on' : ''} onClick={() => setMode('revenue')}>Doanh thu</button>
-                  <button className={mode === 'bottles' ? 'on' : ''} onClick={() => setMode('bottles')}>Số chai</button>
+                  <div className="seg sm" role="tablist" aria-label="Chế độ biểu đồ">
+                    <button className={mode === 'revenue' ? 'on' : ''} onClick={() => setMode('revenue')}>Doanh thu</button>
+                    <button className={mode === 'bottles' ? 'on' : ''} onClick={() => setMode('bottles')}>Số chai</button>
+                  </div>
                 </div>
                 {activeSlots === 0 ? (
                   <p className="small muted">Chưa có số liệu trong khoảng này.</p>
@@ -275,9 +274,9 @@ export default function Revenue() {
                 <div className="row between xs muted">
                   <span>{label(slots[0] || from)}</span>
                   {pickedRow && (
-                    <span className="strong" style={{ color: 'var(--ink)' }}>
-                      {label(picked!)}: {mode === 'revenue' ? vnd(pickedRow.revenue) : `${pickedRow.sold} bán · ${pickedRow.gift} tặng · ${pickedRow.waste} hủy`}
-                    </span>
+                    <button className="strong" style={{ color: 'var(--ink)', border: 0, background: 'transparent', padding: 0, font: 'inherit', cursor: 'pointer' }} onClick={() => setPicked(null)} aria-label="Bỏ chọn, xem cả kỳ">
+                      {label(picked!)}: {mode === 'revenue' ? vnd(pickedRow.revenue) : `${pickedRow.sold} bán · ${pickedRow.gift} tặng · ${pickedRow.waste} hủy`} ✕
+                    </button>
                   )}
                   <span>{label(slots[slots.length - 1] || from)}</span>
                 </div>

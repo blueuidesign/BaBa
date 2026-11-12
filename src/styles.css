@@ -309,3 +309,6 @@ input[aria-invalid="true"] { color: var(--danger); }
 .bars button span.waste { background: var(--danger); opacity: 0.8; }
 .bars button.on span.gift, .bars button.on span.waste { opacity: 1; }
 select.input { appearance: auto; }
+/* Nút gạt nhỏ đặt cùng dòng với tiêu đề card */
+.seg.sm { padding: 3px; flex-shrink: 0; }
+.seg.sm button { min-height: 30px; padding: 0 12px; font-size: 13px; }
