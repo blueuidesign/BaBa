@@ -5,7 +5,13 @@ import { fetchBottles, fetchDaySales, useLoad } from '../lib/data';
 import { callOrQueue, enqueue, type QueuedCall } from '../lib/queue';
 import { errorText } from '../lib/supabase';
 import { uuid, vnd, vnToday } from '../lib/format';
-import { BellLink, Bottle, Header, Icon, Loading, Nav, confirmDialog } from '../components/ui';
+import { BellLink, Bottle, Header, Icon, Loading, MoneyInput, Nav, confirmDialog } from '../components/ui';
+
+type Discount = { kind: 'pct'; value: number } | { kind: 'amt'; value: number } | null;
+const PCTS = [5, 10];
+/** Giảm theo % làm tròn tới nghìn đồng. */
+const discountOf = (d: Discount, total: number) =>
+  !d ? 0 : d.kind === 'pct' ? Math.round((total * d.value) / 100 / 1000) * 1000 : d.value;
 
 export default function Order() {
   const { outlet, catalog, queue, bump } = useApp();
@@ -14,6 +20,10 @@ export default function Order() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [stuck, setStuck] = useState<QueuedCall | null>(null);
+  const [discount, setDiscount] = useState<Discount>(null);
+  const [reason, setReason] = useState('');
+  const [discOpen, setDiscOpen] = useState(false);
+  const [draftAmt, setDraftAmt] = useState('');
   const today = vnToday();
 
   const { data } = useLoad(async (oid) => {
@@ -36,7 +46,10 @@ export default function Order() {
   const products = catalog?.products || [];
   const picked = products.filter((p) => counts[p.id]);
   const bottles = picked.reduce((s, p) => s + counts[p.id], 0);
-  const total = picked.reduce((s, p) => s + counts[p.id] * p.price, 0);
+  const gross = picked.reduce((s, p) => s + counts[p.id] * p.price, 0);
+  const disc = discountOf(discount, gross);
+  const discTooBig = disc > gross && gross > 0;
+  const total = Math.max(0, gross - disc);
 
   function inc(pid: string) {
     setErr(null);
@@ -61,12 +74,17 @@ export default function Order() {
       outletId: outlet!.id,
       createdAt: new Date().toISOString(),
       summary: picked.map((p) => `${counts[p.id]} ${p.short_name}`).join(' · '),
-      payload: { outlet_id: outlet!.id, client_id: id, business_date: today, placed_at: new Date().toISOString(), lines }
+      payload: {
+        outlet_id: outlet!.id, client_id: id, business_date: today, placed_at: new Date().toISOString(), lines,
+        ...(disc > 0 ? { discount_vnd: disc, discount_reason: reason.trim() || (discount?.kind === 'pct' ? `Giảm ${discount.value}%` : null) } : {})
+      }
     };
   }
 
   function done(call: QueuedCall, result: any, queued: boolean) {
     setCounts({});
+    setDiscount(null);
+    setReason('');
     bump();
     nav('/ban/da-luu', {
       state: {
@@ -74,6 +92,9 @@ export default function Order() {
         clientId: call.id,
         result,
         total,
+        gross,
+        discount: disc,
+        discountReason: call.payload.discount_reason || null,
         bottles,
         lines: picked.map((p) => ({ product_id: p.id, name: p.name, color: p.color, qty: counts[p.id], price: p.price }))
       }
@@ -81,7 +102,7 @@ export default function Order() {
   }
 
   async function save(call = buildCall()) {
-    if (busy || !bottles) return;
+    if (busy || !bottles || discTooBig) return;
     setBusy(true);
     setErr(null);
     try {
@@ -150,18 +171,66 @@ export default function Order() {
             ))}
           </div>
         )}
+        {bottles > 0 && (
+          <div className="row between" style={{ gap: 8 }}>
+            {disc > 0 ? (
+              <button type="button" className="chip on" style={{ minHeight: 34, fontSize: 13 }} onClick={() => setDiscOpen(true)} aria-label={`Đang giảm ${vnd(disc)}, bấm để sửa`}>
+                <Icon name="tag" size={15} /> Giảm {discount?.kind === 'pct' ? `${discount.value}% · ` : ''}{vnd(disc)}
+              </button>
+            ) : (
+              <button type="button" className="chip" style={{ minHeight: 34, fontSize: 13 }} onClick={() => { setDraftAmt(''); setDiscOpen(true); }}>
+                <Icon name="tag" size={15} /> Giảm giá
+              </button>
+            )}
+            {disc > 0 && <span className="small muted num">Tạm tính <s>{vnd(gross)}</s></span>}
+          </div>
+        )}
+        {discTooBig && <span className="err">Giảm {vnd(disc)} lớn hơn tiền đơn {vnd(gross)}. Bấm vào ô giảm giá để sửa.</span>}
         {err && <span className="err">{err}</span>}
         <div className="bar-row">
           <div className="bar-total">
-            <span className="label">{bottles ? `${bottles} chai trong đơn` : 'Chưa chọn món'}</span>
+            <span className="label">{bottles ? `${bottles} chai · ${disc > 0 ? 'thu' : 'trong đơn'}` : 'Chưa chọn món'}</span>
             <span className="value">{vnd(total)}</span>
           </div>
-          <button className="btn lg" style={{ minWidth: 150 }} disabled={!bottles || busy} onClick={() => save()}>
+          <button className="btn lg" style={{ minWidth: 150 }} disabled={!bottles || busy || discTooBig} onClick={() => save()}>
             <Icon name="check" size={20} sw={2.2} /> {busy ? 'Đang lưu…' : 'Lưu đơn'}
           </button>
         </div>
       </div>
       <Nav />
+
+      {discOpen && (
+        <>
+          <div className="sheet-back" onClick={() => setDiscOpen(false)} />
+          <div className="sheet" role="dialog" aria-labelledby="disc-t">
+            <h2 id="disc-t" style={{ fontSize: 18 }}>Giảm giá cho đơn này</h2>
+            <p className="small muted">Đơn {bottles} chai · tạm tính {vnd(gross)}. Giá từng món giữ nguyên, app trừ ở tổng đơn.</p>
+            <div className="chips wrap">
+              {PCTS.map((v) => (
+                <button key={v} type="button" className={`chip ${discount?.kind === 'pct' && discount.value === v ? 'on' : ''}`}
+                  onClick={() => { setDiscount({ kind: 'pct', value: v }); setDraftAmt(''); }}>
+                  {v}% · {vnd(discountOf({ kind: 'pct', value: v }, gross))}
+                </button>
+              ))}
+            </div>
+            <span className="small strong">Hoặc nhập số tiền giảm</span>
+            <MoneyInput label="Số tiền giảm" value={draftAmt} placeholder="Ví dụ 5.000"
+              onChange={(v) => { setDraftAmt(v); setDiscount(v ? { kind: 'amt', value: Number(v) } : null); }} />
+            {discTooBig && <span className="err">Giảm không được lớn hơn tiền đơn {vnd(gross)}.</span>}
+            <label className="input-wrap">
+              <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Lý do (không bắt buộc), vd: khách quen" aria-label="Lý do giảm giá" maxLength={80} />
+            </label>
+            <button className="btn lg block" disabled={discTooBig} onClick={() => setDiscOpen(false)}>
+              {disc > 0 ? `Giảm ${vnd(disc)} · thu ${vnd(total)}` : 'Xong'}
+            </button>
+            {discount && (
+              <button className="btn quiet block" onClick={() => { setDiscount(null); setDraftAmt(''); setReason(''); setDiscOpen(false); }}>
+                Bỏ giảm giá
+              </button>
+            )}
+          </div>
+        </>
+      )}
 
       {stuck && (
         <>

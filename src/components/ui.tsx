@@ -23,6 +23,7 @@ const PATHS: Record<string, string> = {
   warn: '<path d="M12 3 2 20h20Z"/><path d="M12 9v5M12 17h.01"/>',
   check: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5L11 15.5L16.5 9.5"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9Z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
   bottle: '<rect x="9" y="2.5" width="6" height="3" rx="1"/><path d="M9.5 5.5V7C9.5 8 7.5 9 7.5 11V19.5A2 2 0 0 0 9.5 21.5H14.5A2 2 0 0 0 16.5 19.5V11C16.5 9 14.5 8 14.5 7V5.5"/><path d="M7.5 14H16.5"/>',
   sprout: '<path d="M12 21V11"/><path d="M12 13C12 9 9 6 4 6C4 10 7 13 12 13Z"/><path d="M12 11C12 7 15 4 20 4C20 8 17 11 12 11Z"/><path d="M7 21H17"/>',
   spark: '<path d="M12 3V7M12 17V21M3 12H7M17 12H21M5.6 5.6L8.4 8.4M15.6 15.6L18.4 18.4M5.6 18.4L8.4 15.6M15.6 8.4L18.4 5.6"/>',
