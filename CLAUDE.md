@@ -40,7 +40,7 @@ App bán hàng và quản lý kho cho sữa hạt **Sữa lành từ BaBa**: PWA
 - React 19 + Vite 7 + TypeScript ~5.9, react-router 7, `@supabase/supabase-js`, `vite-plugin-pwa`. Không có thư viện UI; style ở `src/styles.css`.
 - `npm run dev` · `npm run typecheck` · `npm run build`. Chạy typecheck và build trước mỗi commit.
 - Biến môi trường: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (xem `.env.example`; key là publishable key, để lộ được).
-- Supabase project ref `fsqpajvjjmpyrgllrhgz` (Singapore). Migration ở `supabase/migrations/`, đã chạy tới `0032` (12/11/2026). Edge Function `send-push` đã deploy. Migration mới đánh số từ `0033`. Dữ liệu cũ Excel + Knote của cơ sở Phan Văn Hớn đã nhập ở `0019`, `0020` (sinh bằng `scripts/import/build_import_sql.py`).
+- Supabase project ref `fsqpajvjjmpyrgllrhgz` (Singapore). Migration ở `supabase/migrations/`, đã chạy tới `0032` và `0034` (0033 chưa chạy) (12/11/2026). Edge Function `send-push` đã deploy. Migration mới đánh số từ `0033`. Dữ liệu cũ Excel + Knote của cơ sở Phan Văn Hớn đã nhập ở `0019`, `0020` (sinh bằng `scripts/import/build_import_sql.py`).
 - Địa chỉ app chính thức: https://khobaba.vxlab.vn (dùng trong email mời, hướng dẫn). `baba-wine.vercel.app` chỉ là tên miền mặc định của Vercel.
 
 ## Ràng buộc kỹ thuật bắt buộc
