@@ -346,3 +346,22 @@ export function Empty({ icon, title, text, children }: { icon: string; title: st
     </div>
   );
 }
+
+/** Hai ô Từ ngày – Đến ngày, mỗi ô nửa chiều ngang. Chữ hiện dd/MM/yyyy; ô <input type="date"> thật nằm trong suốt phía trên
+ *  để bấm vào vẫn mở lịch của máy (ô date của iPhone tự giãn rộng nên không dùng để hiển thị). */
+export function DateRange({ from, to, min, max, onChange }: { from: string; to: string; min?: string; max?: string; onChange: (from: string, to: string) => void }) {
+  const fmt = (d: string) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : 'Chọn ngày');
+  const box = (label: string, value: string, lo: string | undefined, hi: string | undefined, set: (v: string) => void) => (
+    <label className="datebox">
+      <span className="xs strong muted">{label}</span>
+      <span className="datebox-val num">{fmt(value)}</span>
+      <input type="date" value={value} min={lo} max={hi} aria-label={label} onChange={(e) => e.target.value && set(e.target.value)} />
+    </label>
+  );
+  return (
+    <div className="date2">
+      {box('Từ ngày', from, min, to || max, (v) => onChange(v, to))}
+      {box('Đến ngày', to, from || min, max, (v) => onChange(from, v))}
+    </div>
+  );
+}
