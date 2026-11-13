@@ -5,7 +5,7 @@ import { GROUP_COLOR, monthLabel } from '../lib/reports';
 import { addDays, addMonths, rangeOf, type Range } from '../lib/period';
 import { supabase } from '../lib/supabase';
 import { useLoad } from '../lib/data';
-import { ddmm, num, timeHM, vnd, vndShort, vnToday } from '../lib/format';
+import { ddmm, num, vnd, vndShort, vnToday } from '../lib/format';
 import { BellLink, DateRange, Header, Icon, Loading, Nav } from '../components/ui';
 
 type Mode = 'revenue' | 'bottles';
@@ -23,7 +23,6 @@ export default function Revenue() {
   const [mode, setMode] = useState<Mode>('revenue');
   // Toàn bộ: lọc từ ngày đến ngày (cả hai đầu đều tính)
   const [cust, setCust] = useState<{ f: string; t: string } | null>(null);
-  const [openOrder, setOpenOrder] = useState<string | null>(null);
 
   // Tháng đầu tiên có số liệu (kể cả số nhập tay tháng cũ) để làm khung cho tab Tất cả
   const { data: span } = useLoad(async (oid) => {
@@ -82,18 +81,8 @@ export default function Revenue() {
     [range, from, to]
   );
 
-  // Danh sách từng đơn của một ngày: tab Ngày, hoặc ngày đang bấm chọn trên biểu đồ
-  const listDay = range === 'day' ? from : picked && !(range === 'all' && (!custOn || custDays > 62)) ? picked : null;
-  const { data: orders } = useLoad(
-    async (oid) => {
-      if (!listDay) return [] as any[];
-      const { data: o } = await supabase.from('orders')
-        .select('id,seq_in_day,placed_at,total_vnd,discount_vnd,is_gift,payment_method,customer_name,note,source,channel,order_lines(qty,product_id,unit_price_vnd)')
-        .eq('outlet_id', oid).eq('business_date', listDay).eq('status', 'active').order('placed_at', { ascending: false });
-      return (o || []) as any[];
-    },
-    [listDay]
-  );
+  // Ngày mở ở màn Các đơn trong ngày: tab Ngày, hoặc ngày đang bấm chọn trên biểu đồ; không thì ngày cuối có dữ liệu
+  const listDay = range === 'day' ? from : picked && !(range === 'all' && (!custOn || custDays > 62)) ? picked : dataLast;
 
   // Gom theo ngày (tháng) hoặc theo tháng (tab Tất cả): đã bán, tặng, hủy, doanh thu
   const byMonth = range === 'all' && (!custOn || custDays > 62);
@@ -366,48 +355,6 @@ export default function Revenue() {
               </section>
             )}
 
-            {listDay && (
-              <section className="card tight">
-                <div className="row between" style={{ padding: '12px 0 2px' }}>
-                  <span className="h2">Các đơn ngày {ddmm(listDay)}</span>
-                  <span className="xs muted">{orders ? `${orders.length} đơn` : ''}</span>
-                </div>
-                {orders && orders.length === 0 && <p className="small muted" style={{ paddingBottom: 12 }}>Chưa có đơn nào trong ngày này.</p>}
-                {(orders || []).map((o: any) => {
-                  const open = openOrder === o.id;
-                  const nQty = o.order_lines.reduce((a: number, l: any) => a + l.qty, 0);
-                  const payL = o.payment_method === 'cash' ? 'Tiền mặt' : o.payment_method === 'transfer' ? 'Chuyển khoản' : 'Chưa ghi cách nhận tiền';
-                  return (
-                    <div key={o.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <button type="button" className="list-row" aria-expanded={open} onClick={() => setOpenOrder(open ? null : o.id)}
-                        style={{ border: 0, background: 'transparent', width: '100%', textAlign: 'left', minHeight: 52, padding: '6px 0', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
-                        <span className="small muted num" style={{ width: 44, flexShrink: 0 }}>{timeHM(o.placed_at)}</span>
-                        <span className="grow" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                          <span className="strong">{o.customer_name || 'Khách lẻ'}</span>
-                          <span className="xs muted">{nQty} phần · {o.is_gift ? 'tặng' : payL}{o.channel === 'aggregate' ? ' · đơn bổ sung' : ''}</span>
-                        </span>
-                        <span className="strong num">{vnd(o.total_vnd)}</span>
-                        <Icon name="chev" size={16} style={{ color: 'var(--ink-muted)', transform: open ? 'rotate(90deg)' : undefined }} />
-                      </button>
-                      {open && (
-                        <div style={{ padding: '0 0 10px 44px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          {o.order_lines.map((l: any, i: number) => (
-                            <div key={i} className="row between small">
-                              <span>{l.qty} × {product(l.product_id)?.name || 'Món đã bỏ'}</span>
-                              <span className="num muted">{vnd(l.qty * l.unit_price_vnd)}</span>
-                            </div>
-                          ))}
-                          {o.discount_vnd > 0 && <div className="row between small"><span>Giảm giá</span><span className="num muted">− {vnd(o.discount_vnd)}</span></div>}
-                          <span className="xs muted">Đơn số {o.seq_in_day} · {payL}{o.source === 'import' ? ' · nhập từ Knote' : ''}</span>
-                          {o.note && <span className="xs muted">{o.note}</span>}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </section>
-            )}
-
             <section className="card">
               <div className="h2">Theo món</div>
               {view.ranked.length === 0 && <p className="small muted">Chưa có đơn trong khoảng này.</p>}
@@ -448,6 +395,15 @@ export default function Revenue() {
               )}
               <p className="xs muted">Tính theo đơn đã đánh dấu sau khi lưu. Đơn tặng không tính.</p>
             </section>
+
+            <Link to={`/bao-cao/don?d=${listDay}`} className="list-row card tight" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <span className="ico-box"><Icon name="cart" size={20} /></span>
+              <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
+                <span className="strong">Các đơn ngày {ddmm(listDay)}</span>
+                <span className="small muted">Từng đơn: giờ, khách, món, cách nhận tiền</span>
+              </span>
+              <Icon name="chev" size={20} style={{ color: 'var(--ink-muted)' }} />
+            </Link>
 
             {canManage && (
               <Link to="/bao-cao/xuat" className="list-row card tight" style={{ textDecoration: 'none', color: 'inherit' }}>
