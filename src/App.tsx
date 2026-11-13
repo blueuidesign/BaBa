@@ -26,6 +26,7 @@ import Export from './pages/Export';
 import Historical from './pages/Historical';
 import Suppliers from './pages/Suppliers';
 import Members from './pages/Members';
+import AdminProducts from './pages/AdminProducts';
 import AdminOverview from './pages/AdminOverview';
 
 export default function App() {
@@ -67,6 +68,7 @@ export default function App() {
       <Route path="/nha-cung-cap" element={<Suppliers />} />
       <Route path="/nhan-vien" element={<Members />} />
       <Route path="/quan-tri" element={<AdminOverview />} />
+      <Route path="/quan-tri/mon" element={<AdminProducts />} />
       <Route path="*" element={<Navigate to={outlets.length ? '/' : '/co-so'} replace />} />
     </Routes>
     </>

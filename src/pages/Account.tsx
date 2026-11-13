@@ -103,7 +103,10 @@ export default function Account() {
         <section className="card">
           <div className="h2">Quản trị hệ thống</div>
           {isAdmin ? (
-            <Link to="/quan-tri" className="btn secondary block">Báo cáo tất cả cơ sở, chủ cơ sở</Link>
+            <>
+              <Link to="/quan-tri" className="btn secondary block">Báo cáo tất cả cơ sở, chủ cơ sở</Link>
+              <Link to="/quan-tri/mon" className="btn secondary block">Quản lý món: tên, nhóm, giá, ngừng bán</Link>
+            </>
           ) : (
             <p className="small muted">Admin BaBa tạo cơ sở mới, gán chủ cơ sở, quản lý công thức và giá chung.</p>
           )}
