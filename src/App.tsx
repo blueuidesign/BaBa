@@ -15,6 +15,7 @@ import Purchase from './pages/Purchase';
 import StockCount from './pages/StockCount';
 import Bottles from './pages/Bottles';
 import DayClose from './pages/DayClose';
+import DayOrders from './pages/DayOrders';
 import Revenue from './pages/Revenue';
 import Notifications from './pages/Notifications';
 import History from './pages/History';
@@ -57,6 +58,7 @@ export default function App() {
       <Route path="/lich-su" element={<History />} />
       <Route path="/tai-khoan" element={<Account />} />
       <Route path="/bao-cao/xuat" element={<Export />} />
+      <Route path="/bao-cao/don" element={<DayOrders />} />
       <Route path="/chi-phi" element={<Expenses />} />
       <Route path="/chi-phi/moi" element={<Expenses openNew />} />
       <Route path="/thang-cu" element={<Historical />} />
