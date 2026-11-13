@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../lib/app';
 import { GROUP_COLOR, monthLabel } from '../lib/reports';
-import { addMonths, rangeOf, type Range } from '../lib/period';
+import { addDays, addMonths, rangeOf, type Range } from '../lib/period';
 import { supabase } from '../lib/supabase';
 import { useLoad } from '../lib/data';
-import { ddmm, num, vnd, vndShort, vnToday } from '../lib/format';
+import { ddmm, num, timeHM, vnd, vndShort, vnToday } from '../lib/format';
 import { BellLink, Header, Icon, Loading, Nav } from '../components/ui';
 
 type Mode = 'revenue' | 'bottles';
@@ -21,6 +21,9 @@ export default function Revenue() {
   const [off, setOff] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>('revenue');
+  // Toàn bộ: lọc từ ngày đến ngày (cả hai đầu đều tính)
+  const [cust, setCust] = useState<{ f: string; t: string } | null>(null);
+  const [openOrder, setOpenOrder] = useState<string | null>(null);
 
   // Tháng đầu tiên có số liệu (kể cả số nhập tay tháng cũ) để làm khung cho tab Tất cả
   const { data: firstMonth } = useLoad(async (oid) => {
@@ -33,19 +36,25 @@ export default function Revenue() {
     const cands = [a, b && `${b}-01`].filter(Boolean) as string[];
     return cands.length ? cands.sort()[0] : thisMonth;
   });
-  const [from, to, pFrom, pTo, rangeLabel] = rangeOf(range, off, firstMonth || thisMonth);
+  const base = rangeOf(range, off, firstMonth || thisMonth);
+  const custOn = range === 'all' && !!cust && cust.f <= cust.t;
+  const from = custOn ? cust!.f : base[0];
+  const to = custOn ? addDays(cust!.t, 1) : base[1];
+  const [pFrom, pTo, rangeLabel] = [base[2], base[3], custOn ? `${ddmm(cust!.f)} – ${ddmm(cust!.t)}` : base[4]];
+  const custDays = custOn ? Math.round((Date.parse(to) - Date.parse(from)) / 86400000) : 0;
 
   const { data } = useLoad(
     async (oid) => {
-      const [days, prods, prev, closes, pnlQ, extra] = await Promise.all([
+      const [days, prods, prev, closes, pnlQ, extra, pays] = await Promise.all([
         supabase.from('v_daily_sales').select('*').eq('outlet_id', oid).gte('business_date', from).lt('business_date', to).order('business_date'),
         supabase.from('v_sales_by_product').select('*').eq('outlet_id', oid).gte('business_date', from).lt('business_date', to),
         pFrom ? supabase.from('v_daily_sales').select('revenue_vnd').eq('outlet_id', oid).gte('business_date', pFrom).lt('business_date', pTo!) : Promise.resolve({ data: [] as any[] }),
         supabase.from('day_closes').select('business_date,waste_total,gift_total,day_close_lines(cooked_qty,carried_qty)').eq('outlet_id', oid).eq('is_current', true).gte('business_date', from).lt('business_date', to),
         // Lãi lỗ theo nhóm chi phí (view 0022). Toàn bộ: lấy từ ngày đầu
-        canManage ? supabase.from('v_daily_pnl_groups').select('*').eq('outlet_id', oid).gte('business_date', range === 'all' ? '2000-01-01' : from).lt('business_date', to) : Promise.resolve({ data: [] as any[] }),
+        canManage ? supabase.from('v_daily_pnl_groups').select('*').eq('outlet_id', oid).gte('business_date', range === 'all' && !custOn ? '2000-01-01' : from).lt('business_date', to) : Promise.resolve({ data: [] as any[] }),
         // Đơn có giảm giá hoặc nhập từ Knote trong kỳ
-        supabase.from('orders').select('discount_vnd,source').eq('outlet_id', oid).eq('status', 'active').gte('business_date', from).lt('business_date', to).or('discount_vnd.gt.0,source.eq.import')
+        supabase.from('orders').select('discount_vnd,source').eq('outlet_id', oid).eq('status', 'active').gte('business_date', from).lt('business_date', to).or('discount_vnd.gt.0,source.eq.import'),
+        supabase.from('v_daily_payments').select('business_date,payment_method,revenue_vnd,orders_count').eq('outlet_id', oid).gte('business_date', from).lt('business_date', to)
       ]);
       const rows = (pnlQ.data || []) as any[];
       const sum = (k: string) => rows.reduce((s: number, r: any) => s + (r[k] || 0), 0);
@@ -56,15 +65,28 @@ export default function Revenue() {
       const ex = (extra.data || []) as any[];
       return {
         days: (days.data || []) as any[], prods: (prods.data || []) as any[], prevRev: (prev.data || []).reduce((s: number, r: any) => s + r.revenue_vnd, 0),
-        closes: (closes.data || []) as any[], pnl, pnlRows: rows,
+        closes: (closes.data || []) as any[], pnl, pnlRows: rows, pays: (pays.data || []) as any[],
         discount: ex.reduce((s, o) => s + (o.discount_vnd || 0), 0), knoteOrders: ex.filter((o) => o.source === 'import').length
       };
     },
     [range, from, to]
   );
 
+  // Danh sách từng đơn của một ngày: tab Ngày, hoặc ngày đang bấm chọn trên biểu đồ
+  const listDay = range === 'day' ? from : picked && !(range === 'all' && (!custOn || custDays > 62)) ? picked : null;
+  const { data: orders } = useLoad(
+    async (oid) => {
+      if (!listDay) return [] as any[];
+      const { data: o } = await supabase.from('orders')
+        .select('id,seq_in_day,placed_at,total_vnd,discount_vnd,is_gift,payment_method,customer_name,note,source,channel,order_lines(qty,product_id,unit_price_vnd)')
+        .eq('outlet_id', oid).eq('business_date', listDay).eq('status', 'active').order('placed_at', { ascending: false });
+      return (o || []) as any[];
+    },
+    [listDay]
+  );
+
   // Gom theo ngày (tháng) hoặc theo tháng (tab Tất cả): đã bán, tặng, hủy, doanh thu
-  const byMonth = range === 'all';
+  const byMonth = range === 'all' && (!custOn || custDays > 62);
   const series = useMemo(() => {
     const keyOf = (d: string) => (byMonth ? d.slice(0, 7) + '-01' : d);
     const m = new Map<string, Day>();
@@ -110,7 +132,13 @@ export default function Revenue() {
       byProduct.set(r.product_id, x);
     });
     const ranked = [...byProduct.entries()].sort((a, b) => b[1].rev - a[1].rev);
-    return { revenue, sold, gift, waste, total: sold + gift + waste, madeAvail, catchup, ranked, nSalesDays: salesDays.length };
+    const pay = { cash: 0, transfer: 0, unknown: 0, nCash: 0, nTransfer: 0, nUnknown: 0 };
+    data.pays.filter((r) => inPick(r.business_date)).forEach((r) => {
+      if (r.payment_method === 'cash') { pay.cash += r.revenue_vnd; pay.nCash += r.orders_count; }
+      else if (r.payment_method === 'transfer') { pay.transfer += r.revenue_vnd; pay.nTransfer += r.orders_count; }
+      else { pay.unknown += r.revenue_vnd; pay.nUnknown += r.orders_count; }
+    });
+    return { revenue, sold, gift, waste, total: sold + gift + waste, madeAvail, catchup, ranked, nSalesDays: salesDays.length, pay };
   }, [data, series, picked, byMonth]);
 
   if (!outlet) return null;
@@ -138,7 +166,7 @@ export default function Revenue() {
   const avgRev = revSlots ? slots.reduce((s, k) => s + (series.get(k)?.revenue || 0), 0) / revSlots : 0;
   const unit = byMonth ? 'tháng' : 'ngày';
   const pickedRow = picked ? series.get(picked) : undefined;
-  const periodLabel = range === 'all' ? 'toàn bộ' : rangeLabel.toLowerCase();
+  const periodLabel = range === 'all' && !custOn ? 'toàn bộ' : rangeLabel.toLowerCase();
   const P = data?.pnl;
   const opCost = P ? P.nguyen_lieu + P.vat_tu + P.van_hanh : 0;
   const profit = P ? P.revenue - opCost : 0;
@@ -168,6 +196,7 @@ export default function Revenue() {
               style={staffLimited && k !== 'day' ? { opacity: 0.45 } : undefined}
               onClick={() => {
                 setRange(k);
+                setCust(null);
                 setOff(0);
                 setPicked(null);
               }}
@@ -177,6 +206,19 @@ export default function Revenue() {
           ))}
         </div>
         {staffLimited && <p className="xs muted">Các kỳ khác chỉ chủ cơ sở xem được.</p>}
+        {range === 'all' && !staffLimited && (
+          <div className="row" style={{ gap: 8, alignItems: 'flex-end', marginTop: -4 }}>
+            <label className="field grow" style={{ minWidth: 0 }}>
+              <span className="xs strong muted">Từ ngày</span>
+              <span className="input-wrap"><input type="date" value={cust?.f || ''} max={cust?.t || vnToday()} onChange={(e) => { setPicked(null); setCust(e.target.value ? { f: e.target.value, t: cust?.t || vnToday() } : null); }} style={{ textAlign: 'left', fontSize: 15 }} aria-label="Từ ngày" /></span>
+            </label>
+            <label className="field grow" style={{ minWidth: 0 }}>
+              <span className="xs strong muted">Đến ngày</span>
+              <span className="input-wrap"><input type="date" value={cust?.t || ''} min={cust?.f} max={vnToday()} onChange={(e) => { setPicked(null); setCust(e.target.value ? { f: cust?.f || firstMonth || thisMonth, t: e.target.value } : null); }} style={{ textAlign: 'left', fontSize: 15 }} aria-label="Đến ngày" /></span>
+            </label>
+            {cust && <button className="btn quiet sm" onClick={() => { setCust(null); setPicked(null); }}>Bỏ lọc</button>}
+          </div>
+        )}
         {range !== 'all' && (
           <div className="row between" style={{ marginTop: -6 }}>
             <button className="icon-btn" aria-label="Kỳ trước" disabled={staffLimited} onClick={() => { setOff(off - 1); setPicked(null); }}>
@@ -319,6 +361,48 @@ export default function Revenue() {
               </section>
             )}
 
+            {listDay && (
+              <section className="card tight">
+                <div className="row between" style={{ padding: '12px 0 2px' }}>
+                  <span className="h2">Các đơn ngày {ddmm(listDay)}</span>
+                  <span className="xs muted">{orders ? `${orders.length} đơn` : ''}</span>
+                </div>
+                {orders && orders.length === 0 && <p className="small muted" style={{ paddingBottom: 12 }}>Chưa có đơn nào trong ngày này.</p>}
+                {(orders || []).map((o: any) => {
+                  const open = openOrder === o.id;
+                  const nQty = o.order_lines.reduce((a: number, l: any) => a + l.qty, 0);
+                  const payL = o.payment_method === 'cash' ? 'Tiền mặt' : o.payment_method === 'transfer' ? 'Chuyển khoản' : 'Chưa ghi cách nhận tiền';
+                  return (
+                    <div key={o.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <button type="button" className="list-row" aria-expanded={open} onClick={() => setOpenOrder(open ? null : o.id)}
+                        style={{ border: 0, background: 'transparent', width: '100%', textAlign: 'left', minHeight: 52, padding: '6px 0', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
+                        <span className="small muted num" style={{ width: 44, flexShrink: 0 }}>{timeHM(o.placed_at)}</span>
+                        <span className="grow" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                          <span className="strong">{o.customer_name || 'Khách lẻ'}</span>
+                          <span className="xs muted">{nQty} phần · {o.is_gift ? 'tặng' : payL}{o.channel === 'aggregate' ? ' · đơn bổ sung' : ''}</span>
+                        </span>
+                        <span className="strong num">{vnd(o.total_vnd)}</span>
+                        <Icon name="chev" size={16} style={{ color: 'var(--ink-muted)', transform: open ? 'rotate(90deg)' : undefined }} />
+                      </button>
+                      {open && (
+                        <div style={{ padding: '0 0 10px 44px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {o.order_lines.map((l: any, i: number) => (
+                            <div key={i} className="row between small">
+                              <span>{l.qty} × {product(l.product_id)?.name || 'Món đã bỏ'}</span>
+                              <span className="num muted">{vnd(l.qty * l.unit_price_vnd)}</span>
+                            </div>
+                          ))}
+                          {o.discount_vnd > 0 && <div className="row between small"><span>Giảm giá</span><span className="num muted">− {vnd(o.discount_vnd)}</span></div>}
+                          <span className="xs muted">Đơn số {o.seq_in_day} · {payL}{o.source === 'import' ? ' · nhập từ Knote' : ''}</span>
+                          {o.note && <span className="xs muted">{o.note}</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </section>
+            )}
+
             <section className="card">
               <div className="h2">Theo món</div>
               {view.ranked.length === 0 && <p className="small muted">Chưa có đơn trong khoảng này.</p>}
@@ -348,6 +432,16 @@ export default function Revenue() {
               <div className="row between small"><span>Chai hủy (từ các ngày đã chốt)</span><span className="num strong">{view.waste} chai{view.madeAvail ? ` · ${num((view.waste / view.madeAvail) * 100, 1)}%` : ''}</span></div>
               <p className="xs muted">Tỉ lệ hủy = chai hủy ÷ (chai nấu + chai tồn qua) của các ngày đã chốt.</p>
               <div className="row between small"><span>Đơn bổ sung cuối ngày</span><span className="num strong">{view.catchup} chai</span></div>
+            </section>
+
+            <section className="card">
+              <div className="h2">Tiền mặt và chuyển khoản</div>
+              <div className="row between small"><span>Tiền mặt <span className="muted">· {view.pay.nCash} đơn</span></span><span className="num strong">{vnd(view.pay.cash)}</span></div>
+              <div className="row between small"><span>Chuyển khoản <span className="muted">· {view.pay.nTransfer} đơn</span></span><span className="num strong">{vnd(view.pay.transfer)}</span></div>
+              {view.pay.nUnknown > 0 && (
+                <div className="row between small"><span>Chưa ghi cách nhận tiền <span className="muted">· {view.pay.nUnknown} đơn</span></span><span className="num strong">{vnd(view.pay.unknown)}</span></div>
+              )}
+              <p className="xs muted">Tính theo đơn đã đánh dấu sau khi lưu. Đơn tặng không tính.</p>
             </section>
 
             {canManage && (

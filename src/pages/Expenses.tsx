@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useLoad } from '../lib/data';
 import { GROUP_COLOR, GROUP_NAME, GROUP_ORDER } from '../lib/reports';
 import { loadExpenseCats, type ExpCat, type ExpenseRow } from '../lib/expenses';
-import { rangeOf, type Range } from '../lib/period';
+import { addDays, rangeOf, type Range } from '../lib/period';
 import { ddmm, vnd, vndShort, vnToday } from '../lib/format';
 import { Empty, Header, Icon, Loading, Nav, useToast } from '../components/ui';
 import ExpenseSheet from '../components/ExpenseSheet';
@@ -60,12 +60,18 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
     const { data } = await supabase.from('expenses').select('spent_on').eq('outlet_id', oid).order('spent_on').limit(1);
     return (data?.[0]?.spent_on as string | undefined) || thisMonth;
   }, [dataVersion]);
-  const [from, to, , , label] = rangeOf(range, off, (firstDay || thisMonth).slice(0, 7) + '-01');
+  // Toàn bộ: lọc từ ngày đến ngày (cả hai đầu đều tính)
+  const [cust, setCust] = useState<{ f: string; t: string } | null>(null);
+  const base = rangeOf(range, off, (firstDay || thisMonth).slice(0, 7) + '-01');
+  const custOn = range === 'all' && !!cust && cust.f <= cust.t;
+  const from = custOn ? cust!.f : base[0];
+  const to = custOn ? addDays(cust!.t, 1) : base[1];
+  const label = custOn ? `${ddmm(cust!.f)} – ${ddmm(cust!.t)}` : base[4];
 
   const { data, loading } = useLoad(
     async (oid) => {
       let q = supabase.from('expenses').select('*').eq('outlet_id', oid).lt('spent_on', to);
-      if (range !== 'all') q = q.gte('spent_on', from);
+      if (range !== 'all' || custOn) q = q.gte('spent_on', from);
       const [rows, used] = await Promise.all([
         q.order('spent_on', { ascending: false }).order('created_at', { ascending: false }).limit(1000),
         supabase.from('expenses').select('item_name').eq('outlet_id', oid).eq('status', 'active').not('item_name', 'is', null).order('created_at', { ascending: false }).limit(300)
@@ -146,11 +152,24 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
               ['all', 'Toàn bộ']
             ] as [Range, string][]
           ).map(([k, l]) => (
-            <button key={k} className={`chip ${range === k ? 'on' : ''}`} onClick={() => { setRange(k); setOff(0); setShowAll(false); }}>
+            <button key={k} className={`chip ${range === k ? 'on' : ''}`} onClick={() => { setRange(k); setCust(null); setOff(0); setShowAll(false); }}>
               {l}
             </button>
           ))}
         </div>
+        {range === 'all' && (
+          <div className="row" style={{ gap: 8, alignItems: 'flex-end', marginTop: -4 }}>
+            <label className="field grow" style={{ minWidth: 0 }}>
+              <span className="xs strong muted">Từ ngày</span>
+              <span className="input-wrap"><input type="date" value={cust?.f || ''} max={cust?.t || vnToday()} onChange={(e) => setCust(e.target.value ? { f: e.target.value, t: cust?.t || vnToday() } : null)} style={{ textAlign: 'left', fontSize: 15 }} aria-label="Từ ngày" /></span>
+            </label>
+            <label className="field grow" style={{ minWidth: 0 }}>
+              <span className="xs strong muted">Đến ngày</span>
+              <span className="input-wrap"><input type="date" value={cust?.t || ''} min={cust?.f} max={vnToday()} onChange={(e) => setCust(e.target.value ? { f: cust?.f || firstDay || thisMonth, t: e.target.value } : null)} style={{ textAlign: 'left', fontSize: 15 }} aria-label="Đến ngày" /></span>
+            </label>
+            {cust && <button className="btn quiet sm" onClick={() => setCust(null)}>Bỏ lọc</button>}
+          </div>
+        )}
         {range !== 'all' && (
           <div className="row between" style={{ marginTop: -6 }}>
             <button className="icon-btn" aria-label="Kỳ trước" onClick={() => setOff(off - 1)}><Icon name="back" size={20} sw={2} /></button>

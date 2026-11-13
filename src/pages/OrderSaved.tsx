@@ -15,6 +15,16 @@ export default function OrderSaved() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const { data: bottles } = useLoad((oid) => fetchBottles(oid));
+  // Cách nhận tiền và tên khách: ghi thêm sau khi đơn đã lưu (fn_set_order_info), không bắt buộc
+  const [pay, setPay] = useState<'cash' | 'transfer' | null>(state?.result?.payment_method || null);
+  const [cust, setCust] = useState<string>(state?.result?.customer_name || '');
+  const [custSaved, setCustSaved] = useState<string>(state?.result?.customer_name || '');
+  const [custFocus, setCustFocus] = useState(false);
+  const { data: knownCust } = useLoad(async (oid) => {
+    const { data } = await supabase.from('orders').select('customer_name').eq('outlet_id', oid).not('customer_name', 'is', null).order('placed_at', { ascending: false }).limit(400);
+    const seen = new Set<string>();
+    return ((data || []) as any[]).map((r) => (r.customer_name as string).trim()).filter((n) => n && n.toLowerCase() !== 'khách lẻ' && !seen.has(n.toLowerCase()) && (seen.add(n.toLowerCase()), true));
+  });
 
   if (!state) return <Navigate to="/ban" replace />;
   const { queued, result, total, bottles: n, lines, clientId } = state;
@@ -35,6 +45,27 @@ export default function OrderSaved() {
     bump();
     nav('/ban', { replace: true });
   }
+
+  async function markPay(m: 'cash' | 'transfer') {
+    const next = pay === m ? null : m;
+    const prev = pay;
+    setPay(next);
+    setErr(null);
+    const { error } = await supabase.rpc('fn_set_order_info', { p_order: orderId, p_payment: next || '' });
+    if (error) { setPay(prev); return setErr(errorText(error)); }
+    bump();
+  }
+  async function saveCust(name: string) {
+    const v = name.trim();
+    if (v === custSaved) return;
+    setErr(null);
+    const { error } = await supabase.rpc('fn_set_order_info', { p_order: orderId, p_customer: v });
+    if (error) return setErr(errorText(error));
+    setCustSaved(v);
+    bump();
+  }
+  const fold = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase();
+  const sug = custFocus ? (knownCust || []).filter((n) => fold(n).includes(fold(cust.trim())) && fold(n) !== fold(cust.trim())).slice(0, 5) : [];
 
   async function gift() {
     setErr(null);
@@ -92,6 +123,42 @@ export default function OrderSaved() {
             )}
           </div>
         </section>
+
+        {!queued && orderId && (
+          <section className="card">
+            {!state.gift && (
+              <>
+                <div className="h2">Đã nhận tiền</div>
+                <div className="grid2">
+                  <button type="button" className={`btn ${pay === 'cash' ? '' : 'secondary'}`} aria-pressed={pay === 'cash'} onClick={() => markPay('cash')}>
+                    {pay === 'cash' && <Icon name="check" size={18} sw={2.2} />} Tiền mặt
+                  </button>
+                  <button type="button" className={`btn ${pay === 'transfer' ? '' : 'secondary'}`} aria-pressed={pay === 'transfer'} onClick={() => markPay('transfer')}>
+                    {pay === 'transfer' && <Icon name="check" size={18} sw={2.2} />} C.khoản
+                  </button>
+                </div>
+                <span className="xs muted">{pay ? 'Bấm lại lần nữa để bỏ đánh dấu.' : 'Chưa đánh dấu. Có thể bỏ qua nếu chưa nhận tiền.'}</span>
+              </>
+            )}
+            <label className="field">
+              <span className="label small strong">Khách hàng <span className="muted" style={{ fontWeight: 400 }}>· không bắt buộc</span></span>
+              <span className="input-wrap">
+                <input value={cust} maxLength={60} placeholder="Gõ tên khách, vd: chú chủ nhà" aria-label="Tên khách hàng" style={{ textAlign: 'left', fontSize: 16 }}
+                  onChange={(e) => setCust(e.target.value)} onFocus={() => setCustFocus(true)}
+                  onBlur={() => setTimeout(() => { setCustFocus(false); saveCust(cust); }, 150)} />
+              </span>
+            </label>
+            {sug.length > 0 && (
+              <div className="chips wrap" role="listbox" aria-label="Khách đã có">
+                {sug.map((n) => (
+                  <button key={n} type="button" className="chip" onMouseDown={(e) => e.preventDefault()} onClick={() => { setCust(n); setCustFocus(false); saveCust(n); }}>{n}</button>
+                ))}
+              </div>
+            )}
+            {custSaved && custSaved === cust.trim() && <span className="xs muted">Đã ghi khách: {custSaved}</span>}
+          </section>
+        )}
+        {queued && <p className="xs muted">Đơn đang chờ gửi vì mất mạng nên chưa ghi được cách nhận tiền và tên khách.</p>}
 
         {/* Tạm ẩn số chai còn (Tùng 12/11: chưa dùng Nấu) */}
         {false && bottles && (
