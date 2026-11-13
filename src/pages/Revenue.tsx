@@ -58,7 +58,7 @@ export default function Revenue() {
         supabase.from('v_daily_sales').select('*').eq('outlet_id', oid).gte('business_date', from).lt('business_date', to).order('business_date'),
         supabase.from('v_sales_by_product').select('*').eq('outlet_id', oid).gte('business_date', from).lt('business_date', to),
         pFrom ? supabase.from('v_daily_sales').select('revenue_vnd').eq('outlet_id', oid).gte('business_date', pFrom).lt('business_date', pTo!) : Promise.resolve({ data: [] as any[] }),
-        supabase.from('day_closes').select('business_date,waste_total,gift_total,day_close_lines(cooked_qty,carried_qty)').eq('outlet_id', oid).eq('is_current', true).gte('business_date', from).lt('business_date', to),
+        supabase.from('day_closes').select('business_date,waste_total,gift_total,day_close_lines(cooked_qty,carried_qty),day_close_wastes(product_id,qty)').eq('outlet_id', oid).eq('is_current', true).gte('business_date', from).lt('business_date', to),
         // Lãi lỗ theo nhóm chi phí (view 0022). Toàn bộ: lấy từ ngày đầu
         canManage ? supabase.from('v_daily_pnl_groups').select('*').eq('outlet_id', oid).gte('business_date', range === 'all' && !custOn ? '2000-01-01' : from).lt('business_date', to) : Promise.resolve({ data: [] as any[] }),
         // Đơn có giảm giá hoặc nhập từ Knote trong kỳ
@@ -131,13 +131,16 @@ export default function Revenue() {
       byProduct.set(r.product_id, x);
     });
     const ranked = [...byProduct.entries()].sort((a, b) => b[1].rev - a[1].rev);
+    const wasteBy = new Map<string, number>();
+    closes.forEach((c: any) => (c.day_close_wastes || []).forEach((w: any) => wasteBy.set(w.product_id, (wasteBy.get(w.product_id) || 0) + w.qty)));
+    const wasteRank = [...wasteBy.entries()].sort((a, b) => b[1] - a[1]);
     const pay = { cash: 0, transfer: 0, unknown: 0, nCash: 0, nTransfer: 0, nUnknown: 0 };
     data.pays.filter((r) => inPick(r.business_date)).forEach((r) => {
       if (r.payment_method === 'cash') { pay.cash += r.revenue_vnd; pay.nCash += r.orders_count; }
       else if (r.payment_method === 'transfer') { pay.transfer += r.revenue_vnd; pay.nTransfer += r.orders_count; }
       else { pay.unknown += r.revenue_vnd; pay.nUnknown += r.orders_count; }
     });
-    return { revenue, sold, gift, waste, total: sold + gift + waste, madeAvail, catchup, ranked, nSalesDays: salesDays.length, pay };
+    return { revenue, sold, gift, waste, total: sold + gift + waste, madeAvail, catchup, ranked, nSalesDays: salesDays.length, pay, wasteRank };
   }, [data, series, picked, byMonth]);
 
   if (!outlet) return null;
@@ -383,6 +386,13 @@ export default function Revenue() {
               <div className="row between small"><span>Chai tặng, dùng thử</span><span className="num strong">{view.gift} chai</span></div>
               <div className="row between small"><span>Chai hủy (từ các ngày đã chốt)</span><span className="num strong">{view.waste} chai{view.madeAvail ? ` · ${num((view.waste / view.madeAvail) * 100, 1)}%` : ''}</span></div>
               <p className="xs muted">Tỉ lệ hủy = chai hủy ÷ (chai nấu + chai tồn qua) của các ngày đã chốt.</p>
+              {view.wasteRank.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 12 }}>
+                  {view.wasteRank.map(([pid, q]) => (
+                    <div key={pid} className="row between small"><span className="muted">Hủy · {product(pid)?.short_name || product(pid)?.name || 'Món đã bỏ'}</span><span className="num">{q} chai</span></div>
+                  ))}
+                </div>
+              )}
               <div className="row between small"><span>Đơn bổ sung cuối ngày</span><span className="num strong">{view.catchup} chai</span></div>
             </section>
 
