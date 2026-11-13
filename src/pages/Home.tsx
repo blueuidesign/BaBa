@@ -108,7 +108,7 @@ export default function Home() {
   expiring.forEach((s) => tasks.push(<Task key={s.ingredient_id} icon="warn" kind="warn" title={`${s.name} sắp hết hạn`} sub={`Hạn ${ddmm(s.nearest_expiry!)}`} to={s.kind === 'made' ? '/nau/me' : `/kho/${s.ingredient_id}`} />));
   if (data.sales.bottles > 0 && !data.closed.has(today))
     tasks.push(<Task key="c" icon="scale" title="Đối chiếu cuối ngày" sub="Đếm chai còn và tiền thu được" to="/doi-chieu" />);
-  if (hour >= 15) tasks.push(<Task key="p" icon="blender" title="Kế hoạch nấu ngày mai" sub="Gợi ý theo 7 ngày gần nhất" to="/nau" />);
+  if (hour >= 15) tasks.push(<Task key="p" icon="blender" title="Kế hoạch nấu ngày mai" sub="Gợi ý theo 7 ngày gần nhất" to="/nau?tab=mai" />);
 
   return (
     <div className="screen">
@@ -159,10 +159,6 @@ export default function Home() {
             </Link>
           </section>
         )}
-
-        <Link to="/ban" className={`btn lg block ${fresh ? 'secondary' : ''}`}>
-          <Icon name="cart" size={22} sw={2} /> Ghi đơn mới
-        </Link>
 
         <Link to="/nau" className="list-row card">
           <span className="ico-box"><Icon name="blender" size={22} /></span>

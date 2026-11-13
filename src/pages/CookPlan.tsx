@@ -10,7 +10,7 @@ export default function CookPlan() {
   const { outlet, catalog, bump } = useApp();
   const nav = useNavigate();
   const toast = useToast();
-  const [kind, setKind] = useState<'next_day' | 'extra_today'>(() => (new Date(Date.now() + 7 * 3600000).getUTCHours() < 12 ? 'extra_today' : 'next_day'));
+  const [kind, setKind] = useState<'next_day' | 'extra_today'>(() => (new URLSearchParams(location.search).get('tab') === 'mai' ? 'next_day' : 'extra_today'));
   const planDate = kind === 'next_day' ? vnToday(1) : vnToday();
   const [qty, setQty] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
@@ -142,12 +142,12 @@ export default function CookPlan() {
           <button className={`chip ${kind === 'extra_today' ? 'on' : ''}`} onClick={() => setKind('extra_today')}>
             Nấu cho hôm nay
           </button>
-          <button className={`chip ${kind === 'next_day' ? 'on' : ''}`} onClick={() => setKind('next_day')}>
-            Nấu cho ngày mai
-          </button>
           <Link className="chip" to="/nau/me">
             Mẻ syrup
           </Link>
+          <button className={`chip ${kind === 'next_day' ? 'on' : ''}`} onClick={() => setKind('next_day')}>
+            Nấu cho ngày mai
+          </button>
         </div>
         {!catalog || !data ? (
           <Loading />
