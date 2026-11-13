@@ -48,6 +48,14 @@ export default function ExpenseSheet({
   const [newName, setNewName] = useState('');
   const [newUnit, setNewUnit] = useState('g');
   const [created, setCreated] = useState<Ingredient[]>([]);
+  // Nhiều món trong một lần ghi (chỉ khi thêm mới): mỗi món là một khoản chi riêng, có loại riêng
+  type Item = { clientId: string; cat: ExpCat; name: string | null; ing?: Ingredient; qty: number | null; amount: number };
+  const [items, setItems] = useState<Item[]>([]);
+  const [unitPrice, setUnitPrice] = useState('');
+  // Số lượng × đơn giá = số tiền: nhập hai số, app tính số còn lại
+  const onQty = (v: string) => { setQty(v); if (Number(v) > 0 && Number(unitPrice) > 0) setAmount(String(Math.round(Number(v) * Number(unitPrice)))); };
+  const onUnitPrice = (v: string) => { setUnitPrice(v); if (Number(v) > 0 && Number(qty) > 0) setAmount(String(Math.round(Number(v) * Number(qty)))); };
+  const onAmount = (v: string) => { setAmount(v); if (Number(qty) > 0) setUnitPrice(Number(v) > 0 ? String(Math.round(Number(v) / Number(qty))) : ''); };
 
   if (!outlet || !catalog) return null;
   const finalCat = catId ? byId[catId] : undefined;
@@ -93,13 +101,14 @@ export default function ExpenseSheet({
   const stockApplied = !!ing && Number(qty) > 0;
   const needsStockWarn = stockMode && !stockApplied;
 
-  async function save() {
+  /** Kiểm tra món đang nhập, hỏi các cảnh báo; trả về null nếu người dùng dừng lại. */
+  async function buildCurrent(): Promise<Item | null> {
     setErr(null);
-    if (!finalCat) return setErr('Chọn nhóm và loại chi.');
-    if (stockMode && !ing) return setErr('Chọn món trong kho, hoặc bấm "Thêm món mới".');
+    if (!finalCat) { setErr('Chọn nhóm và loại chi.'); return null; }
+    if (stockMode && !ing) { setErr('Chọn món trong kho, hoặc bấm "Thêm món mới".'); return null; }
     const amt = Number(amount);
-    if (!amt) return setErr('Nhập số tiền lớn hơn 0.');
-    if (date > vnToday()) return setErr('Không ghi chi phí cho ngày chưa tới.');
+    if (!amt) { setErr('Nhập số tiền lớn hơn 0.'); return null; }
+    if (date > vnToday()) { setErr('Không ghi chi phí cho ngày chưa tới.'); return null; }
     if (!existing) {
       const { data: dup } = await supabase.rpc('fn_find_duplicate_expense', { p_outlet: outlet!.id, p_spent_on: date, p_category_id: finalCat.id, p_amount: amt });
       if (dup && (dup as any).id) {
@@ -111,7 +120,7 @@ export default function ExpenseSheet({
           cancel: 'Bỏ',
           tone: 'warn'
         });
-        if (!go) return;
+        if (!go) return null;
       }
     }
     if (needsStockWarn) {
@@ -124,23 +133,56 @@ export default function ExpenseSheet({
         cancel: 'Sửa lại',
         tone: 'warn'
       });
-      if (!go) return;
+      if (!go) return null;
+    }
+    return { clientId: uuid(), cat: finalCat, name: stockMode ? ing!.name : name.trim() || null, ing: stockApplied ? ing : undefined, qty: stockApplied ? Number(qty) : null, amount: amt };
+  }
+  const payloadOf = (it: Item) => ({
+    outlet_id: outlet!.id, client_id: it.clientId, category_id: it.cat.id, item_name: it.name,
+    ingredient_id: it.ing ? it.ing.id : null, qty: it.ing ? it.qty : null, amount_vnd: it.amount, spent_on: date
+  });
+  const currentEmpty = !Number(amount) && !ing && !name.trim();
+
+  async function addMore() {
+    const it = await buildCurrent();
+    if (!it) return;
+    setItems((l) => [...l, it]);
+    setName(''); setIngId(null); setQty(''); setAmount(''); setUnitPrice('');
+  }
+
+  async function save() {
+    if (existing) {
+      const it = await buildCurrent();
+      if (!it) return;
+      setBusy(true);
+      const { data, error } = await supabase.rpc('fn_edit_expense', { p_id: existing.id, p: { ...payloadOf(it), client_id: clientId } });
+      setBusy(false);
+      if (error) return setErr(errorText(error));
+      return onDone(negMsg((data as any)?.negative_stock) || 'Đã sửa khoản chi');
+    }
+    let list = items;
+    if (!(items.length && currentEmpty)) {
+      const it = await buildCurrent();
+      if (!it) return;
+      list = [...items, it];
     }
     setBusy(true);
-    const p = {
-      outlet_id: outlet!.id,
-      client_id: clientId,
-      category_id: finalCat.id,
-      item_name: stockMode ? ing!.name : name.trim() || null,
-      ingredient_id: stockApplied ? ingId : null,
-      qty: stockApplied ? Number(qty) : null,
-      amount_vnd: amt,
-      spent_on: date
-    };
-    const { data, error } = existing ? await supabase.rpc('fn_edit_expense', { p_id: existing.id, p }) : await supabase.rpc('fn_post_expense_v2', { p });
+    const neg: any[] = [];
+    for (let i = 0; i < list.length; i++) {
+      const { data, error } = await supabase.rpc('fn_post_expense_v2', { p: payloadOf(list[i]) });
+      if (error) {
+        // Các món trước đã ghi xong: bỏ khỏi danh sách để bấm Lưu lại không ghi trùng
+        setItems(list.slice(i));
+        setName(''); setIngId(null); setQty(''); setAmount(''); setUnitPrice('');
+        setBusy(false);
+        return setErr(`${i > 0 ? `Đã ghi ${i} món. ` : ''}Món "${list[i].name || list[i].cat.name}" chưa ghi được: ${errorText(error)}`);
+      }
+      neg.push(...(((data as any)?.negative_stock as any[]) || []));
+    }
     setBusy(false);
-    if (error) return setErr(errorText(error));
-    onDone(negMsg((data as any)?.negative_stock) || (existing ? 'Đã sửa khoản chi' : stockApplied ? `Đã ghi và cộng ${num(Number(qty), 2)} ${unitLabel(ing!.purchase_unit)} ${ing!.name} vào kho` : 'Đã ghi khoản chi'));
+    const stocked = list.filter((x) => x.ing).length;
+    onDone(negMsg(neg) || (list.length > 1 ? `Đã ghi ${list.length} khoản chi · ${vnd(list.reduce((a, x) => a + x.amount, 0))}${stocked ? `, ${stocked} món cộng vào kho` : ''}`
+      : list[0].ing ? `Đã ghi và cộng ${num(list[0].qty!, 2)} ${unitLabel(list[0].ing.purchase_unit)} ${list[0].ing.name} vào kho` : 'Đã ghi khoản chi'));
   }
 
   function negMsg(neg: any[] | undefined) {
@@ -182,6 +224,21 @@ export default function ExpenseSheet({
           <h2 id="exp-t" style={{ fontSize: 18, margin: 0 }}>{existing ? `Sửa khoản chi` : 'Thêm khoản chi'}</h2>
         </div>
         <div className="fp-body">
+        {items.length > 0 && (
+          <div className="card tight" style={{ padding: '4px 12px', gap: 0, background: 'var(--bg-200)', boxShadow: 'none' }}>
+            {items.map((it) => (
+              <div key={it.clientId} className="list-row" style={{ minHeight: 48, padding: '6px 0' }}>
+                <span className="grow" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <span className="strong">{it.name || it.cat.name}</span>
+                  <span className="xs muted">{it.cat.name === 'Nguyên liệu khác' ? 'N.liệu khác' : it.cat.name}{it.ing ? ` · ${num(it.qty!, 2)} ${unitLabel(it.ing.purchase_unit)} · vào kho` : ' · chỉ ghi tiền'}</span>
+                </span>
+                <span className="strong num">{vnd(it.amount)}</span>
+                <button type="button" className="icon-btn" aria-label={`Bỏ ${it.name || it.cat.name}`} onClick={() => setItems((l) => l.filter((x) => x.clientId !== it.clientId))}><Icon name="x" size={18} /></button>
+              </div>
+            ))}
+            <span className="xs muted" style={{ padding: '6px 0' }}>Đã thêm {items.length} món. Chưa ghi cho tới khi bấm Lưu.</span>
+          </div>
+        )}
 
         {fromPurchase ? (
           <>
@@ -213,7 +270,7 @@ export default function ExpenseSheet({
                 <div className="chips wrap" style={{ gap: 6 }}>
                   {optionsOf(grp).map((c) => (
                     <button key={c.id} type="button" className={`chip ${catId === c.id ? 'on' : ''}`} style={chipStyle} onClick={() => pickCat(c.id)}>
-                      {c.name}
+                      {c.name === 'Nguyên liệu khác' ? 'N.liệu khác' : c.name}
                     </button>
                   ))}
                 </div>
@@ -249,9 +306,15 @@ export default function ExpenseSheet({
                   </div>
                 )}
                 {ing && (
-                  <div className="field">
-                    <span className="label small strong">Số lượng</span>
-                    <NumberField value={qty} onChange={setQty} unit={unitLabel(ing.purchase_unit)} label="Số lượng" width={160} decimals />
+                  <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
+                    <div className="field" style={{ flex: '0 0 auto' }}>
+                      <span className="label small strong">Số lượng</span>
+                      <NumberField value={qty} onChange={onQty} unit={unitLabel(ing.purchase_unit)} label="Số lượng" width={130} decimals />
+                    </div>
+                    <div className="field grow" style={{ minWidth: 0 }}>
+                      <span className="label small strong">Đơn giá (đ/{unitLabel(ing.purchase_unit)})</span>
+                      <MoneyInput value={unitPrice} onChange={onUnitPrice} label="Đơn giá" placeholder="không bắt buộc" />
+                    </div>
                   </div>
                 )}
                 <div className="row small" style={{ gap: 8, padding: '8px 10px', background: stockApplied ? 'var(--bg-brand-soft)' : 'var(--bg-200)', borderRadius: 'var(--radius-md)', alignItems: 'flex-start' }}>
@@ -296,8 +359,14 @@ export default function ExpenseSheet({
 
             <div className="field">
               <span className="label small strong">Số tiền</span>
-              <MoneyInput value={amount} onChange={setAmount} label="Số tiền" big />
+              <MoneyInput value={amount} onChange={onAmount} label="Số tiền" big />
+              {stockMode && ing && <span className="xs muted">Nhập số lượng và đơn giá thì app tự tính số tiền, hoặc nhập thẳng số tiền.</span>}
             </div>
+            {!existing && (grp === 'nguyen_lieu' || grp === 'vat_tu') && (
+              <button type="button" className="btn secondary block" disabled={busy} onClick={addMore}>
+                <Icon name="plus" size={18} sw={2} /> Thêm món khác
+              </button>
+            )}
             <label className="field">
               <span className="label small strong">Ngày chi</span>
               <span className="input-wrap">
@@ -313,7 +382,7 @@ export default function ExpenseSheet({
         {err && <span className="err">{err}</span>}
         {!fromPurchase && (
           <button className="btn lg block" disabled={busy} onClick={save}>
-            {busy ? 'Đang lưu…' : existing ? 'Lưu thay đổi' : 'Lưu khoản chi'}
+            {busy ? 'Đang lưu…' : existing ? 'Lưu thay đổi' : items.length ? `Lưu ${items.length + (currentEmpty ? 0 : 1)} khoản · ${vnd(items.reduce((a, x) => a + x.amount, 0) + Number(amount || 0))}` : 'Lưu khoản chi'}
           </button>
         )}
         {existing && (
