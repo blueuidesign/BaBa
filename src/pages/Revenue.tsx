@@ -6,7 +6,7 @@ import { addDays, addMonths, rangeOf, type Range } from '../lib/period';
 import { supabase } from '../lib/supabase';
 import { useLoad } from '../lib/data';
 import { ddmm, num, timeHM, vnd, vndShort, vnToday } from '../lib/format';
-import { BellLink, Header, Icon, Loading, Nav } from '../components/ui';
+import { BellLink, DateRange, Header, Icon, Loading, Nav } from '../components/ui';
 
 type Mode = 'revenue' | 'bottles';
 
@@ -26,16 +26,26 @@ export default function Revenue() {
   const [openOrder, setOpenOrder] = useState<string | null>(null);
 
   // Tháng đầu tiên có số liệu (kể cả số nhập tay tháng cũ) để làm khung cho tab Tất cả
-  const { data: firstMonth } = useLoad(async (oid) => {
-    const [pnl, sales] = await Promise.all([
+  const { data: span } = useLoad(async (oid) => {
+    const [pnl, sales, last] = await Promise.all([
       canManage ? supabase.from('v_monthly_pnl').select('month').eq('outlet_id', oid).order('month').limit(1) : Promise.resolve({ data: [] as any[] }),
-      supabase.from('v_daily_sales').select('business_date').eq('outlet_id', oid).order('business_date').limit(1)
+      supabase.from('v_daily_sales').select('business_date').eq('outlet_id', oid).order('business_date').limit(1),
+      supabase.from('v_daily_sales').select('business_date').eq('outlet_id', oid).order('business_date', { ascending: false }).limit(1)
     ]);
     const a = (pnl.data || [])[0]?.month as string | undefined;
-    const b = ((sales.data || [])[0]?.business_date as string | undefined)?.slice(0, 7);
-    const cands = [a, b && `${b}-01`].filter(Boolean) as string[];
-    return cands.length ? cands.sort()[0] : thisMonth;
+    const b = (sales.data || [])[0]?.business_date as string | undefined;
+    const cands = [a, b && `${b.slice(0, 7)}-01`].filter(Boolean) as string[];
+    const firstDates = [a, b].filter(Boolean) as string[];
+    return {
+      month: cands.length ? cands.sort()[0] : thisMonth,
+      first: firstDates.length ? firstDates.sort()[0] : vnToday(),
+      last: ((last.data || [])[0]?.business_date as string | undefined) || vnToday()
+    };
   });
+  const firstMonth = span?.month;
+  // Ngày đầu và ngày cuối có dữ liệu: giá trị điền sẵn của ô Từ ngày – Đến ngày
+  const dataFirst = span?.first || vnToday();
+  const dataLast = span?.last || vnToday();
   const base = rangeOf(range, off, firstMonth || thisMonth);
   const custOn = range === 'all' && !!cust && cust.f <= cust.t;
   const from = custOn ? cust!.f : base[0];
@@ -210,17 +220,12 @@ export default function Revenue() {
         </div>
         {staffLimited && <p className="xs muted">Các kỳ khác chỉ chủ cơ sở xem được.</p>}
         {range === 'all' && !staffLimited && (
-          <div className="row" style={{ gap: 8, alignItems: 'flex-end', marginTop: -4 }}>
-            <label className="field grow" style={{ minWidth: 0 }}>
-              <span className="xs strong muted">Từ ngày</span>
-              <span className="input-wrap"><input type="date" value={cust?.f || ''} max={cust?.t || vnToday()} onChange={(e) => { setPicked(null); setCust(e.target.value ? { f: e.target.value, t: cust?.t || vnToday() } : null); }} style={{ textAlign: 'left', fontSize: 15 }} aria-label="Từ ngày" /></span>
-            </label>
-            <label className="field grow" style={{ minWidth: 0 }}>
-              <span className="xs strong muted">Đến ngày</span>
-              <span className="input-wrap"><input type="date" value={cust?.t || ''} min={cust?.f} max={vnToday()} onChange={(e) => { setPicked(null); setCust(e.target.value ? { f: cust?.f || firstMonth || thisMonth, t: e.target.value } : null); }} style={{ textAlign: 'left', fontSize: 15 }} aria-label="Đến ngày" /></span>
-            </label>
-            {cust && <button className="btn quiet sm" onClick={() => { setCust(null); setPicked(null); }}>Bỏ lọc</button>}
-          </div>
+          <>
+            <DateRange from={custOn ? cust!.f : dataFirst} to={custOn ? cust!.t : dataLast} max={vnToday()} onChange={(f, t) => { setPicked(null); setCust({ f, t }); }} />
+            {custOn && (
+              <button className="btn quiet sm" style={{ alignSelf: 'flex-start', marginTop: -6 }} onClick={() => { setCust(null); setPicked(null); }}>Đặt lại: xem toàn bộ</button>
+            )}
+          </>
         )}
         {range !== 'all' && (
           <div className="row between" style={{ marginTop: -6 }}>

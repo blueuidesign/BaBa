@@ -7,7 +7,7 @@ import { GROUP_COLOR, GROUP_NAME, GROUP_ORDER } from '../lib/reports';
 import { loadExpenseCats, type ExpCat, type ExpenseRow } from '../lib/expenses';
 import { addDays, rangeOf, type Range } from '../lib/period';
 import { ddmm, vnd, vndShort, vnToday } from '../lib/format';
-import { Empty, Header, Icon, Loading, Nav, useToast } from '../components/ui';
+import { DateRange, Empty, Header, Icon, Loading, Nav, useToast } from '../components/ui';
 import ExpenseSheet from '../components/ExpenseSheet';
 
 /** Biểu đồ tròn rỗng giữa, vẽ bằng stroke-dasharray để không cần thư viện. */
@@ -59,6 +59,10 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
   const { data: firstDay } = useLoad(async (oid) => {
     const { data } = await supabase.from('expenses').select('spent_on').eq('outlet_id', oid).order('spent_on').limit(1);
     return (data?.[0]?.spent_on as string | undefined) || thisMonth;
+  }, [dataVersion]);
+  const { data: lastDay } = useLoad(async (oid) => {
+    const { data } = await supabase.from('expenses').select('spent_on').eq('outlet_id', oid).order('spent_on', { ascending: false }).limit(1);
+    return (data?.[0]?.spent_on as string | undefined) || vnToday();
   }, [dataVersion]);
   // Toàn bộ: lọc từ ngày đến ngày (cả hai đầu đều tính)
   const [cust, setCust] = useState<{ f: string; t: string } | null>(null);
@@ -158,17 +162,10 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
           ))}
         </div>
         {range === 'all' && (
-          <div className="row" style={{ gap: 8, alignItems: 'flex-end', marginTop: -4 }}>
-            <label className="field grow" style={{ minWidth: 0 }}>
-              <span className="xs strong muted">Từ ngày</span>
-              <span className="input-wrap"><input type="date" value={cust?.f || ''} max={cust?.t || vnToday()} onChange={(e) => setCust(e.target.value ? { f: e.target.value, t: cust?.t || vnToday() } : null)} style={{ textAlign: 'left', fontSize: 15 }} aria-label="Từ ngày" /></span>
-            </label>
-            <label className="field grow" style={{ minWidth: 0 }}>
-              <span className="xs strong muted">Đến ngày</span>
-              <span className="input-wrap"><input type="date" value={cust?.t || ''} min={cust?.f} max={vnToday()} onChange={(e) => setCust(e.target.value ? { f: cust?.f || firstDay || thisMonth, t: e.target.value } : null)} style={{ textAlign: 'left', fontSize: 15 }} aria-label="Đến ngày" /></span>
-            </label>
-            {cust && <button className="btn quiet sm" onClick={() => setCust(null)}>Bỏ lọc</button>}
-          </div>
+          <>
+            <DateRange from={custOn ? cust!.f : firstDay || vnToday()} to={custOn ? cust!.t : lastDay || vnToday()} max={vnToday()} onChange={(f, t) => setCust({ f, t })} />
+            {custOn && <button className="btn quiet sm" style={{ alignSelf: 'flex-start', marginTop: -6 }} onClick={() => setCust(null)}>Đặt lại: xem toàn bộ</button>}
+          </>
         )}
         {range !== 'all' && (
           <div className="row between" style={{ marginTop: -6 }}>
