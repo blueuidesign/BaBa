@@ -4,7 +4,7 @@ import { useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { fetchBottles, fetchDaySales, isDayClosed, useLoad } from '../lib/data';
 import { ddmm, vnd, vnToday, weekdayLabel } from '../lib/format';
-import { Empty, Header, Icon, Loading, MoneyInput, Nav, NumberField, Stepper, confirmDialog, reasonDialog } from '../components/ui';
+import { Empty, Header, Icon, Loading, MoneyInput, Nav, NumberField, Stepper, confirmDialog, reasonDialog, useToast } from '../components/ui';
 
 const QUICK = [500000, 200000, 100000, 50000, 20000, 10000];
 
@@ -13,10 +13,13 @@ export default function DayClose() {
   const date = params.get('ngay') || vnToday();
   const { outlet, catalog, queue, bump, canManage } = useApp();
   const nav = useNavigate();
+  const toast = useToast();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [left, setLeft] = useState<Record<string, number>>({});
   const [gift, setGift] = useState(0);
-  const [waste, setWaste] = useState(0);
+  // Chai hủy ghi theo từng món: thêm từng dòng, chọn tên món, ghi số chai
+  const [wasteLines, setWasteLines] = useState<{ pid: string; qty: number }[]>([]);
+  const waste = wasteLines.reduce((a, l) => a + (l.pid ? l.qty : 0), 0);
   const [cash, setCash] = useState('');
   const [transfer, setTransfer] = useState('');
   const [reason, setReason] = useState('');
@@ -92,9 +95,14 @@ export default function DayClose() {
     setErr(null);
     if (pending > 0) return setErr(`Còn ${pending} đơn chưa gửi lên máy chủ. Cần có mạng để đồng bộ trước khi chốt ngày.`);
     setBusy(true);
-    const { error } = await supabase.rpc('fn_close_day', { p: payload(), p_commit: true });
+    const { data: done, error } = await supabase.rpc('fn_close_day', { p: payload(), p_commit: true });
+    if (error) { setBusy(false); return setErr(errorText(error)); }
+    const wl = wasteLines.filter((l) => l.pid && l.qty > 0).map((l) => ({ product_id: l.pid, qty: l.qty }));
+    if (wl.length && (done as any)?.id) {
+      const { error: e2 } = await supabase.rpc('fn_set_close_wastes', { p_close: (done as any).id, p_lines: wl });
+      if (e2) toast.show(`Đã chốt ngày, nhưng chưa ghi được chai hủy theo món: ${errorText(e2)}`);
+    }
     setBusy(false);
-    if (error) return setErr(errorText(error));
     bump();
     nav('/', { replace: true });
   }
@@ -189,7 +197,7 @@ export default function DayClose() {
                 <p className="xs muted" style={{ padding: '6px 0 12px' }}>Chai còn chuyển thành tồn của ngày mai (bán trong ngày hoặc để lạnh 0–4 °C).</p>
               </section>
               <section className="card tight">
-                <div className="h2" style={{ padding: '12px 0 2px' }}>2 · Chai không bán</div>
+                <div className="h2" style={{ padding: '12px 0 2px' }}>2 · Tặng, dùng thử</div>
                 <div className="list-row">
                   <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
                     <span className="strong">Tặng, dùng thử</span>
@@ -197,10 +205,29 @@ export default function DayClose() {
                   </span>
                   <Stepper value={gift} onChange={setGift} label="chai tặng" />
                 </div>
-                <div className="list-row">
-                  <span className="grow strong">Hỏng, đổ, hết hạn</span>
-                  <Stepper value={waste} onChange={setWaste} label="chai hủy" />
+              </section>
+              <section className="card tight">
+                <div className="row between" style={{ padding: '12px 0 2px' }}>
+                  <span className="h2">3 · Hỏng, đổ, hết hạn</span>
+                  <span className="xs muted">{waste > 0 ? `${waste} chai` : 'không có'}</span>
                 </div>
+                {wasteLines.map((l, i) => (
+                  <div key={i} className="list-row" style={{ gap: 8 }}>
+                    <select className="input grow" aria-label="Món bị hủy" value={l.pid} style={{ minWidth: 0, fontSize: 15, minHeight: 44 }}
+                      onChange={(e) => setWasteLines((ls) => ls.map((x, k) => (k === i ? { ...x, pid: e.target.value } : x)))}>
+                      <option value="">Chọn món…</option>
+                      {catalog.products.filter((p) => p.id === l.pid || !wasteLines.some((x) => x.pid === p.id)).map((p) => (
+                        <option key={p.id} value={p.id}>{p.short_name || p.name}</option>
+                      ))}
+                    </select>
+                    <Stepper value={l.qty} onChange={(v) => setWasteLines((ls) => ls.map((x, k) => (k === i ? { ...x, qty: v } : x)))} label="chai hủy" />
+                    <button type="button" className="icon-btn" aria-label="Bỏ dòng này" onClick={() => setWasteLines((ls) => ls.filter((_, k) => k !== i))}><Icon name="x" size={18} /></button>
+                  </div>
+                ))}
+                <button type="button" className="btn secondary block" style={{ margin: '8px 0 12px' }} disabled={wasteLines.some((l) => !l.pid) || wasteLines.length >= catalog.products.length}
+                  onClick={() => setWasteLines((ls) => [...ls, { pid: '', qty: 1 }])}>
+                  <Icon name="plus" size={18} sw={2} /> Thêm món bị hủy
+                </button>
               </section>
             </>
           )}
