@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../lib/app';
 import { supabase } from '../lib/supabase';
 import { useLoad } from '../lib/data';
@@ -7,7 +6,7 @@ import { addDays } from '../lib/period';
 import { timeHM, vnd, vnToday, weekdayLabel } from '../lib/format';
 import { Header, Icon, Loading, Nav } from '../components/ui';
 
-/** Các đơn trong một ngày (mở từ Báo cáo): giờ, khách, số phần, cách nhận tiền; bấm một đơn để xem từng món. */
+/** Các đơn trong một ngày (mở từ Báo cáo): giờ, khách, số phần, cách nhận tiền; bấm một đơn để mở màn chi tiết (xem món, đánh dấu nhận tiền, hủy đơn). */
 export default function DayOrders() {
   const { outlet, catalog, canManage } = useApp();
   const [sp, setSp] = useSearchParams();
@@ -15,7 +14,6 @@ export default function DayOrders() {
   const q = sp.get('d') || today;
   // Nhân viên chỉ xem được hôm nay, giống tab Ngày của Báo cáo
   const day = /^\d{4}-\d{2}-\d{2}$/.test(q) && q <= today && (canManage || q === today) ? q : today;
-  const [open, setOpen] = useState<string | null>(null);
   const { data: orders } = useLoad(
     async (oid) => {
       const { data } = await supabase.from('orders')
@@ -26,8 +24,8 @@ export default function DayOrders() {
     [day]
   );
   if (!outlet) return null;
-  const name = (pid: string) => catalog?.allProducts.find((p) => p.id === pid)?.name || 'Món đã bỏ';
-  const go = (d: string) => { setOpen(null); setSp({ d }, { replace: true }); };
+  const short = (pid: string) => { const p = catalog?.allProducts.find((x) => x.id === pid); return p?.short_name || p?.name || 'Món đã bỏ'; };
+  const go = (d: string) => setSp({ d }, { replace: true });
   const total = (orders || []).reduce((a, o) => a + o.total_vnd, 0);
   const parts = (orders || []).reduce((a, o) => a + o.order_lines.reduce((x: number, l: any) => x + l.qty, 0), 0);
   const dmy = `${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice(0, 4)}`;
@@ -56,35 +54,20 @@ export default function DayOrders() {
             <section className="card tight">
               {orders.length === 0 && <p className="small muted" style={{ padding: '12px 0' }}>Ngày này chưa có đơn nào.</p>}
               {orders.map((o: any, i: number) => {
-                const isOpen = open === o.id;
                 const n = o.order_lines.reduce((a: number, l: any) => a + l.qty, 0);
                 const payL = o.payment_method === 'cash' ? 'Tiền mặt' : o.payment_method === 'transfer' ? 'Chuyển khoản' : 'Chưa ghi cách nhận tiền';
                 return (
-                  <div key={o.id} style={{ borderBottom: i < orders.length - 1 ? '1px solid var(--border)' : 0 }}>
-                    <button type="button" className="list-row" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : o.id)}
-                      style={{ border: 0, background: 'transparent', width: '100%', textAlign: 'left', minHeight: 56, padding: '6px 0', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
-                      <span className="small muted num" style={{ width: 44, flexShrink: 0 }}>{timeHM(o.placed_at)}</span>
-                      <span className="grow" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                        <span className="strong">{o.customer_name || 'Khách lẻ'}</span>
-                        <span className="xs muted">{n} phần · {o.is_gift ? 'tặng' : payL}{o.channel === 'aggregate' ? ' · đơn bổ sung' : ''}</span>
-                      </span>
-                      <span className="strong num">{vnd(o.total_vnd)}</span>
-                      <Icon name="chev" size={16} style={{ color: 'var(--ink-muted)', transform: isOpen ? 'rotate(90deg)' : undefined }} />
-                    </button>
-                    {isOpen && (
-                      <div style={{ padding: '0 0 12px 44px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {o.order_lines.map((l: any, k: number) => (
-                          <div key={k} className="row between small">
-                            <span>{l.qty} × {name(l.product_id)}</span>
-                            <span className="num muted">{vnd(l.qty * l.unit_price_vnd)}</span>
-                          </div>
-                        ))}
-                        {o.discount_vnd > 0 && <div className="row between small"><span>Giảm giá</span><span className="num muted">− {vnd(o.discount_vnd)}</span></div>}
-                        <span className="xs muted">Đơn số {o.seq_in_day} · {payL}{o.source === 'import' ? ' · nhập từ Knote' : ''}</span>
-                        {o.note && <span className="xs muted">{o.note}</span>}
-                      </div>
-                    )}
-                  </div>
+                  <Link key={o.id} to={`/bao-cao/don/${o.id}`} className="list-row"
+                    style={{ borderBottom: i < orders.length - 1 ? '1px solid var(--border)' : 0, minHeight: 56, padding: '6px 0', textDecoration: 'none', color: 'inherit' }}>
+                    <span className="small muted num" style={{ width: 44, flexShrink: 0 }}>{timeHM(o.placed_at)}</span>
+                    <span className="grow" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <span className="strong">{o.customer_name || 'Khách lẻ'}</span>
+                      <span className="xs muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.order_lines.map((l: any) => `${l.qty} ${short(l.product_id)}`).join(' · ')}</span>
+                      <span className="xs muted">{n} phần · {o.is_gift ? 'tặng' : payL}{o.channel === 'aggregate' ? ' · đơn bổ sung' : ''}</span>
+                    </span>
+                    <span className="strong num">{vnd(o.total_vnd)}</span>
+                    <Icon name="chev" size={16} style={{ color: 'var(--ink-muted)' }} />
+                  </Link>
                 );
               })}
             </section>
