@@ -52,6 +52,9 @@ export default function ExpenseSheet({
   type Item = { clientId: string; cat: ExpCat; name: string | null; ing?: Ingredient; qty: number | null; amount: number };
   const [items, setItems] = useState<Item[]>([]);
   const [unitPrice, setUnitPrice] = useState('');
+  // Hoa quả: nhập theo quả, app quy ra gam theo số gam mỗi quả (sửa được từng lần mua)
+  const [byPiece, setByPiece] = useState(false);
+  const [pieceG, setPieceG] = useState('');
   // Số lượng × đơn giá = số tiền: nhập hai số, app tính số còn lại
   const onQty = (v: string) => { setQty(v); if (Number(v) > 0 && Number(unitPrice) > 0) setAmount(String(Math.round(Number(v) * Number(unitPrice)))); };
   const onUnitPrice = (v: string) => { setUnitPrice(v); if (Number(v) > 0 && Number(qty) > 0) setAmount(String(Math.round(Number(v) * Number(qty)))); };
@@ -98,7 +101,12 @@ export default function ExpenseSheet({
     reloadCatalog();
   }
 
-  const stockApplied = !!ing && Number(qty) > 0;
+  const piece = byPiece && !!ing?.piece_g;
+  const gPerPiece = piece ? Number(pieceG) || Number(ing!.piece_g) : 0;
+  // Số lượng theo đơn vị mua của món (kg…), dù người dùng nhập theo quả
+  const qtyPU = piece ? Math.round(((Number(qty) * gPerPiece) / ing!.purchase_factor) * 1000) / 1000 : Number(qty);
+  const qtyUnit = piece ? 'quả' : ing ? unitLabel(ing.purchase_unit) : '';
+  const stockApplied = !!ing && qtyPU > 0;
   const needsStockWarn = stockMode && !stockApplied;
 
   /** Kiểm tra món đang nhập, hỏi các cảnh báo; trả về null nếu người dùng dừng lại. */
@@ -135,7 +143,7 @@ export default function ExpenseSheet({
       });
       if (!go) return null;
     }
-    return { clientId: uuid(), cat: finalCat, name: stockMode ? ing!.name : name.trim() || null, ing: stockApplied ? ing : undefined, qty: stockApplied ? Number(qty) : null, amount: amt };
+    return { clientId: uuid(), cat: finalCat, name: stockMode ? ing!.name : name.trim() || null, ing: stockApplied ? ing : undefined, qty: stockApplied ? qtyPU : null, amount: amt };
   }
   const payloadOf = (it: Item) => ({
     outlet_id: outlet!.id, client_id: it.clientId, category_id: it.cat.id, item_name: it.name,
@@ -147,7 +155,7 @@ export default function ExpenseSheet({
     const it = await buildCurrent();
     if (!it) return;
     setItems((l) => [...l, it]);
-    setName(''); setIngId(null); setQty(''); setAmount(''); setUnitPrice('');
+    setName(''); setIngId(null); setQty(''); setAmount(''); setUnitPrice(''); setByPiece(false); setPieceG('');
   }
 
   async function save() {
@@ -173,7 +181,7 @@ export default function ExpenseSheet({
       if (error) {
         // Các món trước đã ghi xong: bỏ khỏi danh sách để bấm Lưu lại không ghi trùng
         setItems(list.slice(i));
-        setName(''); setIngId(null); setQty(''); setAmount(''); setUnitPrice('');
+        setName(''); setIngId(null); setQty(''); setAmount(''); setUnitPrice(''); setByPiece(false); setPieceG('');
         setBusy(false);
         return setErr(`${i > 0 ? `Đã ghi ${i} món. ` : ''}Món "${list[i].name || list[i].cat.name}" chưa ghi được: ${errorText(error)}`);
       }
@@ -305,23 +313,36 @@ export default function ExpenseSheet({
                     </div>
                   </div>
                 )}
+                {ing?.piece_g && (
+                  <div className="seg sm" role="tablist" aria-label="Đơn vị nhập" style={{ alignSelf: 'flex-start' }}>
+                    <button type="button" className={!byPiece ? 'on' : ''} onClick={() => { setByPiece(false); setQty(''); setUnitPrice(''); }}>Theo {unitLabel(ing.purchase_unit)}</button>
+                    <button type="button" className={byPiece ? 'on' : ''} onClick={() => { setByPiece(true); setQty(''); setUnitPrice(''); }}>Theo quả</button>
+                  </div>
+                )}
                 {ing && (
                   <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
                     <div className="field" style={{ flex: '0 0 auto' }}>
                       <span className="label small strong">Số lượng</span>
-                      <NumberField value={qty} onChange={onQty} unit={unitLabel(ing.purchase_unit)} label="Số lượng" width={130} decimals />
+                      <NumberField value={qty} onChange={onQty} unit={qtyUnit} label="Số lượng" width={130} decimals />
                     </div>
                     <div className="field grow" style={{ minWidth: 0 }}>
-                      <span className="label small strong">Đơn giá (đ/{unitLabel(ing.purchase_unit)})</span>
+                      <span className="label small strong">Đơn giá (đ/{qtyUnit})</span>
                       <MoneyInput value={unitPrice} onChange={onUnitPrice} label="Đơn giá" placeholder="không bắt buộc" />
                     </div>
+                  </div>
+                )}
+                {piece && (
+                  <div className="field">
+                    <span className="label small strong">Mỗi quả khoảng</span>
+                    <NumberField value={pieceG} onChange={setPieceG} unit="g" label="Số gam mỗi quả" width={130} />
+                    <span className="xs muted">Để trống thì lấy {num(Number(ing!.piece_g))} g (ước tính). Cân được thì ghi số thật để kho đúng hơn.</span>
                   </div>
                 )}
                 <div className="row small" style={{ gap: 8, padding: '8px 10px', background: stockApplied ? 'var(--bg-brand-soft)' : 'var(--bg-200)', borderRadius: 'var(--radius-md)', alignItems: 'flex-start' }}>
                   <Icon name={stockApplied ? 'box' : 'scale'} size={18} style={{ color: 'var(--ink-brand)', flexShrink: 0 }} />
                   <span>
                     {stockApplied ? (
-                      <>Sẽ cộng vào kho: <strong>{num(Number(qty), 2)} {unitLabel(ing!.purchase_unit)} {ing!.name}</strong>{ing!.purchase_factor !== 1 ? ` (${num(Number(qty) * ing!.purchase_factor)} ${unitLabel(ing!.unit)})` : ''}, giống Nhập hàng.</>
+                      <>Sẽ cộng vào kho: <strong>{piece ? `${num(Number(qty))} quả = ` : ''}{num(qtyPU, 2)} {unitLabel(ing!.purchase_unit)} {ing!.name}</strong>{ing!.purchase_factor !== 1 ? ` (${num(qtyPU * ing!.purchase_factor)} ${unitLabel(ing!.unit)})` : ''}, giống Nhập hàng.</>
                     ) : ing ? (
                       <>Chưa có số lượng nên <strong>chỉ ghi tiền</strong>. {ing.name} trong kho cập nhật khi kiểm kê.</>
                     ) : (

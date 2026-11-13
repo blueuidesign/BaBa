@@ -14,6 +14,8 @@ export type Product = {
 export type Ingredient = {
   id: string; code: string; name: string; grp: string; unit: string; purchase_unit: string;
   purchase_factor: number; kind: string; shelf_days: number | null; storage_note: string | null; sort_order: number;
+  /** Gam của một quả (hoa quả nhập theo quả); null = không nhập theo quả */
+  piece_g?: number | null;
 };
 export type BatchRecipe = { id: string; code: string; name: string; output_ingredient_id: string; output_qty: number; note: string | null; items: { ingredient_id: string; qty: number }[] };
 export type PackagingRule = { ingredient_id: string; qty_per_unit: number; consume_at: string; product_kind: string };
