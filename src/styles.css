@@ -329,3 +329,9 @@ select.input { appearance: auto; }
 @media (min-width: 600px) { .fullpage { border-left: 1px solid var(--border); border-right: 1px solid var(--border); } }
 
 .bars-svg { display: block; border-bottom: 1px solid var(--border); }
+
+/* Từ ngày – Đến ngày: hai ô bằng nhau, không tràn trên iPhone */
+.date2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.datebox { position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.datebox-val { display: flex; align-items: center; min-height: 44px; padding: 0 12px; background: var(--bg-100); border: 1.5px solid var(--border); border-radius: var(--radius-md); font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; }
+.datebox input { position: absolute; left: 0; right: 0; bottom: 0; height: 44px; width: 100%; opacity: 0; -webkit-appearance: none; appearance: none; border: 0; margin: 0; padding: 0; font-size: 16px; }
