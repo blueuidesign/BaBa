@@ -46,7 +46,19 @@ export default function Home() {
       supabase.from('orders').select('id', { count: 'exact', head: true }).eq('outlet_id', oid).eq('business_date', yesterday).eq('status', 'active'),
       supabase.from('cash_opens').select('amount_vnd').eq('outlet_id', oid).eq('business_date', today).order('created_at', { ascending: false }).limit(1)
     ]);
+    // Gợi ý tiền đầu ngày: tổng tiền trong hộp lúc đối chiếu gần nhất = tiền thu hôm đó + tiền đầu ngày hôm đó
+    let cashHint: { amount: number; date: string } | null = null;
+    if (!(cashOpen.data || []).length) {
+      const { data: last } = await supabase.from('day_closes').select('business_date,cash_counted_vnd')
+        .eq('outlet_id', oid).eq('is_current', true).lt('business_date', today).order('business_date', { ascending: false }).limit(1);
+      if (last?.[0]) {
+        const { data: op } = await supabase.from('cash_opens').select('amount_vnd')
+          .eq('outlet_id', oid).eq('business_date', last[0].business_date).order('created_at', { ascending: false }).limit(1);
+        cashHint = { amount: (last[0].cash_counted_vnd || 0) + (op?.[0]?.amount_vnd || 0), date: last[0].business_date };
+      }
+    }
     return {
+      cashHint,
       sales, bottles, stock, recent: recent.data || [],
       closed: new Set((closes.data || []).map((c: any) => c.business_date)), ydayCount: ydayOrders.count || 0,
       cashOpen: (cashOpen.data || [])[0]?.amount_vnd as number | undefined
@@ -108,7 +120,7 @@ export default function Home() {
   expiring.forEach((s) => tasks.push(<Task key={s.ingredient_id} icon="warn" kind="warn" title={`${s.name} sắp hết hạn`} sub={`Hạn ${ddmm(s.nearest_expiry!)}`} to={s.kind === 'made' ? '/nau/me' : `/kho/${s.ingredient_id}`} />));
   if (data.sales.bottles > 0 && !data.closed.has(today))
     tasks.push(<Task key="c" icon="scale" title="Đối chiếu cuối ngày" sub="Đếm chai còn và tiền thu được" to="/doi-chieu" />);
-  if (hour >= 15) tasks.push(<Task key="p" icon="blender" title="Kế hoạch nấu ngày mai" sub="Gợi ý theo 7 ngày gần nhất" to="/nau" />);
+  if (hour >= 15) tasks.push(<Task key="p" icon="blender" title="Kế hoạch nấu ngày mai" sub="Gợi ý theo 7 ngày gần nhất" to="/nau?tab=mai" />);
 
   return (
     <div className="screen">
@@ -160,10 +172,6 @@ export default function Home() {
           </section>
         )}
 
-        <Link to="/ban" className={`btn lg block ${fresh ? 'secondary' : ''}`}>
-          <Icon name="cart" size={22} sw={2} /> Ghi đơn mới
-        </Link>
-
         <Link to="/nau" className="list-row card">
           <span className="ico-box"><Icon name="blender" size={22} /></span>
           <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -178,7 +186,7 @@ export default function Home() {
             className="list-row card tight"
             style={{ border: 0, width: '100%', textAlign: 'left', cursor: 'pointer' }}
             onClick={() => {
-              setCashIn(data.cashOpen != null ? String(data.cashOpen) : '');
+              setCashIn(data.cashOpen != null ? String(data.cashOpen) : data.cashHint && data.cashHint.amount > 0 ? String(data.cashHint.amount) : '');
               setCashErr(null);
               setCashSheet(true);
             }}
@@ -230,6 +238,9 @@ export default function Home() {
             <strong style={{ fontSize: 17 }}>Tiền đầu ngày</strong>
             <span className="small muted">Số tiền có sẵn trong hộp trước khi bán (tiền lẻ để thối). Cuối ngày bạn có thể đếm cả hộp, app tự trừ số này.</span>
             <MoneyInput value={cashIn} onChange={setCashIn} label="Tiền đầu ngày" big />
+            {data.cashOpen == null && data.cashHint && data.cashHint.amount > 0 && (
+              <span className="small muted">Điền sẵn {vnd(data.cashHint.amount)}: tổng tiền mặt trong hộp lúc đối chiếu ngày {ddmm(data.cashHint.date)}. Đếm lại, sửa nếu khác, rồi bấm Lưu. Chưa bấm Lưu thì chưa ghi nhận.</span>
+            )}
             {cashErr && <span className="err">{cashErr}</span>}
             <button
               className="btn lg block"

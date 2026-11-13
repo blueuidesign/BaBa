@@ -272,27 +272,28 @@ export default function Revenue() {
                 {activeSlots === 0 ? (
                   <p className="small muted">Chưa có số liệu trong khoảng này.</p>
                 ) : (
-                  <div className="bars" style={{ gridTemplateColumns: `repeat(${slots.length}, minmax(0, 1fr))` }} role="img" aria-label={mode === 'revenue' ? 'Biểu đồ doanh thu' : 'Biểu đồ số chai: bán, tặng, hủy'}>
-                    {slots.map((s) => {
+                  // Vẽ bằng SVG: cột dựng bằng <button> + flex không hiện trên Safari iPhone
+                  <svg className="bars-svg" viewBox={`0 0 ${slots.length * 10} ${BAR_H + 4}`} preserveAspectRatio="none" width="100%" height={BAR_H + 4} role="img" aria-label={mode === 'revenue' ? 'Biểu đồ doanh thu' : 'Biểu đồ số chai: bán, tặng, hủy'}>
+                    {slots.map((s, i) => {
                       const r = series.get(s);
-                      // Chiều cao tính bằng px: Safari (iPhone) không tính được % chiều cao trong ô lưới, cột bị cao 0
-                      const h = (v: number) => `${Math.max(v > 0 ? 2 : 0, Math.round((v / maxV) * BAR_H))}px`;
-                      const desc = r ? (mode === 'revenue' ? vnd(r.revenue) : `${r.sold} bán, ${r.gift} tặng, ${r.waste} hủy`) : 'không có';
+                      const h = (v: number) => (v > 0 ? Math.max(2, Math.round((v / maxV) * BAR_H)) : 0);
+                      const on = picked === s;
+                      const parts: [number, string][] = r && mode === 'bottles'
+                        ? [[h(r.sold), 'var(--brand)'], [h(r.gift), 'var(--gift)'], [h(r.waste), 'var(--danger)']]
+                        : [[h(val(r)), 'var(--brand)']];
+                      let y = BAR_H + 4;
                       return (
-                        <button key={s} className={picked === s ? 'on' : ''} aria-label={`${label(s)}: ${desc}`} onClick={() => setPicked(picked === s ? null : s)}>
-                          {r && mode === 'bottles' ? (
-                            <>
-                              {r.waste > 0 && <span className="waste" style={{ height: h(r.waste) }} />}
-                              {r.gift > 0 && <span className="gift" style={{ height: h(r.gift) }} />}
-                              {r.sold > 0 && <span style={{ height: h(r.sold) }} />}
-                            </>
-                          ) : (
-                            <span style={{ height: h(val(r)) }} />
-                          )}
-                        </button>
+                        <g key={s} onClick={() => setPicked(on ? null : s)} style={{ cursor: 'pointer' }}>
+                          <rect x={i * 10} y={0} width={10} height={BAR_H + 4} fill="transparent" />
+                          {parts.map(([ph, col], k) => {
+                            if (!ph) return null;
+                            y -= ph;
+                            return <rect key={k} x={i * 10 + 1.5} y={y} width={7} height={ph} fill={col} opacity={on ? 1 : k === 0 ? 0.55 : 0.8} />;
+                          })}
+                        </g>
                       );
                     })}
-                  </div>
+                  </svg>
                 )}
                 <div className="row between xs muted">
                   <span>{label(slots[0] || from)}</span>

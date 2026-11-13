@@ -327,3 +327,5 @@ select.input { appearance: auto; }
 .fp-body::-webkit-scrollbar { display: none; }
 .fp-foot { flex-shrink: 0; padding: 12px 20px calc(12px + var(--safe-b)); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; background: var(--bg-100); }
 @media (min-width: 600px) { .fullpage { border-left: 1px solid var(--border); border-right: 1px solid var(--border); } }
+
+.bars-svg { display: block; border-bottom: 1px solid var(--border); }
