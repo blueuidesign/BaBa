@@ -205,6 +205,7 @@ export default function Order() {
       </main>
 
       <div className="bar">
+        {rmMode && <span className="xs strong" style={{ color: 'var(--danger)' }}>Đang bớt món: chạm vào món để bớt 1. Bấm lại nút Bớt món để thôi.</span>}
         {bottles > 0 && (
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             {disc > 0 ? (
@@ -229,7 +230,6 @@ export default function Order() {
             )}
           </div>
         )}
-        {rmMode && <span className="xs strong" style={{ color: 'var(--danger)' }}>Đang bớt món: chạm vào món để bớt 1. Bấm lại nút Bớt món để thôi.</span>}
         {discTooBig && <span className="err">Giảm {vnd(disc)} lớn hơn tiền đơn {vnd(gross)}. Bấm vào ô giảm giá để sửa.</span>}
         {err && <span className="err">{err}</span>}
         <div className="bar-row">
