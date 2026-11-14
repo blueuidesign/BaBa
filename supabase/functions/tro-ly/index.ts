@@ -9,7 +9,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const MODEL = 'claude-sonnet-5-5';
 const MAX_ROUNDS = 6;       // số lượt mô hình được gọi công cụ cho một câu hỏi
-const MAX_HISTORY = 12;     // số tin nhắn gần nhất gửi kèm
+const MAX_HISTORY = 8;      // số tin nhắn gần nhất gửi kèm
 const MAX_DAYS = 400;
 
 const cors = {
@@ -114,20 +114,29 @@ Deno.serve(async (req) => {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
     const thu = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'long' }).format(new Date());
     const system = `Bạn là trợ lý báo cáo trong app Kho BaBa (bán sữa hạt Sữa lành từ BaBa). Cơ sở đang xem: ${o?.name || ''}. Hôm nay là ${thu}, ${today} (giờ Việt Nam).
-Quy tắc:
+Xưng hô: xưng "mình", gọi người hỏi là "bạn". Giọng ấm, giản dị, không khách sáo.
+Quy tắc về số liệu:
 - Mọi con số phải lấy từ công cụ. Không ước lượng, không tự bịa. Công cụ báo lỗi hoặc không có dữ liệu thì nói rõ.
-- Trả lời bằng tiếng Việt, ngắn gọn, kết luận trước. Luôn ghi khoảng ngày đã dùng để người đọc đối chiếu với màn Báo cáo.
-- Tiền viết kiểu 175.000 đ. Không dùng bảng markdown; liệt kê bằng gạch đầu dòng ngắn.
 - App chưa tính giá vốn và lãi theo từng cốc. Nếu được hỏi lãi, chỉ nêu doanh thu trừ tiền đã chi trong kỳ và nói rõ đây không phải lãi thật vì tiền mua hàng chưa khớp với hàng đã bán.
 - Bạn chỉ xem được dữ liệu, không ghi đơn, không sửa hay xóa gì. Câu hỏi ngoài việc bán hàng của cơ sở này thì từ chối ngắn gọn.
-- "Phần" gồm cả chai và cốc giấy.`;
+- "Phần" gồm cả chai và cốc giấy. Tiền viết kiểu 175.000 đ.
+Cách trình bày câu trả lời, theo đúng thứ tự:
+1. Một hoặc hai câu trả lời thẳng vào câu hỏi, có ngày hoặc khoảng ngày đã dùng (viết kiểu 14/11/2026), con số chính in đậm bằng **...**.
+2. Dòng "### Điểm chính" rồi 2 đến 4 gạch đầu dòng ngắn (bắt đầu bằng "- "), mỗi dòng một con số đáng chú ý, số in đậm. Câu hỏi quá đơn giản, không còn gì đáng nói thêm thì bỏ mục này.
+3. Dòng "### Lưu ý" rồi một đoạn ngắn, CHỈ khi có điều người đọc dễ hiểu nhầm hoặc số liệu chưa đủ (ví dụ chưa tách theo món, chưa phải lãi thật). Không có gì cần lưu ý thì bỏ hẳn mục này, đừng viết cho có.
+4. Cuối cùng luôn có khối gợi ý, đúng định dạng sau, mỗi dòng một câu hỏi ngắn mà bạn trả lời được bằng công cụ đang có, 2 đến 3 câu, không đánh số:
+<goi_y>
+câu hỏi 1
+câu hỏi 2
+</goi_y>
+Chỉ dùng các định dạng trên: **đậm**, "### tiêu đề", gạch đầu dòng "- ". Không dùng bảng, không dùng biểu tượng cảm xúc.`;
 
     let usage = { input_tokens: 0, output_tokens: 0 };
     for (let i = 0; i < MAX_ROUNDS; i++) {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({ model: MODEL, max_tokens: 1200, system, tools, messages })
+        body: JSON.stringify({ model: MODEL, max_tokens: 900, system, tools, messages })
       });
       if (!r.ok) {
         const t = await r.text();
@@ -139,9 +148,13 @@ Quy tắc:
       usage.input_tokens += res.usage?.input_tokens || 0;
       usage.output_tokens += res.usage?.output_tokens || 0;
       if (res.stop_reason !== 'tool_use') {
-        const text = (res.content || []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n').trim();
+        const raw = (res.content || []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n').trim();
+        // Tách khối <goi_y> thành danh sách câu hỏi gợi ý; phần còn lại là câu trả lời
+        const m = raw.match(/<goi_y>([\s\S]*?)(<\/goi_y>|$)/);
+        const suggestions = m ? m[1].split('\n').map((x: string) => x.replace(/^[-\d.\s]+/, '').trim()).filter((x: string) => x && x.length <= 120).slice(0, 3) : [];
+        const text = (m ? raw.slice(0, m.index) : raw).trim();
         console.log('tro-ly', JSON.stringify({ user: u.user.id, outlet, rounds: i + 1, ...usage }));
-        return json({ reply: text || 'Tôi chưa trả lời được câu này.', usage });
+        return json({ reply: text || 'Mình chưa trả lời được câu này.', suggestions, usage });
       }
       messages.push({ role: 'assistant', content: res.content });
       const results = [];
