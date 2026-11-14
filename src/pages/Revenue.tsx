@@ -416,17 +416,6 @@ export default function Revenue() {
             </Link>
 
             {canManage && (
-              <Link to="/bao-cao/hoi" className="list-row card tight" style={{ textDecoration: 'none', color: 'inherit' }}>
-                <span className="ico-box"><Icon name="bell" size={20} /></span>
-                <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span className="strong">Hỏi trợ lý</span>
-                  <span className="small muted">Gõ câu hỏi về doanh thu, món bán, khoản chi</span>
-                </span>
-                <Icon name="chev" size={20} style={{ color: 'var(--ink-muted)' }} />
-              </Link>
-            )}
-
-            {canManage && (
               <Link to="/bao-cao/xuat" className="list-row card tight" style={{ textDecoration: 'none', color: 'inherit' }}>
                 <span className="ico-box"><Icon name="box" size={20} /></span>
                 <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
