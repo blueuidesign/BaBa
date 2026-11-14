@@ -93,7 +93,7 @@ export default function OrderSaved() {
           <span style={{ fontSize: 32, lineHeight: '38px', fontWeight: 700 }} className="num">
             {vnd(state.gift ? 0 : total)}
           </span>
-          <span className="small muted">{n} chai{state.gift ? ' · tặng' : ''}</span>
+          <span className="small muted">{state.partsLabel || `${n} chai`}{state.gift ? ' · tặng' : ''}</span>
           {!state.gift && state.discount > 0 && (
             <span className="small muted num">
               Tạm tính {vnd(state.gross)} · giảm {vnd(state.discount)}{state.discountReason ? ` (${state.discountReason})` : ''}
@@ -103,10 +103,10 @@ export default function OrderSaved() {
 
         <section className="card">
           {lines.map((l: any) => (
-            <div key={l.product_id} className="list-row" style={{ minHeight: 44 }}>
+            <div key={l.product_id + (l.container || '')} className="list-row" style={{ minHeight: 44 }}>
               <span className="dot-color" style={{ background: l.color }} />
               <span className="grow strong">
-                {l.qty} × {l.name}
+                {l.qty} × {l.name}{l.container === 'coc' ? ' · cốc giấy' : ''}
               </span>
               <span className="num strong">{vnd(state.gift ? 0 : l.qty * l.price)}</span>
             </div>

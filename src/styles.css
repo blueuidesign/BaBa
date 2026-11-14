@@ -1,5 +1,6 @@
 /* Kho BaBa — theme app: màu thương hiệu BaBa, nền xám trung tính, chữ Be Vietnam Pro */
 :root {
+  --cup: #B5791F;
   --baba-green: #296241;
   --baba-cream: #F7F3EB;
   --baba-ink: #1F3A2A;
@@ -243,6 +244,16 @@ a.list-row { color: inherit; text-decoration: none; }
   background: var(--bg-brand); color: var(--ink-on-brand); font-size: 15px; line-height: 28px; font-weight: 700;
 }
 .tile .out { position: absolute; top: -8px; right: -8px; height: 22px; padding: 0 8px; border-radius: 11px; background: var(--bg-200); color: var(--ink-muted); font-size: 11px; line-height: 22px; font-weight: 600; }
+
+/* Cốc giấy */
+.tile.cup { border-color: var(--cup); }
+.tile .count.cup { background: var(--cup); }
+.tile .split { display: flex; flex-direction: column; width: 100%; }
+.tile .split span { display: flex; align-items: center; justify-content: center; gap: 6px; height: 22px; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink-brand, var(--brand)); }
+.tile .split span + span { border-top: 1px dashed var(--border); color: var(--cup); }
+.cup-btn { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid var(--border); background: var(--bg-100); cursor: pointer; }
+.cup-btn.on { border-color: var(--cup); background: var(--cup); }
+.chip.cup { border-color: var(--cup); color: var(--cup); }
 
 /* Thanh tồn kho */
 .stock { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; padding: 12px 0; border-bottom: 1px solid var(--border); color: inherit; text-decoration: none; }

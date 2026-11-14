@@ -17,7 +17,7 @@ export default function DayOrders() {
   const { data: orders } = useLoad(
     async (oid) => {
       const { data } = await supabase.from('orders')
-        .select('id,seq_in_day,placed_at,total_vnd,discount_vnd,is_gift,payment_method,customer_name,note,source,channel,order_lines(qty,product_id,unit_price_vnd)')
+        .select('id,seq_in_day,placed_at,total_vnd,discount_vnd,is_gift,payment_method,customer_name,note,source,channel,order_lines(qty,product_id,container,unit_price_vnd)')
         .eq('outlet_id', oid).eq('business_date', day).eq('status', 'active').order('placed_at', { ascending: false });
       return (data || []) as any[];
     },
@@ -62,7 +62,7 @@ export default function DayOrders() {
                     <span className="small muted num" style={{ width: 44, flexShrink: 0 }}>{timeHM(o.placed_at)}</span>
                     <span className="grow" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                       <span className="strong">{o.customer_name || 'Khách lẻ'}</span>
-                      <span className="xs muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.order_lines.map((l: any) => `${l.qty} ${short(l.product_id)}`).join(' · ')}</span>
+                      <span className="xs muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.order_lines.map((l: any) => `${l.qty} ${short(l.product_id)}${l.container === 'coc' ? ' (cốc)' : ''}`).join(' · ')}</span>
                       <span className="xs muted">{n} phần · {o.is_gift ? 'tặng' : payL}{o.channel === 'aggregate' ? ' · đơn bổ sung' : ''}</span>
                     </span>
                     <span className="strong num">{vnd(o.total_vnd)}</span>

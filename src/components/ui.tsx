@@ -63,6 +63,17 @@ export function Bottle({ color, size = 40 }: { color: string | null; size?: numb
   );
 }
 
+export function Cup({ color, size = 40 }: { color: string | null; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 64" aria-hidden="true">
+      <rect x="9" y="12" width="30" height="6" rx="3" fill="#1F3A2A" opacity="0.85" />
+      <path d="M11 18h26l-3.2 38a4 4 0 0 1-4 3.6H18.2a4 4 0 0 1-4-3.6Z" fill="#F7F3EB" stroke="#1F3A2A" strokeOpacity="0.35" strokeWidth="1.5" />
+      <path d="M12.6 30h22.8l-1.2 14H13.8Z" fill={color || '#ddd'} />
+      <rect x="22.5" y="2" width="3" height="14" rx="1.5" fill="#1F3A2A" opacity="0.6" />
+    </svg>
+  );
+}
+
 export function Header({ title, sub, back, right }: { title: string; sub?: ReactNode; back?: string | true; right?: ReactNode }) {
   const nav = useNavigate();
   const { online, queue } = useApp();
