@@ -255,6 +255,12 @@ a.list-row { color: inherit; text-decoration: none; }
 .cup-btn.on { border-color: var(--cup); background: var(--cup); }
 .chip.cup { border-color: var(--cup); color: var(--cup); }
 
+/* Bớt món */
+.tile.rm, .tile.rm.cup { border-color: var(--danger); }
+.tile.dim { opacity: 0.4; }
+.tile .rm-mark { position: absolute; top: -8px; left: -8px; width: 28px; height: 28px; border-radius: 14px; background: var(--danger); color: #fff; display: flex; align-items: center; justify-content: center; }
+.chip.rm-on { background: var(--danger); border-color: var(--danger); color: #fff; }
+
 /* Thanh tồn kho */
 .stock { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; padding: 12px 0; border-bottom: 1px solid var(--border); color: inherit; text-decoration: none; }
 .stock:last-child { border-bottom: 0; }

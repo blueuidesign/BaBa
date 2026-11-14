@@ -20,6 +20,7 @@ export default function Order() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [cups, setCups] = useState<Record<string, number>>({});
   const [cupMode, setCupMode] = useState(false);
+  const [rmMode, setRmMode] = useState(false); // chế độ bớt món: chạm ô món để bớt 1
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [stuck, setStuck] = useState<QueuedCall | null>(null);
@@ -69,7 +70,12 @@ export default function Order() {
     setErr(null);
     (cupMode ? setCups : setCounts)((c) => ({ ...c, [pid]: (c[pid] || 0) + 1 }));
   }
-  function dec(pid: string, cup = false) {
+  /** Bớt 1 ở món này. Món có cả chai và cốc thì bớt theo nút cốc giấy; chỉ có một loại thì bớt đúng loại đó. */
+  function dec(pid: string) {
+    const nb = counts[pid] || 0;
+    const nc = cups[pid] || 0;
+    if (!nb && !nc) return;
+    const cup = nb && nc ? cupMode : nc > 0;
     (cup ? setCups : setCounts)((c) => {
       const n = (c[pid] || 0) - 1;
       const next = { ...c };
@@ -77,6 +83,7 @@ export default function Order() {
       else next[pid] = n;
       return next;
     });
+    if (nb + nc <= 1 && bottles <= 1) setRmMode(false); // đơn hết món thì tự thoát
   }
 
   function buildCall(): QueuedCall {
@@ -98,6 +105,7 @@ export default function Order() {
   function done(call: QueuedCall, result: any, queued: boolean) {
     setCounts({});
     setCups({});
+    setRmMode(false);
     setCupMode(false); // lưu xong tự về chai để không ghi nhầm cốc cho đơn sau
     setDiscount(null);
     setReason('');
@@ -164,12 +172,13 @@ export default function Order() {
                       <button
                         key={p.id}
                         type="button"
-                        className={`tile ${n ? 'on' : ''} ${nc && !nb ? 'cup' : ''}`}
+                        className={`tile ${n ? 'on' : ''} ${nc && !nb ? 'cup' : ''} ${rmMode ? (n ? 'rm' : 'dim') : ''}`}
                         aria-pressed={n > 0}
-                        aria-label={`${p.name}, ${vnd(p.price)}${SHOW_BOTTLES ? `, còn ${left}` : ''}${nb ? `, ${nb} chai` : ''}${nc ? `, ${nc} cốc giấy` : ''}`}
-                        disabled={out || (!allowNegative && left < 0)}
-                        onClick={() => (allowNegative || left > 0 ? inc(p.id) : setErr(`${p.short_name} đã hết chai trên quầy.`))}
+                        aria-label={`${p.name}, ${vnd(p.price)}${SHOW_BOTTLES ? `, còn ${left}` : ''}${nb ? `, ${nb} chai` : ''}${nc ? `, ${nc} cốc giấy` : ''}${rmMode && n ? ', chạm để bớt 1' : ''}`}
+                        disabled={rmMode ? n === 0 : out || (!allowNegative && left < 0)}
+                        onClick={() => rmMode ? dec(p.id) : (allowNegative || left > 0 ? inc(p.id) : setErr(`${p.short_name} đã hết chai trên quầy.`))}
                       >
+                        {rmMode && n > 0 && <span className="rm-mark"><Icon name="minus" size={16} sw={3} /></span>}
                         {n > 0 ? <span className={`count ${nc && !nb ? 'cup' : ''}`}>{n}</span> : out ? <span className="out">Hết</span> : null}
                         {nb > 0 && nc > 0 ? (
                           <span className="split">
@@ -196,19 +205,8 @@ export default function Order() {
       </main>
 
       <div className="bar">
-        {picked.length > 0 && (
-          <div className="chips wrap">
-            {rows.map(({ p, qty, container }) => (
-              <button key={p.id + container} type="button" className={`chip ${container === 'coc' ? 'cup' : ''}`} style={{ minHeight: 34, fontSize: 13, paddingRight: 10 }}
-                aria-label={`Bớt một ${p.short_name} ${container === 'coc' ? 'cốc giấy' : 'chai'}`} onClick={() => dec(p.id, container === 'coc')}>
-                {p.short_name}{nCoc > 0 ? (container === 'coc' ? ' · cốc' : ' · chai') : ''} <strong>×{qty}</strong>
-                <Icon name="minus" size={14} sw={2.4} />
-              </button>
-            ))}
-          </div>
-        )}
         {bottles > 0 && (
-          <div className="row between" style={{ gap: 8 }}>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             {disc > 0 ? (
               <button type="button" className="chip on" style={{ minHeight: 34, fontSize: 13 }} onClick={() => setDiscOpen(true)} aria-label={`Đang giảm ${vnd(disc)}, bấm để sửa`}>
                 <Icon name="tag" size={15} /> Giảm {discount?.kind === 'pct' ? `${discount.value}% · ` : ''}{vnd(disc)}
@@ -218,9 +216,13 @@ export default function Order() {
                 <Icon name="tag" size={15} /> Giảm giá
               </button>
             )}
-            {disc > 0 && <span className="small muted num">Tạm tính <s>{vnd(gross)}</s></span>}
+            <button type="button" role="switch" aria-checked={rmMode} className={`chip ${rmMode ? 'rm-on' : ''}`} style={{ minHeight: 34, fontSize: 13 }} onClick={() => setRmMode((v) => !v)}>
+              <Icon name="minus" size={15} sw={2.4} /> Bớt món
+            </button>
+            {disc > 0 && <span className="small muted num" style={{ marginLeft: 'auto' }}>Tạm tính <s>{vnd(gross)}</s></span>}
           </div>
         )}
+        {rmMode && <span className="xs strong" style={{ color: 'var(--danger)' }}>Đang bớt món: chạm vào món để bớt 1. Bấm lại nút Bớt món để thôi.</span>}
         {discTooBig && <span className="err">Giảm {vnd(disc)} lớn hơn tiền đơn {vnd(gross)}. Bấm vào ô giảm giá để sửa.</span>}
         {err && <span className="err">{err}</span>}
         <div className="bar-row">
