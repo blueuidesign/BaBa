@@ -5,7 +5,7 @@ import { fetchBottles, fetchDaySales, useLoad } from '../lib/data';
 import { callOrQueue, enqueue, type QueuedCall } from '../lib/queue';
 import { errorText } from '../lib/supabase';
 import { uuid, vnd, vnToday } from '../lib/format';
-import { BellLink, Bottle, Header, Icon, Loading, MoneyInput, Nav, confirmDialog } from '../components/ui';
+import { BellLink, Bottle, Cup, Header, Icon, Loading, MoneyInput, Nav, confirmDialog } from '../components/ui';
 
 type Discount = { kind: 'pct'; value: number } | { kind: 'amt'; value: number } | null;
 const PCTS = [5, 10];
@@ -16,7 +16,10 @@ const discountOf = (d: Discount, total: number) =>
 export default function Order() {
   const { outlet, catalog, queue, bump } = useApp();
   const nav = useNavigate();
+  // Số chai và số cốc giấy của từng món, giữ riêng để một món có thể có cả hai
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [cups, setCups] = useState<Record<string, number>>({});
+  const [cupMode, setCupMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [stuck, setStuck] = useState<QueuedCall | null>(null);
@@ -47,19 +50,27 @@ export default function Order() {
   const SHOW_BOTTLES = false;
   const allowNegative = !SHOW_BOTTLES || !!outlet.settings?.allow_negative_bottles;
   const products = catalog?.products || [];
-  const picked = products.filter((p) => counts[p.id]);
-  const bottles = picked.reduce((s, p) => s + counts[p.id], 0);
-  const gross = picked.reduce((s, p) => s + counts[p.id] * p.price, 0);
+  const picked = products.filter((p) => counts[p.id] || cups[p.id]);
+  const nChai = picked.reduce((s, p) => s + (counts[p.id] || 0), 0);
+  const nCoc = picked.reduce((s, p) => s + (cups[p.id] || 0), 0);
+  const bottles = nChai + nCoc;
+  const partsLabel = [nChai ? `${nChai} chai` : '', nCoc ? `${nCoc} cốc giấy` : ''].filter(Boolean).join(' · ');
+  const gross = picked.reduce((s, p) => s + ((counts[p.id] || 0) + (cups[p.id] || 0)) * p.price, 0);
+  // Mỗi món tách thành dòng chai và dòng cốc
+  const rows = picked.flatMap((p) => [
+    ...(counts[p.id] ? [{ p, qty: counts[p.id], container: 'chai' as const }] : []),
+    ...(cups[p.id] ? [{ p, qty: cups[p.id], container: 'coc' as const }] : [])
+  ]);
   const disc = discountOf(discount, gross);
   const discTooBig = disc > gross && gross > 0;
   const total = Math.max(0, gross - disc);
 
   function inc(pid: string) {
     setErr(null);
-    setCounts((c) => ({ ...c, [pid]: (c[pid] || 0) + 1 }));
+    (cupMode ? setCups : setCounts)((c) => ({ ...c, [pid]: (c[pid] || 0) + 1 }));
   }
-  function dec(pid: string) {
-    setCounts((c) => {
+  function dec(pid: string, cup = false) {
+    (cup ? setCups : setCounts)((c) => {
       const n = (c[pid] || 0) - 1;
       const next = { ...c };
       if (n <= 0) delete next[pid];
@@ -69,14 +80,14 @@ export default function Order() {
   }
 
   function buildCall(): QueuedCall {
-    const lines = picked.map((p) => ({ product_id: p.id, qty: counts[p.id] }));
+    const lines = rows.map((r) => ({ product_id: r.p.id, qty: r.qty, container: r.container }));
     const id = uuid();
     return {
       id,
       fn: 'fn_post_order',
       outletId: outlet!.id,
       createdAt: new Date().toISOString(),
-      summary: picked.map((p) => `${counts[p.id]} ${p.short_name}`).join(' · '),
+      summary: rows.map((r) => `${r.qty} ${r.p.short_name}${r.container === 'coc' ? ' (cốc)' : ''}`).join(' · '),
       payload: {
         outlet_id: outlet!.id, client_id: id, business_date: today, placed_at: new Date().toISOString(), lines,
         ...(disc > 0 ? { discount_vnd: disc, discount_reason: reason.trim() || (discount?.kind === 'pct' ? `Giảm ${discount.value}%` : null) } : {})
@@ -86,6 +97,8 @@ export default function Order() {
 
   function done(call: QueuedCall, result: any, queued: boolean) {
     setCounts({});
+    setCups({});
+    setCupMode(false); // lưu xong tự về chai để không ghi nhầm cốc cho đơn sau
     setDiscount(null);
     setReason('');
     bump();
@@ -99,7 +112,8 @@ export default function Order() {
         discount: disc,
         discountReason: call.payload.discount_reason || null,
         bottles,
-        lines: picked.map((p) => ({ product_id: p.id, name: p.name, color: p.color, qty: counts[p.id], price: p.price }))
+        partsLabel,
+        lines: rows.map((r) => ({ product_id: r.p.id, name: r.p.name, color: r.p.color, qty: r.qty, price: r.p.price, container: r.container }))
       }
     });
   }
@@ -121,7 +135,14 @@ export default function Order() {
 
   return (
     <div className="screen">
-      <Header title="Ghi đơn" sub={`${outlet.name} · ${data?.sales.orders_count ?? 0} đơn · ${data?.sales.bottles ?? 0} chai hôm nay`} right={<BellLink />} />
+      <Header title="Ghi đơn" sub={`${outlet.name} · ${data?.sales.orders_count ?? 0} đơn · ${data?.sales.bottles ?? 0} chai hôm nay`} right={
+          <span className="row" style={{ gap: 8 }}>
+            <button type="button" role="switch" aria-checked={cupMode} aria-label="Ghi bằng cốc giấy" className={`cup-btn ${cupMode ? 'on' : ''}`} onClick={() => setCupMode((v) => !v)}>
+              <Cup color={cupMode ? '#fff' : '#C9A27A'} size={28} />
+            </button>
+            <BellLink />
+          </span>
+        } />
       <main className="main with-bar">
         {!catalog ? (
           <Loading />
@@ -134,21 +155,32 @@ export default function Order() {
                 <h2 className="h2">{line.name}</h2>
                 <div className="tiles">
                   {items.map((p) => {
-                    const n = counts[p.id] || 0;
+                    const nb = counts[p.id] || 0;
+                    const nc = cups[p.id] || 0;
+                    const n = nb + nc;
                     const left = (leftOf.get(p.id) ?? 0) - n;
                     const out = !allowNegative && left + n <= 0 && n === 0;
                     return (
                       <button
                         key={p.id}
                         type="button"
-                        className={`tile ${n ? 'on' : ''}`}
+                        className={`tile ${n ? 'on' : ''} ${nc && !nb ? 'cup' : ''}`}
                         aria-pressed={n > 0}
-                        aria-label={`${p.name}, ${vnd(p.price)}${SHOW_BOTTLES ? `, còn ${left}` : ''}${n ? `, đã chọn ${n}` : ''}`}
+                        aria-label={`${p.name}, ${vnd(p.price)}${SHOW_BOTTLES ? `, còn ${left}` : ''}${nb ? `, ${nb} chai` : ''}${nc ? `, ${nc} cốc giấy` : ''}`}
                         disabled={out || (!allowNegative && left < 0)}
                         onClick={() => (allowNegative || left > 0 ? inc(p.id) : setErr(`${p.short_name} đã hết chai trên quầy.`))}
                       >
-                        {n > 0 ? <span className="count">{n}</span> : out ? <span className="out">Hết</span> : null}
-                        <Bottle color={p.color} size={40} />
+                        {n > 0 ? <span className={`count ${nc && !nb ? 'cup' : ''}`}>{n}</span> : out ? <span className="out">Hết</span> : null}
+                        {nb > 0 && nc > 0 ? (
+                          <span className="split">
+                            <span><Bottle color={p.color} size={20} /> × {nb}</span>
+                            <span><Cup color={p.color} size={20} /> × {nc}</span>
+                          </span>
+                        ) : nc > 0 ? (
+                          <Cup color={p.color} size={40} />
+                        ) : (
+                          <Bottle color={p.color} size={40} />
+                        )}
                         <span className="name">{p.short_name}</span>
                         <span className="meta">
                           {vnd(p.price)}{SHOW_BOTTLES ? ` · còn ${left}` : ''}
@@ -166,9 +198,10 @@ export default function Order() {
       <div className="bar">
         {picked.length > 0 && (
           <div className="chips wrap">
-            {picked.map((p) => (
-              <button key={p.id} type="button" className="chip" style={{ minHeight: 34, fontSize: 13, paddingRight: 10 }} aria-label={`Bớt một ${p.short_name}`} onClick={() => dec(p.id)}>
-                {p.short_name} <strong>×{counts[p.id]}</strong>
+            {rows.map(({ p, qty, container }) => (
+              <button key={p.id + container} type="button" className={`chip ${container === 'coc' ? 'cup' : ''}`} style={{ minHeight: 34, fontSize: 13, paddingRight: 10 }}
+                aria-label={`Bớt một ${p.short_name} ${container === 'coc' ? 'cốc giấy' : 'chai'}`} onClick={() => dec(p.id, container === 'coc')}>
+                {p.short_name}{nCoc > 0 ? (container === 'coc' ? ' · cốc' : ' · chai') : ''} <strong>×{qty}</strong>
                 <Icon name="minus" size={14} sw={2.4} />
               </button>
             ))}
@@ -192,7 +225,7 @@ export default function Order() {
         {err && <span className="err">{err}</span>}
         <div className="bar-row">
           <div className="bar-total">
-            <span className="label">{bottles ? `${bottles} chai · ${disc > 0 ? 'thu' : 'trong đơn'}` : 'Chưa chọn món'}</span>
+            <span className="label">{bottles ? `${partsLabel} · ${disc > 0 ? 'thu' : 'trong đơn'}` : 'Chưa chọn món'}</span>
             <span className="value">{vnd(total)}</span>
           </div>
           <button className="btn lg" style={{ minWidth: 150 }} disabled={!bottles || busy || discTooBig} onClick={() => save()}>
@@ -207,7 +240,7 @@ export default function Order() {
           <div className="sheet-back" onClick={() => setDiscOpen(false)} />
           <div className="sheet" role="dialog" aria-labelledby="disc-t">
             <h2 id="disc-t" style={{ fontSize: 18 }}>Giảm giá cho đơn này</h2>
-            <p className="small muted">Đơn {bottles} chai · tạm tính {vnd(gross)}. Giá từng món giữ nguyên, app trừ ở tổng đơn.</p>
+            <p className="small muted">Đơn {partsLabel} · tạm tính {vnd(gross)}. Giá từng món giữ nguyên, app trừ ở tổng đơn.</p>
             <div className="chips wrap">
               {PCTS.map((v) => (
                 <button key={v} type="button" className={`chip ${discount?.kind === 'pct' && discount.value === v ? 'on' : ''}`}
@@ -244,7 +277,7 @@ export default function Order() {
             </span>
             <h2 id="stuck-t" style={{ fontSize: 18 }}>Chưa lưu được đơn</h2>
             <p className="small muted">
-              Máy chủ không trả lời sau 10 giây. Đơn {bottles} chai · {vnd(total)} vẫn giữ trên máy này. Thử lại ngay, hoặc để app tự gửi khi mạng ổn.
+              Máy chủ không trả lời sau 10 giây. Đơn {partsLabel} · {vnd(total)} vẫn giữ trên máy này. Thử lại ngay, hoặc để app tự gửi khi mạng ổn.
             </p>
             <button
               className="btn lg block"
@@ -274,6 +307,7 @@ export default function Order() {
                 if (await confirmDialog({ title: 'Bỏ đơn này?', text: 'Đơn sẽ không được ghi và không gửi lên máy chủ.', ok: 'Bỏ đơn', cancel: 'Giữ lại', danger: true })) {
                   setStuck(null);
                   setCounts({});
+                  setCups({});
                 }
               }}
             >

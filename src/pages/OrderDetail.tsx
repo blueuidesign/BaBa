@@ -18,7 +18,7 @@ export default function OrderDetail() {
   const { data: o, loading } = useLoad(
     async () => {
       const { data } = await supabase.from('orders')
-        .select('id,outlet_id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,is_gift,payment_method,customer_name,note,source,channel,order_lines(qty,product_id,unit_price_vnd,line_total_vnd)')
+        .select('id,outlet_id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,is_gift,payment_method,customer_name,note,source,channel,order_lines(qty,product_id,container,unit_price_vnd,line_total_vnd)')
         .eq('id', id).maybeSingle();
       return (data as any) || null;
     },
@@ -89,7 +89,7 @@ export default function OrderDetail() {
               {o.order_lines.map((l: any, i: number) => (
                 <div key={i} className="list-row" style={{ minHeight: 44 }}>
                   <span className="grow">
-                    <span className="strong">{l.qty} × {name(l.product_id)}</span>
+                    <span className="strong">{l.qty} × {name(l.product_id)}{l.container === 'coc' ? ' · cốc giấy' : ''}</span>
                     <span className="xs muted" style={{ display: 'block' }}>{vnd(l.unit_price_vnd)} mỗi phần</span>
                   </span>
                   <span className="num strong">{vnd(l.qty * l.unit_price_vnd)}</span>
