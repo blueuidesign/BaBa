@@ -366,3 +366,10 @@ select.input { appearance: auto; }
 .datebox { position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .datebox-val { display: flex; align-items: center; min-height: 44px; padding: 0 12px; background: var(--bg-100); border: 1.5px solid var(--border); border-radius: var(--radius-md); font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; }
 .datebox input { position: absolute; left: 0; right: 0; bottom: 0; height: 44px; width: 100%; opacity: 0; -webkit-appearance: none; appearance: none; border: 0; margin: 0; padding: 0; font-size: 16px; }
+
+/* Trợ lý báo cáo */
+.bubble { max-width: 88%; padding: 10px 12px; border-radius: 14px; font-size: 14px; line-height: 20px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble.user { justify-self: end; background: var(--brand); color: #fff; border-bottom-right-radius: 4px; }
+.bubble.assistant { justify-self: start; background: var(--bg-100); box-shadow: var(--shadow-soft); border-bottom-left-radius: 4px; }
+.bubble.error { background: var(--danger-bg); color: var(--danger); }
+.bubble.muted { color: var(--ink-muted); }

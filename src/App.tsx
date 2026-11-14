@@ -17,6 +17,7 @@ import Bottles from './pages/Bottles';
 import DayClose from './pages/DayClose';
 import OrderDetail from './pages/OrderDetail';
 import DayOrders from './pages/DayOrders';
+import Assistant from './pages/Assistant';
 import Revenue from './pages/Revenue';
 import Notifications from './pages/Notifications';
 import History from './pages/History';
@@ -61,6 +62,7 @@ export default function App() {
       <Route path="/tai-khoan" element={<Account />} />
       <Route path="/bao-cao/xuat" element={<Export />} />
       <Route path="/bao-cao/don" element={<DayOrders />} />
+      <Route path="/bao-cao/hoi" element={<Assistant />} />
       <Route path="/bao-cao/don/:id" element={<OrderDetail />} />
       <Route path="/chi-phi" element={<Expenses />} />
       <Route path="/chi-phi/moi" element={<Expenses openNew />} />
