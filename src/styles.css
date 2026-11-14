@@ -255,9 +255,23 @@ a.list-row { color: inherit; text-decoration: none; }
 .cup-btn.on { border-color: var(--cup); background: var(--cup); }
 .chip.cup { border-color: var(--cup); color: var(--cup); }
 
+/* Ô món: vùng chạm và ô nhập số (Bán nhiều) */
+.tile-hit { all: unset; box-sizing: border-box; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; text-align: center; -webkit-touch-callout: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.tile-hit:focus-visible { outline: 2px solid var(--brand); outline-offset: 4px; border-radius: 8px; }
+.tile.off { opacity: 0.45; }
+.tile.off .tile-hit { cursor: default; }
+.tile .qty { display: flex; align-items: center; gap: 3px; width: 100%; margin-top: 4px; }
+.tile .qty button { flex: none; width: 30px; height: 34px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--bg-100); color: var(--ink); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.tile .qty button:disabled { opacity: 0.35; }
+.tile .qty input { flex: 1; min-width: 0; width: 0; height: 34px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--bg-000); text-align: center; font: inherit; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); padding: 0; }
+.tile .qty input:focus { outline: none; border: 2px solid var(--brand); }
+
+.chip.bulk-on { background: var(--brand); border-color: var(--brand); color: #fff; }
+
 /* Bớt món */
 .tile.rm, .tile.rm.cup { border-color: var(--danger); }
 .tile.dim { opacity: 0.4; }
+.tile.dim.off { opacity: 0.4; }
 .tile .rm-mark { position: absolute; top: -8px; left: -8px; width: 28px; height: 28px; border-radius: 14px; background: var(--danger); color: #fff; display: flex; align-items: center; justify-content: center; }
 .chip.rm-on { background: var(--danger); border-color: var(--danger); color: #fff; }
 

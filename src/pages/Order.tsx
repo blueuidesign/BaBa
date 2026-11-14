@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LINES, useApp } from '../lib/app';
 import { fetchBottles, fetchDaySales, useLoad } from '../lib/data';
@@ -20,6 +20,7 @@ export default function Order() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [cups, setCups] = useState<Record<string, number>>({});
   const [cupMode, setCupMode] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false); // bán nhiều: mỗi món có ô nhập số và nút cộng trừ
   const [rmMode, setRmMode] = useState(false); // chế độ bớt món: chạm ô món để bớt 1
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -86,6 +87,50 @@ export default function Order() {
     if (nb + nc <= 1 && bottles <= 1) setRmMode(false); // đơn hết món thì tự thoát
   }
 
+  /** Đặt thẳng số lượng (ô nhập ở chế độ Bán nhiều). Sửa số cốc khi nút cốc giấy đang bật, không thì sửa số chai. */
+  function setQty(pid: string, n: number) {
+    setErr(null);
+    const v = Math.max(0, Math.min(999, Math.floor(n) || 0));
+    (cupMode ? setCups : setCounts)((c) => {
+      const next = { ...c };
+      if (v <= 0) delete next[pid];
+      else next[pid] = v;
+      return next;
+    });
+  }
+
+  // Giữ ngón tay trên món 0,5 giây thì số tự chạy (bớt nếu đang bật Bớt món); nhả tay hoặc kéo đi là dừng.
+  const hold = useRef<{ t?: number; i?: number; x: number; y: number; fired: boolean }>({ x: 0, y: 0, fired: false });
+  const tick = useRef<(pid: string) => void>(() => {});
+  tick.current = (pid) => (rmMode ? dec(pid) : inc(pid));
+  function holdStop() {
+    window.clearTimeout(hold.current.t);
+    window.clearInterval(hold.current.i);
+    hold.current.t = hold.current.i = undefined;
+  }
+  function holdStart(pid: string, e: React.PointerEvent) {
+    holdStop();
+    hold.current.fired = false;
+    hold.current.x = e.clientX;
+    hold.current.y = e.clientY;
+    hold.current.t = window.setTimeout(() => {
+      hold.current.fired = true;
+      const t0 = Date.now();
+      const run = (ms: number) => {
+        hold.current.i = window.setInterval(() => {
+          tick.current(pid);
+          if (ms > 60 && Date.now() - t0 > 2000) { window.clearInterval(hold.current.i); run(50); } // sau 2 giây chạy nhanh hơn
+        }, ms);
+      };
+      tick.current(pid);
+      run(120);
+    }, 500);
+  }
+  function holdMove(e: React.PointerEvent) {
+    if (Math.abs(e.clientX - hold.current.x) > 10 || Math.abs(e.clientY - hold.current.y) > 10) holdStop();
+  }
+  useEffect(() => holdStop, []);
+
   function buildCall(): QueuedCall {
     const lines = rows.map((r) => ({ product_id: r.p.id, qty: r.qty, container: r.container }));
     const id = uuid();
@@ -106,6 +151,7 @@ export default function Order() {
     setCounts({});
     setCups({});
     setRmMode(false);
+    setBulkMode(false);
     setCupMode(false); // lưu xong tự về chai để không ghi nhầm cốc cho đơn sau
     setDiscount(null);
     setReason('');
@@ -168,33 +214,65 @@ export default function Order() {
                     const n = nb + nc;
                     const left = (leftOf.get(p.id) ?? 0) - n;
                     const out = !allowNegative && left + n <= 0 && n === 0;
+                    const off = rmMode ? n === 0 : out || (!allowNegative && left < 0);
+                    const cur = cupMode ? nc : nb; // số đang sửa ở ô nhập
                     return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        className={`tile ${n ? 'on' : ''} ${nc && !nb ? 'cup' : ''} ${rmMode ? (n ? 'rm' : 'dim') : ''}`}
-                        aria-pressed={n > 0}
-                        aria-label={`${p.name}, ${vnd(p.price)}${SHOW_BOTTLES ? `, còn ${left}` : ''}${nb ? `, ${nb} chai` : ''}${nc ? `, ${nc} cốc giấy` : ''}${rmMode && n ? ', chạm để bớt 1' : ''}`}
-                        disabled={rmMode ? n === 0 : out || (!allowNegative && left < 0)}
-                        onClick={() => rmMode ? dec(p.id) : (allowNegative || left > 0 ? inc(p.id) : setErr(`${p.short_name} đã hết chai trên quầy.`))}
-                      >
-                        {rmMode && n > 0 && <span className="rm-mark"><Icon name="minus" size={16} sw={3} /></span>}
-                        {n > 0 ? <span className={`count ${nc && !nb ? 'cup' : ''}`}>{n}</span> : out ? <span className="out">Hết</span> : null}
-                        {nb > 0 && nc > 0 ? (
-                          <span className="split">
-                            <span><Bottle color={p.color} size={20} /> × {nb}</span>
-                            <span><Cup color={p.color} size={20} /> × {nc}</span>
+                      <div key={p.id} className={`tile ${n ? 'on' : ''} ${nc && !nb ? 'cup' : ''} ${rmMode ? (n ? 'rm' : 'dim') : ''} ${off ? 'off' : ''}`}>
+                        <button
+                          type="button"
+                          className="tile-hit"
+                          aria-pressed={n > 0}
+                          aria-label={`${p.name}, ${vnd(p.price)}${SHOW_BOTTLES ? `, còn ${left}` : ''}${nb ? `, ${nb} chai` : ''}${nc ? `, ${nc} cốc giấy` : ''}${rmMode && n ? ', chạm để bớt 1' : ''}`}
+                          disabled={off}
+                          onPointerDown={(e) => holdStart(p.id, e)}
+                          onPointerMove={holdMove}
+                          onPointerUp={holdStop}
+                          onPointerLeave={holdStop}
+                          onPointerCancel={holdStop}
+                          onContextMenu={(e) => e.preventDefault()}
+                          onClick={() => {
+                            if (hold.current.fired) { hold.current.fired = false; return; } // vừa giữ để chạy số thì không cộng thêm lần chạm
+                            if (rmMode) dec(p.id);
+                            else if (allowNegative || left > 0) inc(p.id);
+                            else setErr(`${p.short_name} đã hết chai trên quầy.`);
+                          }}
+                        >
+                          {rmMode && n > 0 && <span className="rm-mark"><Icon name="minus" size={16} sw={3} /></span>}
+                          {n > 0 ? <span className={`count ${nc && !nb ? 'cup' : ''}`}>{n}</span> : out ? <span className="out">Hết</span> : null}
+                          {nb > 0 && nc > 0 ? (
+                            <span className="split">
+                              <span><Bottle color={p.color} size={20} /> × {nb}</span>
+                              <span><Cup color={p.color} size={20} /> × {nc}</span>
+                            </span>
+                          ) : nc > 0 ? (
+                            <Cup color={p.color} size={40} />
+                          ) : (
+                            <Bottle color={p.color} size={40} />
+                          )}
+                          <span className="name">{p.short_name}</span>
+                          {!bulkMode && (
+                            <span className="meta">
+                              {vnd(p.price)}{SHOW_BOTTLES ? ` · còn ${left}` : ''}
+                            </span>
+                          )}
+                        </button>
+                        {bulkMode && (
+                          <span className="qty">
+                            <button type="button" aria-label={`Bớt một ${p.short_name}`} disabled={cur === 0} onClick={() => setQty(p.id, cur - 1)}><Icon name="minus" size={14} sw={2.6} /></button>
+                            <input
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              aria-label={`Số ${cupMode ? 'cốc giấy' : 'chai'} ${p.short_name}`}
+                              value={cur || ''}
+                              placeholder="0"
+                              maxLength={3}
+                              onFocus={(e) => e.currentTarget.select()}
+                              onChange={(e) => setQty(p.id, Number(e.target.value.replace(/\D/g, '')))}
+                            />
+                            <button type="button" aria-label={`Thêm một ${p.short_name}`} onClick={() => setQty(p.id, cur + 1)}><Icon name="plus" size={14} sw={2.6} /></button>
                           </span>
-                        ) : nc > 0 ? (
-                          <Cup color={p.color} size={40} />
-                        ) : (
-                          <Bottle color={p.color} size={40} />
                         )}
-                        <span className="name">{p.short_name}</span>
-                        <span className="meta">
-                          {vnd(p.price)}{SHOW_BOTTLES ? ` · còn ${left}` : ''}
-                        </span>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -205,10 +283,8 @@ export default function Order() {
       </main>
 
       <div className="bar">
-        {rmMode && <span className="xs strong" style={{ color: 'var(--danger)' }}>Đang bớt món: chạm vào món để bớt 1. Bấm lại nút Bớt món để thôi.</span>}
-        {bottles > 0 && (
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            {disc > 0 ? (
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          {bottles > 0 && (disc > 0 ? (
               <button type="button" className="chip on" style={{ minHeight: 34, fontSize: 13 }} onClick={() => setDiscOpen(true)} aria-label={`Đang giảm ${vnd(disc)}, bấm để sửa`}>
                 <Icon name="tag" size={15} /> Giảm {discount?.kind === 'pct' ? `${discount.value}% · ` : ''}{vnd(disc)}
               </button>
@@ -216,10 +292,15 @@ export default function Order() {
               <button type="button" className="chip" style={{ minHeight: 34, fontSize: 13 }} onClick={() => { setDraftAmt(''); setDiscOpen(true); }}>
                 <Icon name="tag" size={15} /> Giảm giá
               </button>
-            )}
-            <button type="button" role="switch" aria-checked={rmMode} className={`chip ${rmMode ? 'rm-on' : ''}`} style={{ minHeight: 34, fontSize: 13 }} onClick={() => setRmMode((v) => !v)}>
+            ))}
+            {bottles > 0 && <button type="button" role="switch" aria-checked={rmMode} className={`chip ${rmMode ? 'rm-on' : ''}`} style={{ minHeight: 34, fontSize: 13 }} onClick={() => { setRmMode((v) => !v); setBulkMode(false); }}>
               <Icon name="minus" size={15} sw={2.4} /> Bớt món
-            </button>
+            </button>}
+            {!rmMode && (
+              <button type="button" role="switch" aria-checked={bulkMode} className={`chip ${bulkMode ? 'bulk-on' : ''}`} style={{ minHeight: 34, fontSize: 13 }} onClick={() => setBulkMode((v) => !v)}>
+                <Icon name="plus" size={15} sw={2.4} /> Bán nhiều
+              </button>
+            )}
             {rmMode ? (
               <button type="button" className="chip" style={{ minHeight: 34, fontSize: 13, marginLeft: 'auto', color: 'var(--danger)', borderColor: 'var(--danger)' }}
                 onClick={() => { setCounts({}); setCups({}); setDiscount(null); setDraftAmt(''); setReason(''); setRmMode(false); setErr(null); }}>
@@ -228,8 +309,9 @@ export default function Order() {
             ) : (
               disc > 0 && <span className="small muted num" style={{ marginLeft: 'auto' }}>Tạm tính <s>{vnd(gross)}</s></span>
             )}
-          </div>
-        )}
+        </div>
+        {rmMode && <span className="xs strong" style={{ color: 'var(--danger)' }}>Đang bớt món: chạm vào món để bớt 1, giữ để bớt nhanh. Bấm lại nút Bớt món để thôi.</span>}
+        {bulkMode && !rmMode && <span className="xs strong" style={{ color: 'var(--brand)' }}>Đang bán nhiều: gõ số {cupMode ? 'cốc' : 'chai'} vào ô, hoặc bấm cộng trừ. Bấm lại nút Bán nhiều để thôi.</span>}
         {discTooBig && <span className="err">Giảm {vnd(disc)} lớn hơn tiền đơn {vnd(gross)}. Bấm vào ô giảm giá để sửa.</span>}
         {err && <span className="err">{err}</span>}
         <div className="bar-row">
