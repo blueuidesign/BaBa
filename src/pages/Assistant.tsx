@@ -42,7 +42,7 @@ export default function Assistant() {
 
   return (
     <div className="screen">
-      <Header title="Hỏi trợ lý" sub={`${outlet.name} · chỉ xem số liệu, không sửa gì`} back="/bao-cao" />
+      <Header title="Hỏi trợ lý" sub={`${outlet.name} · chỉ xem số liệu, không sửa gì`} back />
       <main className="main" style={{ paddingBottom: 96, gap: 10 }}>
         {!canManage ? (
           <section className="card"><p className="small muted">Chỉ chủ cơ sở hoặc admin dùng được trợ lý báo cáo.</p></section>

@@ -8,6 +8,7 @@ const PATHS: Record<string, string> = {
   blender: '<path d="M7 3H17L15.5 14H8.5Z"/><path d="M8.5 14H15.5V17H8.5Z"/><path d="M6.5 17H17.5V21H6.5Z"/><path d="M12 7V10"/>',
   chart: '<path d="M3 3v18h18"/><path d="M7 15l4-5 4 3 5-7"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  ai: '<path d="M10 3l1.8 5.2L17 10l-5.2 1.8L10 17l-1.8-5.2L3 10l5.2-1.8Z"/><path d="M18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9Z"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   history: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/>',
   back: '<path d="M15 6l-6 6 6 6"/>',
@@ -106,7 +107,7 @@ export function Header({ title, sub, back, right }: { title: string; sub?: React
 }
 
 export function BellLink() {
-  const { outlet, profile, dataVersion } = useApp();
+  const { outlet, profile, dataVersion, canManage } = useApp();
   const [n, setN] = useState(0);
   const [tick, setTick] = useState(0);
   // Quay lại app (mở từ màn hình khóa, đổi tab) thì đếm lại thông báo
@@ -132,11 +133,21 @@ export function BellLink() {
       if (nav.setAppBadge) (count ? nav.setAppBadge(count) : nav.clearAppBadge?.())?.catch?.(() => undefined);
     });
   }, [outlet, profile, dataVersion, tick]);
-  return (
+  const bell = (
     <Link to="/thong-bao" className="icon-btn" aria-label={`Thông báo, ${n} chưa đọc`}>
       <Icon name="bell" size={24} />
       {n > 0 && <span className="dot">{n}</span>}
     </Link>
+  );
+  // Trợ lý báo cáo: chỉ chủ cơ sở và admin, nằm ngay bên trái chuông
+  if (!canManage) return bell;
+  return (
+    <span className="row" style={{ gap: 0 }}>
+      <Link to="/bao-cao/hoi" className="icon-btn" aria-label="Hỏi trợ lý báo cáo">
+        <Icon name="ai" size={24} />
+      </Link>
+      {bell}
+    </span>
   );
 }
 
