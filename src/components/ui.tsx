@@ -106,6 +106,23 @@ export function Header({ title, sub, back, right }: { title: string; sub?: React
   );
 }
 
+/** Biểu tượng trợ lý: ngôi sao lấp lánh tô màu chuyển sắc, chỉ dùng cho chatbot. */
+export function AiMark({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <linearGradient id="ai-grad" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#7B5CFA" />
+          <stop offset="0.55" stopColor="#E0569B" />
+          <stop offset="1" stopColor="#F5A524" />
+        </linearGradient>
+      </defs>
+      <path d="M10 2.5l2 5.5 5.5 2-5.5 2-2 5.5-2-5.5-5.5-2 5.5-2Z" fill="url(#ai-grad)" />
+      <path d="M18 13.5l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1Z" fill="url(#ai-grad)" />
+    </svg>
+  );
+}
+
 export function BellLink() {
   const { outlet, profile, dataVersion, canManage } = useApp();
   const [n, setN] = useState(0);
@@ -144,7 +161,7 @@ export function BellLink() {
   return (
     <span className="row" style={{ gap: 0 }}>
       <Link to="/bao-cao/hoi" className="icon-btn" aria-label="Hỏi trợ lý báo cáo">
-        <Icon name="ai" size={24} />
+        <AiMark size={24} />
       </Link>
       {bell}
     </span>
