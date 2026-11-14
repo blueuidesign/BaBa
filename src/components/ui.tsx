@@ -125,6 +125,7 @@ export function AiMark({ size = 24 }: { size?: number }) {
 
 export function BellLink() {
   const { outlet, profile, dataVersion, canManage } = useApp();
+  const { pathname } = useLocation();
   const [n, setN] = useState(0);
   const [tick, setTick] = useState(0);
   // Quay lại app (mở từ màn hình khóa, đổi tab) thì đếm lại thông báo
@@ -157,11 +158,11 @@ export function BellLink() {
     </Link>
   );
   // Trợ lý báo cáo: chỉ chủ cơ sở và admin, nằm ngay bên trái chuông
-  if (!canManage) return bell;
+  if (!canManage || !['/', '/bao-cao', '/chi-phi'].includes(pathname)) return bell; // chỉ ở Trang chủ, Báo cáo, Chi phí
   return (
     <span className="row" style={{ gap: 0 }}>
       <Link to="/bao-cao/hoi" className="icon-btn" aria-label="Hỏi trợ lý báo cáo">
-        <AiMark size={24} />
+        <AiMark size={32} />
       </Link>
       {bell}
     </span>
