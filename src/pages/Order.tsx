@@ -219,7 +219,14 @@ export default function Order() {
             <button type="button" role="switch" aria-checked={rmMode} className={`chip ${rmMode ? 'rm-on' : ''}`} style={{ minHeight: 34, fontSize: 13 }} onClick={() => setRmMode((v) => !v)}>
               <Icon name="minus" size={15} sw={2.4} /> Bớt món
             </button>
-            {disc > 0 && <span className="small muted num" style={{ marginLeft: 'auto' }}>Tạm tính <s>{vnd(gross)}</s></span>}
+            {rmMode ? (
+              <button type="button" className="chip" style={{ minHeight: 34, fontSize: 13, marginLeft: 'auto', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                onClick={() => { setCounts({}); setCups({}); setDiscount(null); setDraftAmt(''); setReason(''); setRmMode(false); setErr(null); }}>
+                <Icon name="trash" size={15} /> Xóa hết
+              </button>
+            ) : (
+              disc > 0 && <span className="small muted num" style={{ marginLeft: 'auto' }}>Tạm tính <s>{vnd(gross)}</s></span>
+            )}
           </div>
         )}
         {rmMode && <span className="xs strong" style={{ color: 'var(--danger)' }}>Đang bớt món: chạm vào món để bớt 1. Bấm lại nút Bớt món để thôi.</span>}
