@@ -373,3 +373,11 @@ select.input { appearance: auto; }
 .bubble.assistant { justify-self: start; background: var(--bg-100); box-shadow: var(--shadow-soft); border-bottom-left-radius: 4px; }
 .bubble.error { background: var(--danger-bg); color: var(--danger); }
 .bubble.muted { color: var(--ink-muted); }
+.bubble.assistant { white-space: normal; max-width: 94%; }
+.bubble p { margin: 0 0 8px; }
+.bubble p:last-child, .bubble ul:last-child { margin-bottom: 0; }
+.bubble h4 { margin: 10px 0 6px; font-size: 15px; line-height: 20px; font-weight: 700; }
+.bubble ul { margin: 0 0 8px; padding-left: 18px; display: grid; gap: 4px; }
+.bubble .suggest { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.bubble .suggest .chip { font-size: 13px; min-height: 36px; height: auto; padding: 6px 12px; text-align: left; white-space: normal; }
+.bubble.error { white-space: pre-wrap; }
