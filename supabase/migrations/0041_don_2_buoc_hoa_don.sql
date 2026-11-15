@@ -117,12 +117,12 @@ begin
     update orders set is_gift = true, total_vnd = 0, discount_vnd = 0, discount_reason = null, payment_method = null,
                       note = coalesce(note, 'Tặng') where id = p_order;
   else
+    if exists (select 1 from order_lines l where l.order_id = p_order and public.current_price(v.outlet_id, l.product_id, v.business_date) is null) then
+      raise exception 'Có món chưa có giá niêm yết, không tính tiền lại được' using errcode = 'P0001';
+    end if;
     update order_lines l set unit_price_vnd = public.current_price(v.outlet_id, l.product_id, v.business_date),
                              line_total_vnd = public.current_price(v.outlet_id, l.product_id, v.business_date) * l.qty
      where l.order_id = p_order;
-    if exists (select 1 from order_lines where order_id = p_order and unit_price_vnd is null) then
-      raise exception 'Có món chưa có giá niêm yết, không tính tiền lại được' using errcode = 'P0001';
-    end if;
     select coalesce(sum(line_total_vnd), 0) into v_total from order_lines where order_id = p_order;
     update orders set is_gift = false, total_vnd = v_total, note = nullif(note, 'Tặng') where id = p_order;
   end if;
