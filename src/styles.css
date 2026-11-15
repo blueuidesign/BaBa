@@ -403,3 +403,4 @@ select.input { appearance: auto; }
 .inv-top .ln { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
 .inv-bot { padding: 10px 12px 12px; border-top: 1px solid var(--border); }
 .inv-bot .seg3 button { min-height: 44px; font-size: 13px; }
+.inv-bot .seg3 button:first-child { flex: 0 0 auto; padding: 0 12px; white-space: nowrap; }
