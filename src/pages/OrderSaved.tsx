@@ -113,19 +113,17 @@ export default function OrderSaved() {
           ))}
           {err && <span className="err">{err}</span>}
           <div className="chips wrap">
-            {/* Đơn đã lên máy chủ: chỉ chủ cơ sở hủy hay chuyển thành tặng được. Đơn còn chờ gửi thì ai cũng bỏ được. */}
-            {(queued || canManage) && (
-              <button className="chip" disabled={busy} onClick={undo}>
-                <Icon name="undo" size={16} sw={2.2} /> Hoàn tác đơn này
-              </button>
-            )}
-            {!queued && !state.gift && canManage && (
+            {/* Đơn vừa ghi: người ghi hoàn tác hoặc đánh dấu tặng được trong 10 phút (máy chủ kiểm, 0040). Đơn cũ hơn phải nhờ chủ cơ sở. */}
+            <button className="chip" disabled={busy} onClick={undo}>
+              <Icon name="undo" size={16} sw={2.2} /> Hoàn tác đơn này
+            </button>
+            {!queued && !state.gift && (
               <button className="chip" disabled={busy} onClick={gift}>
                 <Icon name="gift" size={16} /> Đánh dấu tặng
               </button>
             )}
           </div>
-          {!queued && !canManage && <span className="xs muted">Ghi nhầm? Chỉ chủ cơ sở sửa hoặc hủy được đơn đã lưu. Báo chủ cơ sở kèm giờ ghi đơn.</span>}
+          {!queued && !canManage && <span className="xs muted">Ghi nhầm thì hoàn tác ngay ở đây, trong 10 phút. Sau đó chỉ chủ cơ sở sửa hoặc hủy được.</span>}
         </section>
 
         {!queued && orderId && (
