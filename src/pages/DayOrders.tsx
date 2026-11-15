@@ -12,7 +12,7 @@ const dmy = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`
 
 /**
  * Hóa đơn: mọi đơn đã ghi của cơ sở, lọc theo Hôm nay, Hôm qua, Tháng này, Tất cả.
- * Mỗi đơn một thẻ: nửa trên bấm để mở chi tiết; nửa dưới đánh dấu Đã nhận t.mặt, Đã nhận c.khoản, Đơn tặng.
+ * Mỗi đơn một thẻ: nửa trên bấm để mở chi tiết; nửa dưới đánh dấu Đơn tặng, Nhận t.mặt, Nhận c.khoản.
  * Chỉ đơn chưa đánh dấu mới bấm được; đã đánh dấu thì ô đó nền xanh, muốn đổi phải vào Sửa đơn.
  * Mở từ Trang chủ (nút Tất cả ở Đơn gần đây) và từ Báo cáo (?d=ngày).
  */
@@ -136,7 +136,7 @@ export default function Invoices() {
                     </Link>
                     <div className="inv-bot">
                       <div className="seg3" role="group" aria-label="Đánh dấu nhận tiền">
-                        {([['cash', 'Đã nhận t.mặt'], ['transfer', 'Đã nhận c.khoản'], ['gift', 'Đơn tặng']] as ['cash' | 'transfer' | 'gift', string][]).map(([k, l]) => (
+                        {([['gift', 'Đơn tặng'], ['cash', 'Nhận t.mặt'], ['transfer', 'Nhận c.khoản']] as ['cash' | 'transfer' | 'gift', string][]).map(([k, l]) => (
                           <button key={k} type="button" aria-pressed={on === k} className={on === k ? 'on' : ''} disabled={busy || (!!on && on !== k)}
                             aria-disabled={!!on} style={on === k ? { cursor: 'default' } : undefined} onClick={() => mark(o, k)}>
                             {on === k && <Icon name="check" size={15} sw={2.6} />}{l}
