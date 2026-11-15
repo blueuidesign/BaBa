@@ -381,3 +381,25 @@ select.input { appearance: auto; }
 .bubble .suggest { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 .bubble .suggest .chip { font-size: 13px; min-height: 36px; height: auto; padding: 6px 12px; text-align: left; white-space: normal; }
 .bubble.error { white-space: pre-wrap; }
+
+/* Ghi đơn hai bước: chọn cách nhận tiền, gợi ý khách, popup đã lưu */
+.seg3 { display: flex; gap: 8px; }
+.seg3 button { flex: 1; min-width: 0; min-height: 52px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: var(--radius-lg, 14px); border: 1.5px solid var(--border); background: var(--bg-100); color: var(--ink); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; padding: 0 6px; }
+.seg3 button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.seg3 button:disabled { opacity: 0.5; }
+.suggest-list { display: flex; flex-direction: column; background: var(--bg-100); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.suggest-list button { all: unset; box-sizing: border-box; display: flex; flex-direction: column; min-height: 48px; padding: 6px 12px; justify-content: center; cursor: pointer; }
+.suggest-list button + button { border-top: 1px solid var(--border); }
+.pop-back { position: fixed; inset: 0; background: rgba(20, 28, 24, 0.45); z-index: 60; }
+.pop { position: fixed; z-index: 61; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); max-width: 360px; margin: 0 auto; background: var(--bg-000); border-radius: 20px; padding: 24px 20px 0; display: flex; flex-direction: column; align-items: center; gap: 8px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25); overflow: hidden; }
+.pop-ok { width: 64px; height: 64px; border-radius: 50%; background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center; }
+.pop-timer { align-self: stretch; height: 4px; margin: 8px -20px 0; background: var(--border); }
+.pop-timer div { height: 100%; background: var(--brand); animation: pop-run 5s linear forwards; }
+@keyframes pop-run { from { width: 100%; } to { width: 0; } }
+@media (prefers-reduced-motion: reduce) { .pop-timer div { animation: none; width: 100%; } }
+/* Hóa đơn: mỗi đơn một thẻ, nửa trên mở chi tiết, nửa dưới đánh dấu nhận tiền */
+.inv { display: flex; flex-direction: column; background: var(--bg-100); border-radius: var(--radius-xl, 18px); box-shadow: var(--shadow-soft); overflow: hidden; }
+.inv-top { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px 12px; text-decoration: none; color: inherit; }
+.inv-top .ln { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
+.inv-bot { padding: 10px 12px 12px; border-top: 1px solid var(--border); }
+.inv-bot .seg3 button { min-height: 44px; font-size: 13px; }

@@ -17,7 +17,7 @@ export default function OrderEdit() {
   const from = new URLSearchParams(useLocation().search).get('from') === 'home' ? '?from=home' : '';
   const { data: o, loading } = useLoad(async () => {
     const { data } = await supabase.from('orders')
-      .select('id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,is_gift,customer_name,order_lines(qty,product_id,container)')
+      .select('id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,is_gift,payment_method,customer_name,order_lines(qty,product_id,container)')
       .eq('id', id).maybeSingle();
     return (data as any) || null;
   }, [id]);
@@ -25,6 +25,8 @@ export default function OrderEdit() {
   const [disc, setDisc] = useState('');
   const [discWhy, setDiscWhy] = useState('');
   const [why, setWhy] = useState('');
+  const [pay, setPay] = useState<'cash' | 'transfer' | 'gift' | null>(null);
+  const [cust, setCust] = useState('');
   const [addPid, setAddPid] = useState('');
   const [addCup, setAddCup] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -34,14 +36,17 @@ export default function OrderEdit() {
     setLines(o.order_lines.map((l: any) => ({ pid: l.product_id, container: l.container === 'coc' ? 'coc' : 'chai', qty: l.qty })));
     setDisc(o.discount_vnd ? String(o.discount_vnd) : '');
     setDiscWhy(o.discount_reason || '');
+    setPay(o.is_gift ? 'gift' : o.payment_method || null);
+    setCust(o.customer_name || '');
   }, [o]);
 
   if (!outlet) return null;
   const prod = (pid: string) => catalog?.allProducts.find((p) => p.id === pid);
   const back = `/bao-cao/don/${id}${from}`;
   const kept = lines.filter((l) => l.qty > 0);
-  const gross = o?.is_gift ? 0 : kept.reduce((s, l) => s + l.qty * (prod(l.pid)?.price || 0), 0);
-  const discN = o?.is_gift ? 0 : Number(disc) || 0;
+  const isGift = pay === 'gift';
+  const gross = isGift ? 0 : kept.reduce((s, l) => s + l.qty * (prod(l.pid)?.price || 0), 0);
+  const discN = isGift ? 0 : Number(disc) || 0;
   const total = gross - discN;
   const parts = kept.reduce((s, l) => s + l.qty, 0);
 
@@ -65,7 +70,8 @@ export default function OrderEdit() {
     setBusy(true);
     const { data, error } = await supabase.rpc('fn_edit_order', {
       p_order: id,
-      p: { lines: kept.map((l) => ({ product_id: l.pid, qty: l.qty, container: l.container })), discount_vnd: discN, discount_reason: discN > 0 ? discWhy.trim() || null : null },
+      p: { lines: kept.map((l) => ({ product_id: l.pid, qty: l.qty, container: l.container })), discount_vnd: discN, discount_reason: discN > 0 ? discWhy.trim() || null : null,
+           is_gift: isGift, payment_method: isGift ? '' : pay || '', customer_name: cust.trim() },
       p_reason: why.trim() || null
     });
     setBusy(false);
@@ -88,7 +94,7 @@ export default function OrderEdit() {
         ) : (
           <>
             <p className="small muted">
-              Đơn lúc {timeHM(o.placed_at)}, {o.customer_name || 'khách lẻ'}, đang là {vnd(o.total_vnd)}. Khi lưu, đơn cũ được đánh dấu đã sửa và một đơn mới thay thế, cùng giờ bán, cùng khách, cùng cách nhận tiền. Giá tính theo bảng giá của ngày bán.
+              Đơn lúc {timeHM(o.placed_at)}, {o.customer_name || 'khách lẻ'}, đang là {vnd(o.total_vnd)}. Khi lưu, đơn cũ được đánh dấu đã sửa và một đơn mới thay thế, cùng giờ bán. Giá tính theo bảng giá của ngày bán.
             </p>
             <section className="card tight">
               <div className="h2" style={{ padding: '12px 0 2px' }}>Món</div>
@@ -113,7 +119,24 @@ export default function OrderEdit() {
               </div>
             </section>
 
-            {!o.is_gift && (
+            <section className="card">
+              <div className="h2">Nhận tiền</div>
+              <div className="seg3" role="radiogroup" aria-label="Nhận tiền">
+                {([['cash', 'Tiền mặt'], ['transfer', 'C.khoản'], ['gift', 'Tặng']] as ['cash' | 'transfer' | 'gift', string][]).map(([k, l]) => (
+                  <button key={k} type="button" role="radio" aria-checked={pay === k} className={pay === k ? 'on' : ''} onClick={() => setPay(pay === k ? null : k)}>
+                    {pay === k && <Icon name="check" size={16} sw={2.6} />}{l}
+                  </button>
+                ))}
+              </div>
+              <span className="xs muted">{isGift ? 'Đơn tặng: tính 0 đ, hàng vẫn trừ.' : pay ? 'Bấm lại lần nữa để bỏ đánh dấu.' : 'Đang để chưa nhận tiền.'}</span>
+            </section>
+
+            <section className="card">
+              <div className="h2">Khách hàng</div>
+              <label className="input-wrap"><input value={cust} onChange={(ev) => setCust(ev.target.value)} placeholder="Để trống nếu là khách lẻ" aria-label="Tên khách hàng" maxLength={60} autoComplete="off" /></label>
+            </section>
+
+            {!isGift && (
               <section className="card">
                 <div className="h2">Giảm giá</div>
                 <MoneyInput value={disc} onChange={setDisc} label="Số tiền giảm" placeholder="0" />

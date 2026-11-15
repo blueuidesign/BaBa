@@ -409,7 +409,7 @@ export default function Revenue() {
             <Link to={`/bao-cao/don?d=${listDay}`} className="list-row card tight" style={{ textDecoration: 'none', color: 'inherit' }}>
               <span className="ico-box"><Icon name="cart" size={20} /></span>
               <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
-                <span className="strong">Các đơn ngày {ddmm(listDay)}</span>
+                <span className="strong">Hóa đơn ngày {ddmm(listDay)}</span>
                 <span className="small muted">Từng đơn: giờ, khách, món, cách nhận tiền</span>
               </span>
               <Icon name="chev" size={20} style={{ color: 'var(--ink-muted)' }} />

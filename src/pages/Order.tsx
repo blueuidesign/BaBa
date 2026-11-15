@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { LINES, useApp } from '../lib/app';
-import { fetchBottles, fetchDaySales, useLoad } from '../lib/data';
+import { fetchBottles, fetchCustomers, fetchDaySales, useLoad } from '../lib/data';
 import { callOrQueue, enqueue, type QueuedCall } from '../lib/queue';
 import { errorText } from '../lib/supabase';
-import { uuid, vnd, vnToday } from '../lib/format';
+import { ddmm, timeHM, uuid, vnd, vnToday } from '../lib/format';
 import { BellLink, Bottle, Cup, Header, Icon, Loading, MoneyInput, Nav, confirmDialog } from '../components/ui';
 
 type Discount = { kind: 'pct'; value: number } | { kind: 'amt'; value: number } | null;
@@ -15,7 +14,6 @@ const discountOf = (d: Discount, total: number) =>
 
 export default function Order() {
   const { outlet, catalog, queue, bump } = useApp();
-  const nav = useNavigate();
   // Số chai và số cốc giấy của từng món, giữ riêng để một món có thể có cả hai
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [cups, setCups] = useState<Record<string, number>>({});
@@ -29,12 +27,24 @@ export default function Order() {
   const [reason, setReason] = useState('');
   const [discOpen, setDiscOpen] = useState(false);
   const [draftAmt, setDraftAmt] = useState('');
+  // Ghi đơn hai bước: 'pick' chọn món → 'review' rà soát, nhận tiền, tên khách → lưu
+  const [step, setStep] = useState<'pick' | 'review'>('pick');
+  const [pay, setPay] = useState<'cash' | 'transfer' | 'gift' | null>(null);
+  const [cust, setCust] = useState('');
+  const [saved, setSaved] = useState<null | { seq?: number; at: string; parts: string; total: number; queued: boolean; cust: string; pay: string | null }>(null);
   const today = vnToday();
 
   const { data } = useLoad(async (oid) => {
-    const [bottles, sales] = await Promise.all([fetchBottles(oid, today), fetchDaySales(oid, today)]);
-    return { bottles, sales };
+    const [bottles, sales, customers] = await Promise.all([fetchBottles(oid, today), fetchDaySales(oid, today), fetchCustomers(oid).catch(() => [])]);
+    return { bottles, sales, customers };
   });
+
+  // Popup "đã lưu đơn" tự đóng sau 5 giây
+  useEffect(() => {
+    if (!saved) return;
+    const t = window.setTimeout(() => setSaved(null), 5000);
+    return () => window.clearTimeout(t);
+  }, [saved]);
 
   // Số chai còn = số sổ trừ các đơn đang chờ gửi trên máy này
   const leftOf = useMemo(() => {
@@ -65,7 +75,15 @@ export default function Order() {
   ]);
   const disc = discountOf(discount, gross);
   const discTooBig = disc > gross && gross > 0;
-  const total = Math.max(0, gross - disc);
+  const isGift = pay === 'gift';
+  const total = isGift ? 0 : Math.max(0, gross - disc);
+  // Gợi ý khách: chưa gõ thì hiện khách mua gần đây; đang gõ thì lọc theo chữ đã gõ, tên bắt đầu bằng chữ đó xếp trước
+  const custKey = cust.trim().toLowerCase();
+  const custList = data?.customers || [];
+  const custHits = !custKey
+    ? custList.slice(0, 6)
+    : custList.filter((c) => c.name.toLowerCase().includes(custKey) && c.name.toLowerCase() !== custKey)
+        .sort((a, b) => Number(b.name.toLowerCase().startsWith(custKey)) - Number(a.name.toLowerCase().startsWith(custKey))).slice(0, 5);
 
   function inc(pid: string) {
     setErr(null);
@@ -142,34 +160,40 @@ export default function Order() {
       summary: rows.map((r) => `${r.qty} ${r.p.short_name}${r.container === 'coc' ? ' (cốc)' : ''}`).join(' · '),
       payload: {
         outlet_id: outlet!.id, client_id: id, business_date: today, placed_at: new Date().toISOString(), lines,
-        ...(disc > 0 ? { discount_vnd: disc, discount_reason: reason.trim() || (discount?.kind === 'pct' ? `Giảm ${discount.value}%` : null) } : {})
+        ...(isGift ? { is_gift: true, note: 'Tặng' } : pay ? { payment_method: pay } : {}),
+        ...(cust.trim() ? { customer_name: cust.trim() } : {}),
+        ...(disc > 0 && !isGift ? { discount_vnd: disc, discount_reason: reason.trim() || (discount?.kind === 'pct' ? `Giảm ${discount.value}%` : null) } : {})
       }
     };
   }
 
-  function done(call: QueuedCall, result: any, queued: boolean) {
+  function reset() {
     setCounts({});
     setCups({});
     setRmMode(false);
     setBulkMode(false);
     setCupMode(false); // lưu xong tự về chai để không ghi nhầm cốc cho đơn sau
     setDiscount(null);
+    setDraftAmt('');
     setReason('');
-    bump();
-    nav('/ban/da-luu', {
-      state: {
-        queued,
-        clientId: call.id,
-        result,
-        total,
-        gross,
-        discount: disc,
-        discountReason: call.payload.discount_reason || null,
-        bottles,
-        partsLabel,
-        lines: rows.map((r) => ({ product_id: r.p.id, name: r.p.name, color: r.p.color, qty: r.qty, price: r.p.price, container: r.container }))
-      }
+    setPay(null);
+    setCust('');
+    setErr(null);
+    setStep('pick');
+  }
+
+  /** Lưu xong: về ngay lưới món để ghi đơn kế tiếp, hiện popup báo đơn vừa lưu. */
+  function done(call: QueuedCall, result: any, queued: boolean) {
+    setSaved({
+      seq: result?.seq_in_day, at: call.payload.placed_at, parts: partsLabel, total: result?.total_vnd ?? total, queued,
+      cust: call.payload.customer_name || '', pay: call.payload.is_gift ? 'gift' : call.payload.payment_method || null
     });
+    reset();
+    bump();
+  }
+
+  async function cancelOrder() {
+    if (await confirmDialog({ title: 'Bỏ đơn đang ghi?', text: `Đơn ${partsLabel}, ${vnd(total)} chưa được lưu. Bỏ thì các món đã chọn sẽ mất.`, ok: 'Bỏ đơn', cancel: 'Ghi tiếp', danger: true })) reset();
   }
 
   async function save(call = buildCall()) {
@@ -185,6 +209,104 @@ export default function Order() {
     } finally {
       setBusy(false);
     }
+  }
+
+  const stuckSheet = stuck && (
+    <>
+      <div className="sheet-back" onClick={() => setStuck(null)} />
+      <div className="sheet" role="alertdialog" aria-labelledby="stuck-t">
+        <span className="ico-box danger" style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--danger-bg)' }}>
+          <Icon name="warn" size={26} sw={2} />
+        </span>
+        <h2 id="stuck-t" style={{ fontSize: 18 }}>Chưa lưu được đơn</h2>
+        <p className="small muted">
+          Máy chủ không trả lời sau 10 giây. Đơn {partsLabel} · {vnd(total)} vẫn giữ trên máy này. Thử lại ngay, hoặc để app tự gửi khi mạng ổn.
+        </p>
+        <button className="btn lg block" onClick={() => { const c = stuck; setStuck(null); save(c); }}>Thử lại</button>
+        <button className="btn secondary block" onClick={() => { const c = stuck; enqueue(c); setStuck(null); done(c, null, true); }}>Giữ lại, gửi sau</button>
+        <button className="btn quiet block" style={{ color: 'var(--danger)' }}
+          onClick={async () => {
+            if (await confirmDialog({ title: 'Bỏ đơn này?', text: 'Đơn sẽ không được ghi và không gửi lên máy chủ.', ok: 'Bỏ đơn', cancel: 'Giữ lại', danger: true })) { setStuck(null); reset(); }
+          }}>
+          Bỏ đơn này
+        </button>
+      </div>
+    </>
+  );
+
+  if (step === 'review' && bottles > 0) {
+    const PAYS: [typeof pay, string][] = [['cash', 'Tiền mặt'], ['transfer', 'C.khoản'], ['gift', 'Tặng']];
+    return (
+      <div className="screen">
+        <Header title="Rà soát đơn" sub={`${outlet.name} · chưa lưu`} back={() => { setErr(null); setStep('pick'); }}
+          right={<button type="button" className="icon-btn" aria-label="Hủy đơn đang ghi" onClick={cancelOrder}><Icon name="x" size={24} sw={2} /></button>} />
+        <main className="main with-bar" style={{ paddingBottom: 110 }}>
+          <section className="card" style={{ gap: 8 }}>
+            <div className="row between" style={{ alignItems: 'baseline' }}>
+              <span className="strong muted">{partsLabel}</span>
+              <span className="num" style={{ fontSize: 26, fontWeight: 700 }}>{vnd(total)}</span>
+            </div>
+            {disc > 0 && !isGift && <span className="xs muted num">Tạm tính {vnd(gross)} · giảm {vnd(disc)}</span>}
+            <div style={{ height: 1, background: 'var(--border)' }} />
+            {rows.map((r) => (
+              <div key={r.p.id + r.container} className="row" style={{ gap: 10, minHeight: 32 }}>
+                {r.container === 'coc' ? <Cup color={r.p.color} size={24} /> : <Bottle color={r.p.color} size={24} />}
+                <span className="grow strong">{r.qty} × {r.p.name}{r.container === 'coc' ? ' · cốc giấy' : ''}</span>
+                <span className="num strong">{vnd(isGift ? 0 : r.qty * r.p.price)}</span>
+              </div>
+            ))}
+          </section>
+
+          <section className="card">
+            <div className="h2">Nhận tiền</div>
+            <div className="seg3" role="radiogroup" aria-label="Nhận tiền">
+              {PAYS.map(([k, l]) => (
+                <button key={k} type="button" role="radio" aria-checked={pay === k} className={`${pay === k ? 'on' : ''} ${k === 'gift' ? 'gift' : ''}`} onClick={() => setPay(pay === k ? null : k)}>
+                  {pay === k && <Icon name="check" size={16} sw={2.6} />}{l}
+                </button>
+              ))}
+            </div>
+            <span className="xs muted">
+              {isGift ? 'Đơn tặng: không tính tiền, vẫn trừ hàng.' : pay ? 'Bấm lại lần nữa để bỏ chọn.' : 'Chưa chọn thì đơn lưu là chưa nhận tiền, đánh dấu sau ở màn Hóa đơn.'}
+            </span>
+          </section>
+
+          <section className="card">
+            <div className="h2">Khách hàng</div>
+            <label className="input-wrap">
+              <Icon name="user" size={20} style={{ color: 'var(--ink-muted)' }} />
+              <input value={cust} onChange={(e) => setCust(e.target.value)} placeholder="Gõ tên, hoặc để trống nếu là khách lẻ" aria-label="Tên khách hàng" maxLength={60} autoComplete="off" enterKeyHint="done" />
+              {cust && <button type="button" className="icon-btn" style={{ width: 32, height: 32 }} aria-label="Xóa tên khách" onClick={() => setCust('')}><Icon name="x" size={18} sw={2} /></button>}
+            </label>
+            {custHits.length > 0 && !custKey && (
+              <>
+                <span className="xs strong muted">Khách quen gần đây</span>
+                <div className="chips wrap">
+                  {custHits.map((c) => <button key={c.name} type="button" className="chip" style={{ minHeight: 36, fontSize: 14 }} onClick={() => setCust(c.name)}>{c.name}</button>)}
+                </div>
+              </>
+            )}
+            {custHits.length > 0 && custKey && (
+              <div className="suggest-list" role="listbox" aria-label="Khách có sẵn">
+                {custHits.map((c) => (
+                  <button key={c.name} type="button" role="option" aria-selected={false} onClick={() => setCust(c.name)}>
+                    <span className="strong">{c.name}</span>
+                    <span className="xs muted">Mua {c.count} lần, gần nhất {c.last === today ? 'hôm nay' : ddmm(c.last)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        </main>
+        <div className="bar" style={{ bottom: 0, paddingBottom: 'calc(12px + var(--safe-b))' }}>
+          {err && <span className="err">{err}</span>}
+          <button className="btn lg block" disabled={busy} onClick={() => save()}>
+            <Icon name="check" size={20} sw={2.2} /> {busy ? 'Đang lưu…' : `Lưu đơn · ${vnd(total)}`}
+          </button>
+        </div>
+        {stuckSheet}
+      </div>
+    );
   }
 
   return (
@@ -319,8 +441,8 @@ export default function Order() {
             <span className="label">{bottles ? `${partsLabel} · ${disc > 0 ? 'thu' : 'trong đơn'}` : 'Chưa chọn món'}</span>
             <span className="value">{vnd(total)}</span>
           </div>
-          <button className="btn lg" style={{ minWidth: 150 }} disabled={!bottles || busy || discTooBig} onClick={() => save()}>
-            <Icon name="check" size={20} sw={2.2} /> {busy ? 'Đang lưu…' : 'Lưu đơn'}
+          <button className="btn lg" style={{ minWidth: 150 }} disabled={!bottles || discTooBig} onClick={() => { setErr(null); setRmMode(false); setBulkMode(false); setStep('review'); }}>
+            Tiếp theo <Icon name="chev" size={20} sw={2.4} />
           </button>
         </div>
       </div>
@@ -359,51 +481,23 @@ export default function Order() {
         </>
       )}
 
-      {stuck && (
+      {stuckSheet}
+
+      {saved && (
         <>
-          <div className="sheet-back" onClick={() => setStuck(null)} />
-          <div className="sheet" role="alertdialog" aria-labelledby="stuck-t">
-            <span className="ico-box danger" style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--danger-bg)' }}>
-              <Icon name="warn" size={26} sw={2} />
+          <div className="pop-back" onClick={() => setSaved(null)} />
+          <div className="pop" role="status" aria-live="polite">
+            <span className="pop-ok"><Icon name="check" size={34} sw={2.6} /></span>
+            <strong style={{ fontSize: 18 }}>{saved.queued ? 'Đã lưu trên máy' : `Đã lưu đơn số ${saved.seq ?? ''}`}</strong>
+            <span className="small muted" style={{ textAlign: 'center' }}>
+              {timeHM(saved.at)}{saved.cust ? ` · ${saved.cust}` : ''}{saved.pay === 'cash' ? ' · tiền mặt' : saved.pay === 'transfer' ? ' · chuyển khoản' : saved.pay === 'gift' ? ' · đơn tặng' : ' · chưa nhận tiền'}
+              {saved.queued ? '. Đang mất mạng, app sẽ tự gửi khi có mạng.' : ''}
             </span>
-            <h2 id="stuck-t" style={{ fontSize: 18 }}>Chưa lưu được đơn</h2>
-            <p className="small muted">
-              Máy chủ không trả lời sau 10 giây. Đơn {partsLabel} · {vnd(total)} vẫn giữ trên máy này. Thử lại ngay, hoặc để app tự gửi khi mạng ổn.
-            </p>
-            <button
-              className="btn lg block"
-              onClick={() => {
-                const c = stuck;
-                setStuck(null);
-                save(c);
-              }}
-            >
-              Thử lại
-            </button>
-            <button
-              className="btn secondary block"
-              onClick={() => {
-                const c = stuck;
-                enqueue(c);
-                setStuck(null);
-                done(c, null, true);
-              }}
-            >
-              Giữ lại, gửi sau
-            </button>
-            <button
-              className="btn quiet block"
-              style={{ color: 'var(--danger)' }}
-              onClick={async () => {
-                if (await confirmDialog({ title: 'Bỏ đơn này?', text: 'Đơn sẽ không được ghi và không gửi lên máy chủ.', ok: 'Bỏ đơn', cancel: 'Giữ lại', danger: true })) {
-                  setStuck(null);
-                  setCounts({});
-                  setCups({});
-                }
-              }}
-            >
-              Bỏ đơn này
-            </button>
+            <span className="strong">{saved.parts}</span>
+            <span className="num" style={{ fontSize: 30, fontWeight: 700, lineHeight: '36px' }}>{vnd(saved.total)}</span>
+            <button className="btn secondary block" style={{ marginTop: 8 }} onClick={() => setSaved(null)}>Đóng</button>
+            <span className="xs muted">Tự đóng sau 5 giây</span>
+            <div className="pop-timer"><div /></div>
           </div>
         </>
       )}

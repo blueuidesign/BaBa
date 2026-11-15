@@ -75,7 +75,7 @@ export function Cup({ color, size = 40 }: { color: string | null; size?: number 
   );
 }
 
-export function Header({ title, sub, back, right }: { title: string; sub?: ReactNode; back?: string | true; right?: ReactNode }) {
+export function Header({ title, sub, back, right }: { title: string; sub?: ReactNode; back?: string | true | (() => void); right?: ReactNode }) {
   const nav = useNavigate();
   const { online, queue } = useApp();
   const pending = queue.filter((q) => !q.rejected).length;
@@ -83,7 +83,7 @@ export function Header({ title, sub, back, right }: { title: string; sub?: React
     <>
       <header className="header">
         {back && (
-          <button className="icon-btn" style={{ marginLeft: -8 }} aria-label="Quay lại" onClick={() => (back === true ? nav(-1) : nav(back))}>
+          <button className="icon-btn" style={{ marginLeft: -8 }} aria-label="Quay lại" onClick={() => (typeof back === 'function' ? back() : back === true ? nav(-1) : nav(back))}>
             <Icon name="back" size={24} sw={2} />
           </button>
         )}

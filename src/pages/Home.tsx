@@ -41,7 +41,7 @@ export default function Home() {
         .eq('business_date', today)
         .eq('status', 'active')
         .order('placed_at', { ascending: false })
-        .limit(3),
+        .limit(5),
       supabase.from('day_closes').select('business_date').eq('outlet_id', oid).eq('is_current', true).in('business_date', [today, yesterday]),
       supabase.from('orders').select('id', { count: 'exact', head: true }).eq('outlet_id', oid).eq('business_date', yesterday).eq('status', 'active'),
       supabase.from('cash_opens').select('amount_vnd').eq('outlet_id', oid).eq('business_date', today).order('created_at', { ascending: false }).limit(1)
@@ -216,7 +216,10 @@ export default function Home() {
 
         {data.recent.length > 0 && (
           <section className="card tight">
-            <div className="h2" style={{ padding: '12px 0 2px' }}>Đơn gần đây</div>
+            <div className="row between" style={{ padding: '12px 0 2px' }}>
+              <span className="h2">Đơn gần đây</span>
+              <Link to="/hoa-don" className="small strong" style={{ color: 'var(--ink-brand)', textDecoration: 'none', minHeight: 32, display: 'inline-flex', alignItems: 'center' }}>Tất cả</Link>
+            </div>
             {data.recent.map((o: any) => (
               <Link key={o.id} to={`/bao-cao/don/${o.id}?from=home`} className="list-row" style={{ minHeight: 48, textDecoration: 'none', color: 'inherit' }}
                 aria-label={`Đơn lúc ${timeHM(o.placed_at)}, ${vnd(o.total_vnd)}. Mở chi tiết`}>
