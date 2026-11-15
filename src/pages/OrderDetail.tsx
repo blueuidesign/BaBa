@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { useLoad } from '../lib/data';
@@ -25,7 +25,9 @@ export default function OrderDetail() {
     [id, ver]
   );
   if (!outlet) return null;
-  const back = o ? `/bao-cao/don?d=${o.business_date}` : '/bao-cao/don';
+  // Mở từ Trang chủ thì quay lại Trang chủ; mở từ Báo cáo thì về danh sách đơn của ngày đó
+  const fromHome = new URLSearchParams(useLocation().search).get('from') === 'home';
+  const back = fromHome ? '/' : o ? `/bao-cao/don?d=${o.business_date}` : '/bao-cao/don';
   const name = (pid: string) => catalog?.allProducts.find((p) => p.id === pid)?.name || 'Món đã bỏ';
   const d = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}`;
 

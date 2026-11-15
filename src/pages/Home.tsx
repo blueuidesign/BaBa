@@ -36,7 +36,7 @@ export default function Home() {
       fetchStock(oid),
       supabase
         .from('orders')
-        .select('id,seq_in_day,placed_at,total_vnd,is_gift,channel,order_lines(qty,product_id)')
+        .select('id,seq_in_day,placed_at,total_vnd,is_gift,channel,order_lines(qty,product_id,container)')
         .eq('outlet_id', oid)
         .eq('business_date', today)
         .eq('status', 'active')
@@ -218,14 +218,16 @@ export default function Home() {
           <section className="card tight">
             <div className="h2" style={{ padding: '12px 0 2px' }}>Đơn gần đây</div>
             {data.recent.map((o: any) => (
-              <div key={o.id} className="list-row" style={{ minHeight: 44 }}>
+              <Link key={o.id} to={`/bao-cao/don/${o.id}?from=home`} className="list-row" style={{ minHeight: 48, textDecoration: 'none', color: 'inherit' }}
+                aria-label={`Đơn lúc ${timeHM(o.placed_at)}, ${vnd(o.total_vnd)}. Mở chi tiết`}>
                 <span className="small muted num" style={{ width: 44 }}>{timeHM(o.placed_at)}</span>
                 <span className="grow">
-                  {o.order_lines.map((l: any) => `${l.qty} ${nameOf(l.product_id)}`).join(' · ')}
+                  {o.order_lines.map((l: any) => `${l.qty} ${nameOf(l.product_id)}${l.container === 'coc' ? ' (cốc)' : ''}`).join(' · ')}
                   {o.is_gift ? ' · tặng' : o.channel === 'aggregate' ? ' · bổ sung' : ''}
                 </span>
                 <span className="strong num">{vnd(o.total_vnd)}</span>
-              </div>
+                <Icon name="chev" size={18} style={{ color: 'var(--ink-muted)' }} />
+              </Link>
             ))}
           </section>
         )}
