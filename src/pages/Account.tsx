@@ -95,6 +95,7 @@ export default function Account() {
           <section className="card tight">
             <div className="h2" style={{ padding: '12px 0 2px' }}>Chủ cơ sở</div>
             <Item icon="coin" title="Chi phí" sub="Ghi chi phí, xem chi theo loại" to="/chi-phi" />
+            <Item icon="history" title="Lịch sử sửa, hủy đơn" sub="Ai sửa, hủy đơn nào, lúc nào, vì sao" to="/lich-su-don" />
             <Item icon="history" title="Số liệu tháng cũ" sub="Nhập doanh thu, chi phí trước khi dùng app" to="/thang-cu" />
             <Item icon="user" title="Nhân viên" sub="Thêm người bằng email, chọn cơ sở" to="/nhan-vien" />
           </section>

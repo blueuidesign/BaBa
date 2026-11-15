@@ -18,6 +18,8 @@ import DayClose from './pages/DayClose';
 import OrderDetail from './pages/OrderDetail';
 import DayOrders from './pages/DayOrders';
 import Assistant from './pages/Assistant';
+import OrderEdit from './pages/OrderEdit';
+import OrderChanges from './pages/OrderChanges';
 import Revenue from './pages/Revenue';
 import Notifications from './pages/Notifications';
 import History from './pages/History';
@@ -64,6 +66,8 @@ export default function App() {
       <Route path="/bao-cao/don" element={<DayOrders />} />
       <Route path="/bao-cao/hoi" element={<Assistant />} />
       <Route path="/bao-cao/don/:id" element={<OrderDetail />} />
+      <Route path="/bao-cao/don/:id/sua" element={<OrderEdit />} />
+      <Route path="/lich-su-don" element={<OrderChanges />} />
       <Route path="/chi-phi" element={<Expenses />} />
       <Route path="/chi-phi/moi" element={<Expenses openNew />} />
       <Route path="/thang-cu" element={<Historical />} />
