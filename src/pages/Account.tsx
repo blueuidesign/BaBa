@@ -83,10 +83,10 @@ export default function Account() {
           <section className="card tight">
             <div className="h2" style={{ padding: '12px 0 2px' }}>Quản lý</div>
             <Item icon="box" title="Tồn kho và nhập hàng" sub="Nguyên liệu, bao bì, nhắc đặt hàng" to="/kho" />
-            <Item icon="bottle" title="Chai đang có" sub="Tồn thành phẩm theo món" to="/kho/chai" />
             <Item icon="truck" title="Nhà cung cấp" sub="Ai cung cấp vật tư nào" to="/nha-cung-cap" />
+            <Item icon="bottle" title="Chai đang có" sub="Tồn thành phẩm theo món" to="/kho/chai" />
+            {canManage && <Item icon="user" title="Nhân viên" sub="Thêm người bằng email, chọn cơ sở" to="/nhan-vien" />}
             <Item icon="history" title="Lịch sử bản ghi" sub={canManage ? 'Đơn, nấu, nhập, kiểm kê, đối chiếu; sửa và hủy đơn' : 'Đơn, nấu, nhập, kiểm kê, đối chiếu'} to="/lich-su" />
-            {canManage && <Item icon="chart" title="Số liệu tháng cũ" sub="Nhập doanh thu, chi phí trước khi dùng app" to="/thang-cu" />}
           </section>
         )}
 
@@ -94,24 +94,19 @@ export default function Account() {
           <section className="card tight">
             <div className="h2" style={{ padding: '12px 0 2px' }}>Thiết lập</div>
             <Item icon="bell" title="Thông báo và nhắc nhở" sub="Đặt hàng, hết hạn, chốt ngày" to="/thong-bao" />
-            {canManage && <Item icon="user" title="Nhân viên" sub="Thêm người bằng email, chọn cơ sở" to="/nhan-vien" />}
           </section>
         )}
 
         <PushCard />
 
-        <section className="card">
-          <div className="h2">Quản trị hệ thống</div>
-          {isAdmin ? (
-            <>
-              <Link to="/quan-tri" className="btn secondary block">Báo cáo tất cả cơ sở, chủ cơ sở</Link>
-              <Link to="/quan-tri/mon" className="btn secondary block">Quản lý món: tên, nhóm, giá, ngừng bán</Link>
-            </>
-          ) : (
-            <p className="small muted">Admin BaBa tạo cơ sở mới, gán chủ cơ sở, quản lý công thức và giá chung.</p>
-          )}
+        <section className="card tight">
+          <div className="h2" style={{ padding: '12px 0 2px' }}>Quản trị hệ thống</div>
+          {isAdmin && <Item icon="chart" title="Báo cáo tất cả cơ sở" sub="Doanh thu từng cơ sở, chủ cơ sở" to="/quan-tri" />}
+          {isAdmin && <Item icon="bottle" title="Quản lý món" to="/quan-tri/mon" />}
+          {outlet && canManage && <Item icon="history" title="Số liệu tháng cũ" sub="Nhập doanh thu, chi phí trước khi dùng app" to="/thang-cu" />}
+          {!isAdmin && <p className="small muted" style={{ padding: '8px 0' }}>Admin BaBa tạo cơ sở mới, gán chủ cơ sở, quản lý công thức và giá chung.</p>}
           {admins.map((e) => (
-            <div key={e} className="row small">
+            <div key={e} className="row small" style={{ padding: '8px 0' }}>
               <Icon name="check" size={18} sw={2} style={{ color: 'var(--ink-brand)' }} />
               <span className="grow strong">{e}</span>
               <span className="badge ok">Admin</span>
