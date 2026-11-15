@@ -108,7 +108,7 @@ revoke all on function public.fn_edit_order(uuid, jsonb, text) from public, anon
 grant execute on function public.fn_edit_order(uuid, jsonb, text) to authenticated;
 
 -- 4. Chủ cơ sở đọc được lịch sử của đơn thuộc cơ sở mình (admin đã đọc được mọi dòng từ 0007)
-drop policy if exists audit_orders_owner on public.audit_log;
+drop policy if exists audit_orders_owner on public.audit_log; -- lúc chạy trên production (15/11) đã bỏ dòng này vì policy chưa tồn tại
 create policy audit_orders_owner on public.audit_log for select to authenticated
   using (table_name = 'orders' and exists (select 1 from public.orders o where o.id = audit_log.row_id and public.can_manage_outlet(o.outlet_id)));
 create index if not exists audit_log_orders_row on public.audit_log (row_id) where table_name = 'orders';
