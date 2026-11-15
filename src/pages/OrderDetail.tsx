@@ -142,7 +142,7 @@ export default function OrderDetail() {
             )}
             {active && (
               <p className="xs muted">
-                {canManage ? 'Sửa và hủy được khi ngày đó chưa chốt. Mỗi lần sửa, hủy đều ghi vào Lịch sử sửa, hủy đơn trong Tài khoản.' : 'Chỉ chủ cơ sở sửa hoặc hủy được đơn. Cần sửa thì nhờ chủ cơ sở.'}
+                {canManage ? 'Sửa và hủy được khi ngày đó chưa chốt. Mỗi lần sửa, hủy đều ghi vào Lịch sử sửa, hủy đơn trong Tài khoản.' : 'Đơn đã lưu thì chỉ chủ cơ sở sửa hoặc hủy được. Đơn bạn vừa ghi thì hoàn tác được ngay ở màn Đã lưu đơn, trong 10 phút.'}
               </p>
             )}
           </>
