@@ -13,6 +13,7 @@ const dmy = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`
 /**
  * Hóa đơn: mọi đơn đã ghi của cơ sở, lọc theo Hôm nay, Hôm qua, Tháng này, Tất cả.
  * Mỗi đơn một thẻ: nửa trên bấm để mở chi tiết; nửa dưới đánh dấu Đã nhận t.mặt, Đã nhận c.khoản, Đơn tặng.
+ * Chỉ đơn chưa đánh dấu mới bấm được; đã đánh dấu thì ô đó nền xanh, muốn đổi phải vào Sửa đơn.
  * Mở từ Trang chủ (nút Tất cả ở Đơn gần đây) và từ Báo cáo (?d=ngày).
  */
 export default function Invoices() {
@@ -65,32 +66,18 @@ export default function Invoices() {
   const pick = (r: Range) => setSp(r === 'today' ? {} : { loc: r === 'yesterday' ? 'hom-qua' : r === 'month' ? 'thang' : 'tat-ca' }, { replace: true });
   const sum = Object.values(days).reduce((a, x) => ({ orders: a.orders + x.orders, parts: a.parts + x.parts, revenue: a.revenue + x.revenue }), { orders: 0, parts: 0, revenue: 0 });
 
-  /** Đánh dấu cách nhận tiền hoặc đơn tặng. Bấm lại ô đang chọn thì bỏ đánh dấu. */
+  /** Đánh dấu cho đơn CHƯA đánh dấu. Đơn đã đánh dấu thì muốn đổi phải vào Sửa đơn (chủ cơ sở). */
   async function mark(o: any, k: 'cash' | 'transfer' | 'gift') {
-    if (busyId) return;
+    if (busyId || o.payment_method || o.is_gift) return;
     setErr(null);
-    if (k === 'gift' || o.is_gift) {
-      const toGift = k === 'gift' && !o.is_gift;
-      const ok = await confirmDialog(toGift
-        ? { title: 'Đánh dấu đơn tặng?', text: `Đơn ${vnd(o.total_vnd)} sẽ tính 0 đ, hàng vẫn trừ. Việc này được ghi vào lịch sử sửa, hủy đơn.`, ok: 'Đơn tặng', cancel: 'Thôi' }
-        : { title: 'Bỏ đánh dấu tặng?', text: 'Đơn sẽ tính tiền lại theo bảng giá của ngày bán. Việc này được ghi vào lịch sử sửa, hủy đơn.', ok: 'Tính tiền lại', cancel: 'Thôi' });
-      if (!ok) return;
-    }
+    if (k === 'gift' && !(await confirmDialog({ title: 'Đánh dấu đơn tặng?', text: `Đơn ${vnd(o.total_vnd)} sẽ tính 0 đ, hàng vẫn trừ. Sau khi đánh dấu, muốn đổi lại phải vào Sửa đơn.`, ok: 'Đơn tặng', cancel: 'Thôi' }))) return;
     setBusyId(o.id);
-    let error: any = null;
-    if (k === 'gift') {
-      ({ error } = await supabase.rpc('fn_set_order_gift', { p_order: o.id, p_gift: !o.is_gift }));
-    } else if (o.is_gift) {
-      // Đang là đơn tặng: tính tiền lại rồi mới ghi cách nhận tiền cho đơn mới thay thế
-      const r = await supabase.rpc('fn_set_order_gift', { p_order: o.id, p_gift: false });
-      error = r.error;
-      if (!error) ({ error } = await supabase.rpc('fn_set_order_info', { p_order: (r.data as any).id, p_payment: k }));
-    } else {
-      ({ error } = await supabase.rpc('fn_set_order_info', { p_order: o.id, p_payment: o.payment_method === k ? '' : k }));
-    }
+    const { error } = k === 'gift'
+      ? await supabase.rpc('fn_set_order_gift', { p_order: o.id, p_gift: true })
+      : await supabase.rpc('fn_set_order_info', { p_order: o.id, p_payment: k });
     setBusyId(null);
     if (error) return setErr({ id: o.id, text: errorText(error) });
-    toast.show('Đã cập nhật');
+    toast.show('Đã đánh dấu');
     bump();
   }
 
@@ -150,7 +137,8 @@ export default function Invoices() {
                     <div className="inv-bot">
                       <div className="seg3" role="group" aria-label="Đánh dấu nhận tiền">
                         {([['cash', 'Đã nhận t.mặt'], ['transfer', 'Đã nhận c.khoản'], ['gift', 'Đơn tặng']] as ['cash' | 'transfer' | 'gift', string][]).map(([k, l]) => (
-                          <button key={k} type="button" aria-pressed={on === k} className={on === k ? 'on' : ''} disabled={busy} onClick={() => mark(o, k)}>
+                          <button key={k} type="button" aria-pressed={on === k} className={on === k ? 'on' : ''} disabled={busy || (!!on && on !== k)}
+                            aria-disabled={!!on} style={on === k ? { cursor: 'default' } : undefined} onClick={() => mark(o, k)}>
                             {on === k && <Icon name="check" size={15} sw={2.6} />}{l}
                           </button>
                         ))}

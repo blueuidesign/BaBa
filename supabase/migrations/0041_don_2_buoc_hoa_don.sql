@@ -123,8 +123,78 @@ end $$;
 revoke all on function public.fn_set_order_gift(uuid, boolean) from public, anon;
 grant execute on function public.fn_set_order_gift(uuid, boolean) to authenticated;
 
+-- 3. Đã đánh dấu rồi thì chỉ đổi được qua Sửa đơn (Tùng 15/11 21:35).
+--    fn_set_order_info: ai có quyền ở cơ sở đều đánh dấu được cách nhận tiền cho đơn CHƯA đánh dấu;
+--    đổi hoặc bỏ cách nhận tiền đã ghi thì chỉ chủ cơ sở, admin. Tên khách không bị siết.
+create or replace function public.fn_set_order_info(p_order uuid, p_payment text default null, p_customer text default null)
+ returns jsonb language plpgsql security definer set search_path to 'public' as $function$
+declare o orders%rowtype; v_pay text; v_cust text;
+begin
+  select * into o from orders where id = p_order;
+  if not found then raise exception 'Không tìm thấy đơn' using errcode = 'P0001'; end if;
+  if auth.uid() is null or not public.can_access_outlet(o.outlet_id) then
+    raise exception 'Bạn không có quyền ở cơ sở này' using errcode = '42501';
+  end if;
+  if o.status <> 'active' then raise exception 'Đơn này đã hủy, không ghi thêm được' using errcode = 'P0001'; end if;
+  if p_payment is not null and p_payment not in ('', 'cash', 'transfer') then
+    raise exception 'Cách nhận tiền chỉ là tiền mặt hoặc chuyển khoản' using errcode = 'P0001';
+  end if;
+  v_pay := case when p_payment is null then o.payment_method when p_payment = '' then null else p_payment end;
+  v_cust := case when p_customer is null then o.customer_name when btrim(p_customer) = '' then null else left(btrim(p_customer), 60) end;
+  if v_pay is distinct from o.payment_method then
+    if o.is_gift then raise exception 'Đơn tặng không có cách nhận tiền. Muốn tính tiền lại thì dùng Sửa đơn.' using errcode = 'P0001'; end if;
+    if o.payment_method is not null and not public.can_manage_outlet(o.outlet_id) then
+      raise exception 'Đơn đã đánh dấu nhận tiền. Chỉ chủ cơ sở đổi được, ở Sửa đơn.' using errcode = '42501';
+    end if;
+  end if;
+  if v_pay is distinct from o.payment_method or v_cust is distinct from o.customer_name then
+    update orders set payment_method = v_pay, customer_name = v_cust where id = p_order;
+    insert into audit_log (actor_id, table_name, row_id, action, old_row, new_row)
+    values (auth.uid(), 'orders', p_order, 'set_info',
+            jsonb_build_object('payment_method', o.payment_method, 'customer_name', o.customer_name),
+            jsonb_build_object('payment_method', v_pay, 'customer_name', v_cust));
+  end if;
+  return jsonb_build_object('id', p_order, 'payment_method', v_pay, 'customer_name', v_cust);
+end $function$;
+
+-- 4. Sửa đơn nhận thêm cách nhận tiền, đơn tặng, tên khách: p = { lines, discount_vnd, discount_reason,
+--    payment_method ('cash' | 'transfer' | '' để bỏ), is_gift, customer_name }. Khóa nào không gửi thì giữ như đơn cũ.
+create or replace function public.fn_edit_order(p_order uuid, p jsonb, p_reason text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v orders; v_old jsonb; v_res jsonb; v_new uuid; v_why text := nullif(btrim(coalesce(p_reason, '')), '');
+  v_gift boolean; v_pay text; v_cust text;
+begin
+  select * into v from orders where id = p_order;
+  if not found or auth.uid() is null or not public.can_access_outlet(v.outlet_id) then
+    raise exception 'Không tìm thấy đơn' using errcode = '42501';
+  end if;
+  if not public.can_manage_outlet(v.outlet_id) then
+    raise exception 'Chỉ chủ cơ sở sửa được đơn. Nhờ chủ cơ sở sửa giúp.' using errcode = '42501';
+  end if;
+  if v.status <> 'active' then raise exception 'Đơn này đã hủy, không sửa được' using errcode = 'P0001'; end if;
+  if jsonb_array_length(coalesce(p->'lines', '[]'::jsonb)) = 0 then
+    raise exception 'Đơn phải còn ít nhất một món. Muốn bỏ cả đơn thì dùng Hủy đơn.' using errcode = 'P0001';
+  end if;
+  v_gift := coalesce((p->>'is_gift')::boolean, v.is_gift);
+  v_pay := case when v_gift then null when p ? 'payment_method' then nullif(p->>'payment_method', '') else v.payment_method end;
+  v_cust := case when p ? 'customer_name' then nullif(btrim(coalesce(p->>'customer_name', '')), '') else v.customer_name end;
+  v_old := public._order_snapshot(p_order);
+  perform public._reverse_order_core(p_order, 'Sửa đơn' || coalesce(': ' || v_why, ''));
+  v_res := public.fn_post_order(jsonb_build_object(
+    'outlet_id', v.outlet_id, 'business_date', v.business_date, 'placed_at', v.placed_at, 'channel', v.channel,
+    'is_gift', v_gift, 'note', case when v_gift then coalesce(v.note, 'Tặng') else nullif(v.note, 'Tặng') end, 'lines', p->'lines',
+    'discount_vnd', coalesce(p->>'discount_vnd', '0'), 'discount_reason', p->>'discount_reason',
+    'payment_method', v_pay, 'customer_name', v_cust));
+  v_new := (v_res->>'id')::uuid;
+  insert into audit_log (actor_id, table_name, row_id, action, old_row, new_row)
+  values (auth.uid(), 'orders', v_new, 'edit', v_old, public._order_snapshot(v_new) || jsonb_build_object('reason', v_why));
+  return v_res || jsonb_build_object('replaced', p_order);
+end $$;
+
 -- Kiểm tra (thử rồi hủy bằng raise exception):
 --   1. fn_post_order với payment_method 'transfer', customer_name 'anh Tùng' → orders.payment_method = 'transfer', customer_name = 'anh Tùng'.
 --   2. payment_method 'the' → "Cách nhận tiền không hợp lệ".
 --   3. fn_set_order_gift(đơn, true) → đơn cũ 'reversed', đơn mới is_gift, tổng 0, cùng giờ và khách; audit_log 1 dòng 'edit'.
 --   4. fn_set_order_gift(đơn tặng, false) → đơn mới tính tiền theo bảng giá.
+--   5. Nhân viên fn_set_order_info đổi 'cash' → 'transfer' trên đơn đã đánh dấu → "Đơn đã đánh dấu nhận tiền…"; đơn chưa đánh dấu thì được.
+--   6. Chủ cơ sở fn_edit_order với is_gift true → đơn mới 0 đ; với payment_method 'transfer', customer_name 'chị Lan' → lưu đúng.
