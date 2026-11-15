@@ -5,7 +5,6 @@ import Login from './pages/Login';
 import Outlets from './pages/Outlets';
 import Home from './pages/Home';
 import Order from './pages/Order';
-import OrderSaved from './pages/OrderSaved';
 import CookPlan from './pages/CookPlan';
 import Ingredients from './pages/Ingredients';
 import Batches from './pages/Batches';
@@ -48,7 +47,8 @@ export default function App() {
       <Route path="/co-so" element={<Outlets />} />
       <Route path="/" element={<Home />} />
       <Route path="/ban" element={<Order />} />
-      <Route path="/ban/da-luu" element={<OrderSaved />} />
+      <Route path="/ban/da-luu" element={<Navigate to="/ban" replace />} />
+      <Route path="/hoa-don" element={<DayOrders />} />
       <Route path="/nau" element={<CookPlan />} />
       <Route path="/nau/nguyen-lieu" element={<Ingredients />} />
       <Route path="/nau/me" element={<Batches />} />

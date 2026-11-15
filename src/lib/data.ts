@@ -65,3 +65,21 @@ export async function isDayClosed(outletId: string, date = vnToday()) {
   const { data } = await supabase.from('day_closes').select('id').eq('outlet_id', outletId).eq('business_date', date).eq('is_current', true).maybeSingle();
   return !!data;
 }
+
+export type Customer = { name: string; count: number; last: string };
+/** Khách quen của cơ sở, lấy từ tên khách trên các đơn đã ghi (500 đơn có tên gần nhất), xếp theo lần mua gần nhất. */
+export async function fetchCustomers(outletId: string): Promise<Customer[]> {
+  const { data } = await supabase.from('orders').select('customer_name,business_date')
+    .eq('outlet_id', outletId).eq('status', 'active').not('customer_name', 'is', null)
+    .order('placed_at', { ascending: false }).limit(500);
+  const m = new Map<string, Customer>();
+  for (const r of (data || []) as any[]) {
+    const name = String(r.customer_name || '').trim();
+    const k = name.toLowerCase();
+    if (!name || k === 'khách lẻ') continue;
+    const c = m.get(k);
+    if (c) c.count++;
+    else m.set(k, { name, count: 1, last: r.business_date });
+  }
+  return [...m.values()];
+}

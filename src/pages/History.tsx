@@ -136,7 +136,7 @@ export default function History() {
             Xem thêm
           </button>
         )}
-        <p className="xs muted" style={{ textAlign: 'center' }}>Bản ghi không xóa được. Đơn ghi nhầm thì hoàn tác ngay sau khi lưu, trong 10 phút; sau đó chủ cơ sở sửa hoặc hủy, và lần sửa, hủy đó hiện ở bộ lọc "Sửa, hủy đơn".</p>
+        <p className="xs muted" style={{ textAlign: 'center' }}>Bản ghi không xóa được. Đơn ghi nhầm thì chủ cơ sở sửa hoặc hủy ở màn chi tiết đơn; lần sửa, hủy đó hiện ở bộ lọc "Sửa, hủy đơn".</p>
         </>
         )}
       </main>

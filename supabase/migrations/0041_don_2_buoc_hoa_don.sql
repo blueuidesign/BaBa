@@ -1,0 +1,130 @@
+-- 0041 · Ghi đơn hai bước và màn Hóa đơn (Tùng duyệt 15/11 21:21, yêu cầu 21:29).
+-- 1. fn_post_order nhận thêm payment_method ('cash' | 'transfer' | bỏ trống) và customer_name, để tên khách và cách nhận tiền
+--    lưu cùng lúc với đơn (trước đây lưu sau bằng fn_set_order_info). Phần còn lại giữ nguyên bản 0035.
+-- 2. fn_set_order_gift(p_order, p_gift): đánh dấu hoặc bỏ đánh dấu đơn tặng từ màn Hóa đơn.
+--    Cách làm: đảo đơn cũ + ghi đơn mới (sổ cái nối thêm), giữ giờ bán, khách, loại chai / cốc. Đơn tặng tính 0 đ và không có cách nhận tiền.
+--    Quyền: như hủy đơn (0040): chủ cơ sở, admin; nhân viên chỉ với đơn mình ghi trong 10 phút. Ghi audit_log action 'edit'.
+-- Chạy ở: migration. Không đổi cột.
+
+CREATE OR REPLACE FUNCTION public.fn_post_order(p jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_outlet uuid := (p->>'outlet_id')::uuid;
+  v_client uuid := nullif(p->>'client_id', '')::uuid;
+  v_date date := coalesce(nullif(p->>'business_date', '')::date, public.vn_today());
+  v_gift boolean := coalesce((p->>'is_gift')::boolean, false);
+  v_disc int := coalesce(nullif(p->>'discount_vnd', '')::int, 0);
+  v_ex orders; v_id uuid; v_seq int; v_total int := 0; v_price int; r record;
+  v_pay text := nullif(btrim(coalesce(p->>'payment_method', '')), '');
+  v_cust text := nullif(btrim(coalesce(p->>'customer_name', '')), '');
+begin
+  if auth.uid() is null or not public.can_access_outlet(v_outlet) then
+    raise exception 'Bạn không có quyền ghi đơn ở cơ sở này' using errcode = '42501';
+  end if;
+  if v_client is not null then
+    select * into v_ex from orders where client_id = v_client;
+    if found then
+      return jsonb_build_object('id', v_ex.id, 'seq_in_day', v_ex.seq_in_day, 'total_vnd', v_ex.total_vnd,
+                                'discount_vnd', v_ex.discount_vnd, 'business_date', v_ex.business_date, 'duplicate', true);
+    end if;
+  end if;
+  if coalesce(p->>'channel', 'counter') <> 'aggregate'
+     and exists (select 1 from day_closes where outlet_id = v_outlet and business_date = v_date and is_current) then
+    raise exception 'Ngày % đã chốt, không ghi thêm đơn được', to_char(v_date, 'DD/MM') using errcode = 'P0001';
+  end if;
+  if jsonb_array_length(coalesce(p->'lines', '[]'::jsonb)) = 0 then
+    raise exception 'Đơn chưa có món nào' using errcode = 'P0001';
+  end if;
+  if v_disc < 0 then raise exception 'Giảm giá không được là số âm' using errcode = 'P0001'; end if;
+  if v_gift then v_disc := 0; end if;
+
+  perform pg_advisory_xact_lock(hashtext(v_outlet::text || v_date::text));
+  select coalesce(max(seq_in_day), 0) + 1 into v_seq from orders
+   where outlet_id = v_outlet and business_date = v_date and seq_in_day > 0;
+
+  -- 0041: cách nhận tiền và tên khách ghi cùng lúc với đơn. Đơn tặng không có cách nhận tiền.
+  if v_pay is not null and v_pay not in ('cash', 'transfer') then
+    raise exception 'Cách nhận tiền không hợp lệ: %', v_pay using errcode = 'P0001';
+  end if;
+  insert into orders (outlet_id, client_id, seq_in_day, business_date, channel, is_gift, note, placed_at, payment_method, customer_name)
+  values (v_outlet, v_client, v_seq, v_date, coalesce(p->>'channel', 'counter'), v_gift, p->>'note',
+          coalesce(nullif(p->>'placed_at', '')::timestamptz, now()),
+          case when v_gift then null else v_pay end, left(v_cust, 80))
+  returning id into v_id;
+
+  for r in select (x->>'product_id')::uuid as product_id, (x->>'qty')::int as qty,
+                  coalesce(nullif(x->>'container', ''), 'chai') as container
+             from jsonb_array_elements(p->'lines') x loop
+    continue when r.qty is null or r.qty <= 0;
+    if r.container not in ('chai', 'coc') then
+      raise exception 'Loại bao bì không hợp lệ: %', r.container using errcode = 'P0001';
+    end if;
+    if v_gift then v_price := 0;
+    else
+      v_price := public.current_price(v_outlet, r.product_id, v_date);
+      if v_price is null then raise exception 'Món chưa có giá niêm yết' using errcode = 'P0001'; end if;
+    end if;
+    insert into order_lines (order_id, product_id, qty, unit_price_vnd, recipe_id, line_total_vnd, container)
+    values (v_id, r.product_id, r.qty, v_price, public.current_recipe(r.product_id, v_date), v_price * r.qty, r.container);
+    v_total := v_total + v_price * r.qty;
+    insert into stock_movements (outlet_id, ingredient_id, qty_delta, reason, ref_table, ref_id, business_date)
+    select v_outlet, pr.ingredient_id, -pr.qty_per_unit * r.qty, 'sale_packaging', 'orders', v_id, v_date
+      from packaging_rules pr join products pd on pd.kind = pr.product_kind and pd.org_id = pr.org_id
+     where pd.id = r.product_id and pr.consume_at = 'sale';
+  end loop;
+
+  if v_disc > v_total then
+    raise exception 'Giảm % lớn hơn tiền đơn %. Sửa lại số giảm giá.',
+      to_char(v_disc, 'FM999G999G999'), to_char(v_total, 'FM999G999G999') using errcode = 'P0001';
+  end if;
+  update orders set total_vnd = v_total - v_disc, discount_vnd = v_disc,
+                    discount_reason = case when v_disc > 0 then nullif(p->>'discount_reason', '') end
+   where id = v_id;
+  return jsonb_build_object('id', v_id, 'seq_in_day', v_seq, 'total_vnd', v_total - v_disc, 'gross_vnd', v_total,
+                            'discount_vnd', v_disc, 'business_date', v_date);
+end $function$;
+
+create or replace function public.fn_set_order_gift(p_order uuid, p_gift boolean) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v orders; v_old jsonb; v_lines jsonb; v_res jsonb; v_new uuid;
+begin
+  select * into v from orders where id = p_order;
+  if not found or auth.uid() is null or not public.can_access_outlet(v.outlet_id) then
+    raise exception 'Không tìm thấy đơn' using errcode = '42501';
+  end if;
+  if v.status <> 'active' then raise exception 'Đơn này đã hủy' using errcode = 'P0001'; end if;
+  if v.is_gift = p_gift then return jsonb_build_object('id', v.id, 'unchanged', true); end if;
+  if not public.can_manage_outlet(v.outlet_id) then
+    if v.created_by is distinct from auth.uid() then
+      raise exception 'Đơn này do người khác ghi. Chỉ chủ cơ sở đổi được thành đơn tặng.' using errcode = '42501';
+    end if;
+    if v.created_at < now() - interval '10 minutes' then
+      raise exception 'Đơn đã ghi quá 10 phút. Nhờ chủ cơ sở đổi giúp.' using errcode = '42501';
+    end if;
+  end if;
+  v_old := public._order_snapshot(p_order);
+  select jsonb_agg(jsonb_build_object('product_id', product_id, 'qty', qty, 'container', container)) into v_lines
+    from order_lines where order_id = p_order;
+  perform public._reverse_order_core(p_order, case when p_gift then 'Đánh dấu đơn tặng' else 'Bỏ đánh dấu tặng' end);
+  v_res := public.fn_post_order(jsonb_build_object(
+    'outlet_id', v.outlet_id, 'business_date', v.business_date, 'placed_at', v.placed_at, 'channel', v.channel,
+    'is_gift', p_gift, 'note', case when p_gift then coalesce(v.note, 'Tặng') else nullif(v.note, 'Tặng') end,
+    'lines', v_lines, 'customer_name', v.customer_name));
+  v_new := (v_res->>'id')::uuid;
+  insert into audit_log (actor_id, table_name, row_id, action, old_row, new_row)
+  values (auth.uid(), 'orders', v_new, 'edit', v_old,
+          public._order_snapshot(v_new) || jsonb_build_object('reason', case when p_gift then 'Đánh dấu đơn tặng' else 'Bỏ đánh dấu tặng' end));
+  return v_res || jsonb_build_object('replaced', p_order);
+end $$;
+revoke all on function public.fn_set_order_gift(uuid, boolean) from public, anon;
+grant execute on function public.fn_set_order_gift(uuid, boolean) to authenticated;
+
+-- Kiểm tra (thử rồi hủy bằng raise exception):
+--   1. fn_post_order với payment_method 'transfer', customer_name 'anh Tùng' → orders.payment_method = 'transfer', customer_name = 'anh Tùng'.
+--   2. payment_method 'the' → "Cách nhận tiền không hợp lệ".
+--   3. fn_set_order_gift(đơn, true) → đơn cũ 'reversed', đơn mới is_gift, tổng 0, cùng giờ và khách; audit_log 1 dòng 'edit'.
+--   4. fn_set_order_gift(đơn tặng, false) → đơn mới tính tiền theo bảng giá.
