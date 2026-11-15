@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { OrderChangesList } from './OrderChanges';
 import { useApp } from '../lib/app';
 import { supabase } from '../lib/supabase';
 import { removeFromQueue } from '../lib/queue';
@@ -21,15 +23,18 @@ const ICON: Record<string, [string, string]> = {
 const PAGE = 50;
 
 export default function History() {
-  const { outlet, queue, dataVersion } = useApp();
-  const [filter, setFilter] = useState('all');
+  const { outlet, queue, dataVersion, canManage } = useApp();
+  const [sp] = useSearchParams();
+  const [filter, setFilter] = useState(sp.get('loc') === 'sua-huy' ? 'changes' : 'all');
+  // Bộ lọc "Sửa, hủy đơn" chỉ chủ cơ sở và admin thấy; nội dung lấy từ audit_log, không phải v_activity
+  const filters = canManage ? [...FILTERS.slice(0, 2), ['changes', 'Sửa, hủy đơn'] as [string, string], ...FILTERS.slice(2)] : FILTERS;
   const [rows, setRows] = useState<any[] | null>(null);
   const [more, setMore] = useState(true);
   const [names, setNames] = useState<Record<string, string>>({});
   const [showReversed, setShowReversed] = useState(false);
 
   async function load(offset: number) {
-    if (!outlet) return;
+    if (!outlet || filter === 'changes') return;
     let q = supabase.from('v_activity').select('*').eq('outlet_id', outlet.id).order('at', { ascending: false }).range(offset, offset + PAGE - 1);
     if (filter !== 'all') q = q.eq('kind', filter);
     const { data } = await q;
@@ -61,13 +66,17 @@ export default function History() {
       <Header title="Lịch sử" back="/tai-khoan" sub={`Mọi bản ghi của ${outlet.name}`} />
       <main className="main">
         <div className="chips">
-          {FILTERS.map(([k, l]) => (
+          {filters.map(([k, l]) => (
             <button key={k} className={`chip ${filter === k ? 'on' : ''}`} onClick={() => setFilter(k)}>
               {l}
             </button>
           ))}
         </div>
 
+        {filter === 'changes' ? (
+          <OrderChangesList />
+        ) : (
+        <>
         {hiddenCount > 0 || showReversed ? (
           <label className="row small" style={{ cursor: 'pointer' }}>
             <input type="checkbox" checked={showReversed} onChange={(e) => setShowReversed(e.target.checked)} style={{ width: 20, height: 20 }} />
@@ -127,7 +136,9 @@ export default function History() {
             Xem thêm
           </button>
         )}
-        <p className="xs muted" style={{ textAlign: 'center' }}>Bản ghi không xóa được. Đơn ghi nhầm thì hoàn tác ngay sau khi lưu; sai sót phát hiện muộn sẽ lộ ra ở bước đối chiếu cuối ngày.</p>
+        <p className="xs muted" style={{ textAlign: 'center' }}>Bản ghi không xóa được. Đơn ghi nhầm thì hoàn tác ngay sau khi lưu, trong 10 phút; sau đó chủ cơ sở sửa hoặc hủy, và lần sửa, hủy đó hiện ở bộ lọc "Sửa, hủy đơn".</p>
+        </>
+        )}
       </main>
       <Nav />
     </div>

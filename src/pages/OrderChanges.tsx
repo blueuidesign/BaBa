@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useApp } from '../lib/app';
 import { supabase } from '../lib/supabase';
 import { ddmm, timeHM, vnd } from '../lib/format';
-import { Empty, Header, Icon, Loading, Nav } from '../components/ui';
+import { Empty, Icon, Loading } from '../components/ui';
 
 const PAGE = 40;
 const lineText = (ls: any[] | undefined) => (ls || []).map((l) => `${l.qty} ${l.name}${l.container === 'coc' ? ' (cốc)' : ''}`).join(' · ') || 'không có món';
 const pay = (m: string | null | undefined) => (m === 'cash' ? 'tiền mặt' : m === 'transfer' ? 'chuyển khoản' : 'chưa ghi');
 
-/** Lịch sử sửa, hủy đơn của cơ sở (chủ cơ sở, admin). Đọc từ v_order_changes (audit_log). */
+/** Màn riêng cũ: giờ gộp vào Lịch sử bản ghi (bộ lọc "Sửa, hủy đơn"). Giữ đường dẫn cũ cho ai đã lưu. */
 export default function OrderChanges() {
+  return <Navigate to="/lich-su?loc=sua-huy" replace />;
+}
+
+/** Danh sách sửa, hủy đơn của cơ sở (chủ cơ sở, admin). Đọc từ v_order_changes (audit_log). Hiện trong màn Lịch sử. */
+export function OrderChangesList() {
   const { outlet, canManage, dataVersion } = useApp();
   const [all, setAll] = useState(false); // false: chỉ sửa và hủy; true: thêm cả đổi cách nhận tiền, tên khách
   const [rows, setRows] = useState<any[] | null>(null);
@@ -38,13 +43,8 @@ export default function OrderChanges() {
   }, [outlet?.id, all, dataVersion, canManage]);
 
   if (!outlet) return null;
+  if (!canManage) return <section className="card"><p className="small muted">Chỉ chủ cơ sở hoặc admin xem được lịch sử sửa, hủy đơn.</p></section>;
   return (
-    <div className="screen">
-      <Header title="Lịch sử sửa, hủy đơn" sub={outlet.name} back="/tai-khoan" />
-      <main className="main">
-        {!canManage ? (
-          <section className="card"><p className="small muted">Chỉ chủ cơ sở hoặc admin xem được lịch sử sửa, hủy đơn.</p></section>
-        ) : (
           <>
             <div className="chips">
               <button type="button" className={`chip ${!all ? 'on' : ''}`} aria-pressed={!all} onClick={() => setAll(false)}>Sửa và hủy</button>
@@ -91,9 +91,5 @@ export default function OrderChanges() {
               </section>
             )}
           </>
-        )}
-      </main>
-      <Nav />
-    </div>
   );
 }

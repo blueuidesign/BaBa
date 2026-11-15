@@ -71,8 +71,6 @@ export default function Account() {
           </div>
         </section>
 
-        <PushCard />
-
         {outlet && (
           <section className="card tight">
             <div className="h2" style={{ padding: '12px 0 2px' }}>Cơ sở đang làm việc</div>
@@ -80,26 +78,27 @@ export default function Account() {
           </section>
         )}
 
+        {/* Quản lý: việc làm hằng ngày với hàng hóa và sổ sách. Thiết lập: cài một lần, thỉnh thoảng mới đổi. Chi phí đã có ở thanh dưới. */}
         {outlet && (
           <section className="card tight">
             <div className="h2" style={{ padding: '12px 0 2px' }}>Quản lý</div>
             <Item icon="box" title="Tồn kho và nhập hàng" sub="Nguyên liệu, bao bì, nhắc đặt hàng" to="/kho" />
             <Item icon="bottle" title="Chai đang có" sub="Tồn thành phẩm theo món" to="/kho/chai" />
-            <Item icon="history" title="Lịch sử bản ghi" sub="Đơn, nấu, nhập, kiểm kê, đối chiếu" to="/lich-su" />
-            <Item icon="bell" title="Thông báo và nhắc nhở" sub="Đặt hàng, hết hạn, chốt ngày" to="/thong-bao" />
             <Item icon="truck" title="Nhà cung cấp" sub="Ai cung cấp vật tư nào" to="/nha-cung-cap" />
+            <Item icon="history" title="Lịch sử bản ghi" sub={canManage ? 'Đơn, nấu, nhập, kiểm kê, đối chiếu; sửa và hủy đơn' : 'Đơn, nấu, nhập, kiểm kê, đối chiếu'} to="/lich-su" />
+            {canManage && <Item icon="chart" title="Số liệu tháng cũ" sub="Nhập doanh thu, chi phí trước khi dùng app" to="/thang-cu" />}
           </section>
         )}
 
-        {outlet && canManage && (
+        {outlet && (
           <section className="card tight">
-            <div className="h2" style={{ padding: '12px 0 2px' }}>Chủ cơ sở</div>
-            <Item icon="coin" title="Chi phí" sub="Ghi chi phí, xem chi theo loại" to="/chi-phi" />
-            <Item icon="history" title="Lịch sử sửa, hủy đơn" sub="Ai sửa, hủy đơn nào, lúc nào, vì sao" to="/lich-su-don" />
-            <Item icon="history" title="Số liệu tháng cũ" sub="Nhập doanh thu, chi phí trước khi dùng app" to="/thang-cu" />
-            <Item icon="user" title="Nhân viên" sub="Thêm người bằng email, chọn cơ sở" to="/nhan-vien" />
+            <div className="h2" style={{ padding: '12px 0 2px' }}>Thiết lập</div>
+            <Item icon="bell" title="Thông báo và nhắc nhở" sub="Đặt hàng, hết hạn, chốt ngày" to="/thong-bao" />
+            {canManage && <Item icon="user" title="Nhân viên" sub="Thêm người bằng email, chọn cơ sở" to="/nhan-vien" />}
           </section>
         )}
+
+        <PushCard />
 
         <section className="card">
           <div className="h2">Quản trị hệ thống</div>
