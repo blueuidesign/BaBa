@@ -1,8 +1,10 @@
 -- 0041 · Ghi đơn hai bước và màn Hóa đơn (Tùng duyệt 15/11 21:21, yêu cầu 21:29).
 -- 1. fn_post_order nhận thêm payment_method ('cash' | 'transfer' | bỏ trống) và customer_name, để tên khách và cách nhận tiền
 --    lưu cùng lúc với đơn (trước đây lưu sau bằng fn_set_order_info). Phần còn lại giữ nguyên bản 0035.
--- 2. fn_set_order_gift(p_order, p_gift): đánh dấu hoặc bỏ đánh dấu đơn tặng từ màn Hóa đơn.
---    Cách làm: đảo đơn cũ + ghi đơn mới (sổ cái nối thêm), giữ giờ bán, khách, loại chai / cốc. Đơn tặng tính 0 đ và không có cách nhận tiền.
+-- 2. fn_set_order_gift(p_order, p_gift): đánh dấu đơn tặng từ màn Hóa đơn.
+--    Theo quyết định của Tùng (15/11 21:47): SỬA THẲNG đơn cũ, không tạo đơn thay thế, để số thứ tự đơn không đổi.
+--    Đây là ngoại lệ có chủ ý của nguyên tắc sổ cái nối thêm: giá từng dòng và tổng đơn bị ghi đè về 0;
+--    giá trước khi đổi vẫn còn trong audit_log (old_row). Kho không bị ảnh hưởng vì đơn tặng vẫn trừ hàng như đơn thường.
 --    Quyền: như hủy đơn (0040): chủ cơ sở, admin; nhân viên chỉ với đơn mình ghi trong 10 phút. Ghi audit_log action 'edit'.
 -- Chạy ở: migration. Không đổi cột.
 
@@ -90,14 +92,17 @@ end $function$;
 
 create or replace function public.fn_set_order_gift(p_order uuid, p_gift boolean) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare v orders; v_old jsonb; v_lines jsonb; v_res jsonb; v_new uuid;
+declare v orders; v_old jsonb; v_total int := 0;
 begin
-  select * into v from orders where id = p_order;
+  select * into v from orders where id = p_order for update;
   if not found or auth.uid() is null or not public.can_access_outlet(v.outlet_id) then
     raise exception 'Không tìm thấy đơn' using errcode = '42501';
   end if;
   if v.status <> 'active' then raise exception 'Đơn này đã hủy' using errcode = 'P0001'; end if;
   if v.is_gift = p_gift then return jsonb_build_object('id', v.id, 'unchanged', true); end if;
+  if exists (select 1 from day_closes where outlet_id = v.outlet_id and business_date = v.business_date and is_current) then
+    raise exception 'Ngày % đã chốt; muốn sửa thì chốt lại ngày đó', to_char(v.business_date, 'DD/MM') using errcode = 'P0001';
+  end if;
   if not public.can_manage_outlet(v.outlet_id) then
     if v.created_by is distinct from auth.uid() then
       raise exception 'Đơn này do người khác ghi. Chỉ chủ cơ sở đổi được thành đơn tặng.' using errcode = '42501';
@@ -107,18 +112,24 @@ begin
     end if;
   end if;
   v_old := public._order_snapshot(p_order);
-  select jsonb_agg(jsonb_build_object('product_id', product_id, 'qty', qty, 'container', container)) into v_lines
-    from order_lines where order_id = p_order;
-  perform public._reverse_order_core(p_order, case when p_gift then 'Đánh dấu đơn tặng' else 'Bỏ đánh dấu tặng' end);
-  v_res := public.fn_post_order(jsonb_build_object(
-    'outlet_id', v.outlet_id, 'business_date', v.business_date, 'placed_at', v.placed_at, 'channel', v.channel,
-    'is_gift', p_gift, 'note', case when p_gift then coalesce(v.note, 'Tặng') else nullif(v.note, 'Tặng') end,
-    'lines', v_lines, 'customer_name', v.customer_name));
-  v_new := (v_res->>'id')::uuid;
+  if p_gift then
+    update order_lines set unit_price_vnd = 0, line_total_vnd = 0 where order_id = p_order;
+    update orders set is_gift = true, total_vnd = 0, discount_vnd = 0, discount_reason = null, payment_method = null,
+                      note = coalesce(note, 'Tặng') where id = p_order;
+  else
+    update order_lines l set unit_price_vnd = public.current_price(v.outlet_id, l.product_id, v.business_date),
+                             line_total_vnd = public.current_price(v.outlet_id, l.product_id, v.business_date) * l.qty
+     where l.order_id = p_order;
+    if exists (select 1 from order_lines where order_id = p_order and unit_price_vnd is null) then
+      raise exception 'Có món chưa có giá niêm yết, không tính tiền lại được' using errcode = 'P0001';
+    end if;
+    select coalesce(sum(line_total_vnd), 0) into v_total from order_lines where order_id = p_order;
+    update orders set is_gift = false, total_vnd = v_total, note = nullif(note, 'Tặng') where id = p_order;
+  end if;
   insert into audit_log (actor_id, table_name, row_id, action, old_row, new_row)
-  values (auth.uid(), 'orders', v_new, 'edit', v_old,
-          public._order_snapshot(v_new) || jsonb_build_object('reason', case when p_gift then 'Đánh dấu đơn tặng' else 'Bỏ đánh dấu tặng' end));
-  return v_res || jsonb_build_object('replaced', p_order);
+  values (auth.uid(), 'orders', p_order, 'edit', v_old,
+          public._order_snapshot(p_order) || jsonb_build_object('reason', case when p_gift then 'Đánh dấu đơn tặng' else 'Bỏ đánh dấu tặng' end));
+  return jsonb_build_object('id', p_order, 'seq_in_day', v.seq_in_day, 'is_gift', p_gift, 'total_vnd', v_total);
 end $$;
 revoke all on function public.fn_set_order_gift(uuid, boolean) from public, anon;
 grant execute on function public.fn_set_order_gift(uuid, boolean) to authenticated;
@@ -194,7 +205,7 @@ end $$;
 -- Kiểm tra (thử rồi hủy bằng raise exception):
 --   1. fn_post_order với payment_method 'transfer', customer_name 'anh Tùng' → orders.payment_method = 'transfer', customer_name = 'anh Tùng'.
 --   2. payment_method 'the' → "Cách nhận tiền không hợp lệ".
---   3. fn_set_order_gift(đơn, true) → đơn cũ 'reversed', đơn mới is_gift, tổng 0, cùng giờ và khách; audit_log 1 dòng 'edit'.
+--   3. fn_set_order_gift(đơn, true) → cùng đơn đó: is_gift, tổng 0, giá từng dòng 0, số thứ tự không đổi; audit_log 1 dòng 'edit' giữ giá cũ.
 --   4. fn_set_order_gift(đơn tặng, false) → đơn mới tính tiền theo bảng giá.
 --   5. Nhân viên fn_set_order_info đổi 'cash' → 'transfer' trên đơn đã đánh dấu → "Đơn đã đánh dấu nhận tiền…"; đơn chưa đánh dấu thì được.
 --   6. Chủ cơ sở fn_edit_order với is_gift true → đơn mới 0 đ; với payment_method 'transfer', customer_name 'chị Lan' → lưu đúng.

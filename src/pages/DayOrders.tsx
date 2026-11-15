@@ -70,7 +70,7 @@ export default function Invoices() {
   async function mark(o: any, k: 'cash' | 'transfer' | 'gift') {
     if (busyId || o.payment_method || o.is_gift) return;
     setErr(null);
-    if (k === 'gift' && !(await confirmDialog({ title: 'Đánh dấu đơn tặng?', text: `Đơn ${vnd(o.total_vnd)} sẽ tính 0 đ, hàng vẫn trừ. Sau khi đánh dấu, muốn đổi lại phải vào Sửa đơn.`, ok: 'Đơn tặng', cancel: 'Thôi' }))) return;
+    if (k === 'gift' && !(await confirmDialog({ title: 'Đánh dấu đơn tặng?', text: `Đơn ${vnd(o.total_vnd)} sẽ tính 0 đ, hàng vẫn trừ, số đơn giữ nguyên. Sau khi đánh dấu, muốn đổi lại phải vào Sửa đơn.`, ok: 'Đơn tặng', cancel: 'Thôi' }))) return;
     setBusyId(o.id);
     const { error } = k === 'gift'
       ? await supabase.rpc('fn_set_order_gift', { p_order: o.id, p_gift: true })
