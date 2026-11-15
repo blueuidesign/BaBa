@@ -9,7 +9,7 @@ import { Header, Icon, Nav, useToast } from '../components/ui';
 
 export default function OrderSaved() {
   const { state } = useLocation() as { state: any };
-  const { catalog, bump } = useApp();
+  const { catalog, bump, canManage } = useApp();
   const nav = useNavigate();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -113,15 +113,19 @@ export default function OrderSaved() {
           ))}
           {err && <span className="err">{err}</span>}
           <div className="chips wrap">
-            <button className="chip" disabled={busy} onClick={undo}>
-              <Icon name="undo" size={16} sw={2.2} /> Hoàn tác đơn này
-            </button>
-            {!queued && !state.gift && (
+            {/* Đơn đã lên máy chủ: chỉ chủ cơ sở hủy hay chuyển thành tặng được. Đơn còn chờ gửi thì ai cũng bỏ được. */}
+            {(queued || canManage) && (
+              <button className="chip" disabled={busy} onClick={undo}>
+                <Icon name="undo" size={16} sw={2.2} /> Hoàn tác đơn này
+              </button>
+            )}
+            {!queued && !state.gift && canManage && (
               <button className="chip" disabled={busy} onClick={gift}>
                 <Icon name="gift" size={16} /> Đánh dấu tặng
               </button>
             )}
           </div>
+          {!queued && !canManage && <span className="xs muted">Ghi nhầm? Chỉ chủ cơ sở sửa hoặc hủy được đơn đã lưu. Báo chủ cơ sở kèm giờ ghi đơn.</span>}
         </section>
 
         {!queued && orderId && (

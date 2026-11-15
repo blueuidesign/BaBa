@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { useLoad } from '../lib/data';
@@ -9,7 +9,7 @@ import { Header, Icon, Loading, Nav, reasonDialog, useToast } from '../component
 /** Chi tiết một đơn (mở từ Các đơn trong ngày): món, tiền, khách, cách nhận tiền; hủy đơn bằng bản ghi đảo. */
 export default function OrderDetail() {
   const { id } = useParams();
-  const { outlet, catalog, bump } = useApp();
+  const { outlet, catalog, bump, canManage } = useApp();
   const nav = useNavigate();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -130,12 +130,21 @@ export default function OrderDetail() {
             )}
 
             {err && <span className="err">{err}</span>}
-            {active && (
-              <button className="btn secondary block" disabled={busy} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={cancel}>
-                <Icon name="trash" size={18} sw={2} /> Hủy đơn này…
-              </button>
+            {active && canManage && (
+              <div className="grid2">
+                <Link to={`/bao-cao/don/${o.id}/sua${fromHome ? '?from=home' : ''}`} className="btn secondary" style={{ textDecoration: 'none' }}>
+                  <Icon name="history" size={18} sw={2} /> Sửa đơn
+                </Link>
+                <button className="btn secondary" disabled={busy} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={cancel}>
+                  <Icon name="trash" size={18} sw={2} /> Hủy đơn…
+                </button>
+              </div>
             )}
-            {active && <p className="xs muted">Hủy được khi ngày đó chưa chốt. Chỉ người ghi đơn hoặc chủ cơ sở hủy được.</p>}
+            {active && (
+              <p className="xs muted">
+                {canManage ? 'Sửa và hủy được khi ngày đó chưa chốt. Mỗi lần sửa, hủy đều ghi vào Lịch sử sửa, hủy đơn trong Tài khoản.' : 'Chỉ chủ cơ sở sửa hoặc hủy được đơn. Cần sửa thì nhờ chủ cơ sở.'}
+              </p>
+            )}
           </>
         )}
       </main>
