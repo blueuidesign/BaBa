@@ -60,7 +60,7 @@ export const LINES: { id: string; name: string }[] = [
 export const GROUPS: { id: string; name: string }[] = [
   { id: 'main', name: 'Nguyên liệu chính' },
   { id: 'additive', name: 'Phụ gia' },
-  { id: 'made', name: 'Tự làm' },
+  { id: 'made', name: 'Bán thành phẩm' },
   { id: 'packaging', name: 'Bao bì' }
 ];
 

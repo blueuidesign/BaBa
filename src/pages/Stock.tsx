@@ -29,7 +29,7 @@ export function StockLine({ s, countOnly = false }: { s: StockRow; countOnly?: b
         <span>
           Còn {fq(s.qty_on_hand, s.unit)} · tối thiểu {fq(s.min_qty, s.unit)}
         </span>
-        <span>{s.kind === 'made' ? 'Tự làm' : `${s.supplier_name || 'Chưa gán NCC'} · ${s.lead_days ? `giao ${s.lead_days} ngày` : 'mua ngay được'}`}</span>
+        <span>{s.kind === 'made' ? 'Bán thành phẩm (tự nấu)' : `${s.supplier_name || 'Chưa gán NCC'} · ${s.lead_days ? `giao ${s.lead_days} ngày` : 'mua ngay được'}`}</span>
       </span>
     </Link>
   );
