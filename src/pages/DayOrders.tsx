@@ -40,7 +40,7 @@ export default function Invoices() {
   async function load(offset: number) {
     if (!outlet) return;
     let qy = supabase.from('orders')
-      .select('id,seq_in_day,business_date,placed_at,total_vnd,discount_vnd,is_gift,payment_method,customer_name,channel,order_lines(qty,product_id,container)')
+      .select('id,seq_in_day,business_date,placed_at,total_vnd,discount_vnd,is_gift,payment_method,customer_name,channel,order_lines(qty,product_id,container,discount_qty,discount_unit_vnd)')
       .eq('outlet_id', outlet.id).eq('status', 'active').lte('business_date', to)
       .order('business_date', { ascending: false }).order('placed_at', { ascending: false }).range(offset, offset + PAGE - 1);
     if (from) qy = qy.gte('business_date', from);
@@ -149,7 +149,12 @@ export default function Invoices() {
                       </span>
                       <span className="strong" style={{ fontSize: 16 }}>{o.customer_name || 'Khách lẻ'}</span>
                       {o.order_lines.map((l: any, i: number) => (
-                        <span key={i} className="ln"><span>{name(l.product_id)}{l.container === 'coc' ? ' · cốc giấy' : ''}</span><span className="num">× {l.qty}</span></span>
+                        <span key={i} style={{ display: 'contents' }}>
+                          <span className="ln"><span>{name(l.product_id)}{l.container === 'coc' ? ' · cốc giấy' : ''}</span><span className="num">× {l.qty}</span></span>
+                          {l.discount_qty > 0 && (
+                            <span className="line-disc" style={{ marginTop: -4 }}><span>Giảm 10% · {l.discount_qty} phần × {vnd(l.discount_unit_vnd)}</span><span>− {vnd(l.discount_qty * l.discount_unit_vnd)}</span></span>
+                          )}
+                        </span>
                       ))}
                       <span className="row" style={{ justifyContent: 'flex-end', gap: 8, alignItems: 'baseline' }}>
                         {o.discount_vnd > 0 && <span className="xs muted num">đã giảm {vnd(o.discount_vnd)}</span>}

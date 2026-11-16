@@ -431,3 +431,9 @@ select.input { appearance: auto; }
 .switch::after { content: ''; position: absolute; left: 2px; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
 .switch.on { background: var(--brand); } .switch.on::after { transform: translateX(18px); }
 .range { width: 100%; accent-color: var(--brand); }
+
+/* Danh sách phần được giảm trong sheet Giảm giá 10% */
+.disc-list { display: flex; flex-direction: column; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-100); }
+.disc-list > .row { padding: 8px 0; align-items: center; }
+.disc-list > .row + .row { border-top: 1px solid var(--border); }
+.line-disc { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--ink-brand); font-variant-numeric: tabular-nums; }
