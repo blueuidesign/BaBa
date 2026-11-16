@@ -26,6 +26,8 @@ export type ExpenseRow = {
   status: string;
   ingredient_id: string | null;
   qty: number | null;
+  period_from?: string | null;
+  period_to?: string | null;
   purchase_id: string | null;
   replaces_id: string | null;
   import_ref: string | null;
