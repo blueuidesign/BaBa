@@ -33,6 +33,7 @@ export default function Invoices() {
   const [rows, setRows] = useState<any[] | null>(null);
   const [more, setMore] = useState(false);
   const [days, setDays] = useState<Record<string, { orders: number; parts: number; revenue: number }>>({});
+  const [unpaid, setUnpaid] = useState<{ n: number; vnd: number } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [err, setErr] = useState<{ id: string; text: string } | null>(null);
 
@@ -52,6 +53,19 @@ export default function Invoices() {
       if (from) dq = dq.gte('business_date', from);
       const { data: ds } = await dq;
       setDays(Object.fromEntries(((ds || []) as any[]).map((x) => [x.business_date, { orders: x.orders_count, parts: x.bottles, revenue: x.revenue_vnd }])));
+      // Chưa nhận: đơn chưa đánh dấu nhận tiền và không phải đơn tặng, trong cùng khoảng ngày
+      let n = 0, v = 0;
+      for (let off = 0; ; off += 1000) {
+        let uq = supabase.from('orders').select('total_vnd').eq('outlet_id', outlet.id).eq('status', 'active').eq('is_gift', false)
+          .is('payment_method', null).gt('total_vnd', 0).lte('business_date', to).order('id').range(off, off + 999);
+        if (from) uq = uq.gte('business_date', from);
+        const { data: us } = await uq;
+        const got2 = (us || []) as any[];
+        n += got2.length;
+        v += got2.reduce((a, x) => a + x.total_vnd, 0);
+        if (got2.length < 1000) break;
+      }
+      setUnpaid({ n, vnd: v });
     }
   }
   useEffect(() => {
@@ -100,9 +114,17 @@ export default function Invoices() {
           </Empty>
         ) : (
           <>
-            <section className="card" style={{ gap: 2 }}>
-              <span className="small strong muted">{sum.orders} đơn · {sum.parts} phần</span>
-              <span style={{ fontSize: 26, fontWeight: 700 }} className="num">{vnd(sum.revenue)}</span>
+            <section className="card" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                <span className="small strong muted">{sum.orders} đơn · {sum.parts} phần</span>
+                <span style={{ fontSize: 26, fontWeight: 700 }} className="num">{vnd(sum.revenue)}</span>
+              </div>
+              {unpaid && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-end', textAlign: 'right' }}>
+                  <span className="small strong muted">{unpaid.n > 0 ? `Chưa nhận · ${unpaid.n} đơn` : 'Chưa nhận'}</span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: unpaid.vnd > 0 ? 'var(--warn)' : 'var(--ink-muted)' }} className="num">{vnd(unpaid.vnd)}</span>
+                </div>
+              )}
             </section>
             {rows.map((o: any) => {
               const head = o.business_date !== lastDay;
