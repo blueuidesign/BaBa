@@ -30,6 +30,9 @@ import Suppliers from './pages/Suppliers';
 import Members from './pages/Members';
 import AdminProducts from './pages/AdminProducts';
 import AdminOverview from './pages/AdminOverview';
+import ProfitByProduct from './pages/ProfitByProduct';
+import HourReport from './pages/HourReport';
+import OutletModel from './pages/OutletModel';
 
 export default function App() {
   const { session, loading, outlet, outlets } = useApp();
@@ -65,6 +68,9 @@ export default function App() {
       <Route path="/bao-cao/xuat" element={<Export />} />
       <Route path="/bao-cao/don" element={<DayOrders />} />
       <Route path="/bao-cao/hoi" element={<Assistant />} />
+      <Route path="/bao-cao/lai-gop" element={<ProfitByProduct />} />
+      <Route path="/bao-cao/theo-gio" element={<HourReport />} />
+      <Route path="/bao-cao/mo-hinh" element={<OutletModel />} />
       <Route path="/bao-cao/don/:id" element={<OrderDetail />} />
       <Route path="/bao-cao/don/:id/sua" element={<OrderEdit />} />
       <Route path="/lich-su-don" element={<OrderChanges />} />

@@ -5,6 +5,7 @@ import { fold, type ExpCat, type ExpenseRow } from '../lib/expenses';
 import { GROUP_COLOR, GROUP_NAME, GROUP_ORDER } from '../lib/reports';
 import type { Ingredient } from '../lib/app';
 import { num, timeHM, unitLabel, uuid, vnd, vnToday } from '../lib/format';
+import { addMonths } from '../lib/period';
 import { Icon, MoneyInput, NumberField, confirmDialog, reasonDialog } from './ui';
 
 /**
@@ -53,6 +54,10 @@ export default function ExpenseSheet({
   const [items, setItems] = useState<Item[]>([]);
   const [unitPrice, setUnitPrice] = useState('');
   // Hoa quả: nhập theo quả, app quy ra gam theo số gam mỗi quả (sửa được từng lần mua)
+  // Khoản vận hành trả một lần cho nhiều tháng (vd tiền thuê 3 tháng): báo cáo lãi chia đều cho từng tháng
+  const [multi, setMulti] = useState(!!existing?.period_from && existing.period_from !== existing.period_to);
+  const [pFrom, setPFrom] = useState((existing?.period_from || existing?.spent_on || vnToday()).slice(0, 7));
+  const [pTo, setPTo] = useState((existing?.period_to || addMonths((existing?.spent_on || vnToday()).slice(0, 7) + '-01', 2)).slice(0, 7));
   const [byPiece, setByPiece] = useState(false);
   const [pieceG, setPieceG] = useState('');
   // Số lượng × đơn giá = số tiền: nhập hai số, app tính số còn lại
@@ -116,6 +121,8 @@ export default function ExpenseSheet({
     if (stockMode && !ing) { setErr('Chọn món trong kho, hoặc bấm "Thêm món mới".'); return null; }
     const amt = Number(amount);
     if (!amt) { setErr('Nhập số tiền lớn hơn 0.'); return null; }
+    if (spanOn && !nMonths) { setErr('Chọn tháng bắt đầu và tháng kết thúc; tháng kết thúc không được trước tháng bắt đầu.'); return null; }
+    if (spanOn && nMonths > 36) { setErr('Một khoản chi chia tối đa 36 tháng.'); return null; }
     if (date > vnToday()) { setErr('Không ghi chi phí cho ngày chưa tới.'); return null; }
     if (!existing) {
       const { data: dup } = await supabase.rpc('fn_find_duplicate_expense', { p_outlet: outlet!.id, p_spent_on: date, p_category_id: finalCat.id, p_amount: amt });
@@ -150,6 +157,14 @@ export default function ExpenseSheet({
     ingredient_id: it.ing ? it.ing.id : null, qty: it.ing ? it.qty : null, amount_vnd: it.amount, spent_on: date
   });
   const currentEmpty = !Number(amount) && !ing && !name.trim();
+  const spanOn = multi && grp === 'van_hanh';
+  const nMonths = spanOn && pFrom && pTo && pTo >= pFrom ? (Number(pTo.slice(0, 4)) - Number(pFrom.slice(0, 4))) * 12 + Number(pTo.slice(5, 7)) - Number(pFrom.slice(5, 7)) + 1 : 0;
+  /** Ghi khoảng tháng cho khoản vừa lưu (theo client_id). Lỗi ở bước này không làm mất khoản chi. */
+  async function savePeriod(cid: string): Promise<string | null> {
+    if (!spanOn) return null;
+    const { error } = await supabase.rpc('fn_set_expense_period', { p_client: cid, p_from: `${pFrom}-01`, p_to: `${pTo}-01` });
+    return error ? errorText(error) : null;
+  }
 
   async function addMore() {
     const it = await buildCurrent();
@@ -166,7 +181,8 @@ export default function ExpenseSheet({
       const { data, error } = await supabase.rpc('fn_edit_expense', { p_id: existing.id, p: { ...payloadOf(it), client_id: clientId } });
       setBusy(false);
       if (error) return setErr(errorText(error));
-      return onDone(negMsg((data as any)?.negative_stock) || 'Đã sửa khoản chi');
+      const pe = await savePeriod(clientId);
+      return onDone(pe ? `Đã sửa khoản chi, nhưng chưa ghi được khoảng tháng: ${pe}` : negMsg((data as any)?.negative_stock) || 'Đã sửa khoản chi');
     }
     let list = items;
     if (!(items.length && currentEmpty)) {
@@ -187,7 +203,10 @@ export default function ExpenseSheet({
       }
       neg.push(...(((data as any)?.negative_stock as any[]) || []));
     }
+    const pe = list.length === 1 ? await savePeriod(list[0].clientId) : null;
     setBusy(false);
+    if (pe) return onDone(`Đã ghi khoản chi, nhưng chưa ghi được khoảng tháng: ${pe}`);
+    if (spanOn && list.length === 1) return onDone(`Đã ghi khoản chi · chia ${nMonths} tháng, mỗi tháng ${vnd(Math.round(list[0].amount / nMonths))}`);
     const stocked = list.filter((x) => x.ing).length;
     onDone(negMsg(neg) || (list.length > 1 ? `Đã ghi ${list.length} khoản chi · ${vnd(list.reduce((a, x) => a + x.amount, 0))}${stocked ? `, ${stocked} món cộng vào kho` : ''}`
       : list[0].ing ? `Đã ghi và cộng ${num(list[0].qty!, 2)} ${unitLabel(list[0].ing.purchase_unit)} ${list[0].ing.name} vào kho` : 'Đã ghi khoản chi'));
@@ -394,6 +413,36 @@ export default function ExpenseSheet({
                 <input type="date" value={date} max={vnToday()} onChange={(e) => setDate(e.target.value)} style={{ textAlign: 'left', fontSize: 16 }} />
               </span>
             </label>
+            {grp === 'van_hanh' && finalCat && (
+              <div className="field">
+                <span className="label small strong">Khoản này dùng cho</span>
+                <div className="seg" role="tablist" aria-label="Khoản này dùng cho">
+                  <button type="button" className={!multi ? 'on' : ''} onClick={() => setMulti(false)}>Chỉ tháng này</button>
+                  <button type="button" className={multi ? 'on' : ''} onClick={() => setMulti(true)}>Nhiều tháng</button>
+                </div>
+                {multi && (
+                  <>
+                    <div className="grid2">
+                      <label className="field">
+                        <span className="label small strong">Từ tháng</span>
+                        <span className="input-wrap"><input type="month" value={pFrom} onChange={(e) => setPFrom(e.target.value)} style={{ textAlign: 'left', fontSize: 16 }} /></span>
+                      </label>
+                      <label className="field">
+                        <span className="label small strong">Đến tháng</span>
+                        <span className="input-wrap"><input type="month" value={pTo} min={pFrom} onChange={(e) => setPTo(e.target.value)} style={{ textAlign: 'left', fontSize: 16 }} /></span>
+                      </label>
+                    </div>
+                    <div className="row small" style={{ gap: 8, padding: '8px 10px', background: 'var(--bg-brand-soft)', borderRadius: 'var(--radius-md)', alignItems: 'flex-start' }}>
+                      <Icon name="box" size={18} style={{ color: 'var(--ink-brand)', flexShrink: 0 }} />
+                      <span>
+                        {nMonths ? <><strong>{nMonths} tháng.</strong> {Number(amount) > 0 ? `Mỗi tháng tính ${vnd(Math.round(Number(amount) / nMonths))} vào chi phí vận hành.` : 'Nhập số tiền để xem mỗi tháng tính bao nhiêu.'}</> : 'Tháng kết thúc không được trước tháng bắt đầu.'}
+                      </span>
+                    </div>
+                    <span className="xs muted">Màn Chi phí vẫn hiện đủ số tiền vào ngày chi. Báo cáo lãi ròng chia đều cho từng tháng.</span>
+                  </>
+                )}
+              </div>
+            )}
             {existing && <p className="xs muted">Sửa không xóa khoản cũ. App hủy khoản cũ rồi ghi khoản mới, cả hai vẫn xem được trong Lịch sử.</p>}
           </>
         )}
