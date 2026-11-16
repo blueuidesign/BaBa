@@ -114,13 +114,14 @@ export default function Invoices() {
           </Empty>
         ) : (
           <>
-            <section className="card" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+            <section className="card" style={{ display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: 14 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
                 <span className="small strong muted">{sum.orders} đơn · {sum.parts} phần</span>
                 <span style={{ fontSize: 26, fontWeight: 700 }} className="num">{vnd(sum.revenue)}</span>
               </div>
+              {unpaid && <span aria-hidden style={{ width: 1, alignSelf: 'stretch', background: 'var(--border)' }} />}
               {unpaid && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-end', textAlign: 'right' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 2, flex: 1, minWidth: 0 }}>
                   <span className="small strong muted">{unpaid.n > 0 ? `Chưa nhận · ${unpaid.n} đơn` : 'Chưa nhận'}</span>
                   <span style={{ fontSize: 18, fontWeight: 700, color: unpaid.vnd > 0 ? 'var(--warn)' : 'var(--ink-muted)' }} className="num">{vnd(unpaid.vnd)}</span>
                 </div>
