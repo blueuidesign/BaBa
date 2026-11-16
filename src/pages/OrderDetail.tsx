@@ -18,7 +18,7 @@ export default function OrderDetail() {
   const { data: o, loading } = useLoad(
     async () => {
       const { data } = await supabase.from('orders')
-        .select('id,outlet_id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,is_gift,payment_method,customer_name,note,source,channel,order_lines(qty,product_id,container,unit_price_vnd,line_total_vnd)')
+        .select('id,outlet_id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,is_gift,payment_method,customer_name,note,source,channel,order_lines(qty,product_id,container,unit_price_vnd,discount_qty,discount_unit_vnd,line_total_vnd)')
         .eq('id', id).maybeSingle();
       return (data as any) || null;
     },
@@ -63,6 +63,7 @@ export default function OrderDetail() {
   const subtotal = o ? o.order_lines.reduce((a: number, l: any) => a + l.qty * l.unit_price_vnd, 0) : 0;
   const parts = o ? o.order_lines.reduce((a: number, l: any) => a + l.qty, 0) : 0;
   const active = o?.status === 'active';
+  const discParts = o ? o.order_lines.reduce((a: number, l: any) => a + (l.discount_qty || 0), 0) : 0;
 
   return (
     <div className="screen">
@@ -94,14 +95,18 @@ export default function OrderDetail() {
                   <span className="grow">
                     <span className="strong">{l.qty} × {name(l.product_id)}{l.container === 'coc' ? ' · cốc giấy' : ''}</span>
                     <span className="xs muted" style={{ display: 'block' }}>{vnd(l.unit_price_vnd)} mỗi phần</span>
+                    {l.discount_qty > 0 && <span className="xs strong" style={{ display: 'block', color: 'var(--ink-brand)' }}>Giảm 10% · {l.discount_qty} phần × {vnd(l.discount_unit_vnd)}</span>}
                   </span>
-                  <span className="num strong">{vnd(l.qty * l.unit_price_vnd)}</span>
+                  <span className="num" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <span className="strong" style={{ display: 'block' }}>{vnd(l.qty * l.unit_price_vnd)}</span>
+                    {l.discount_qty > 0 && <span className="xs strong" style={{ color: 'var(--ink-brand)' }}>− {vnd(l.discount_qty * l.discount_unit_vnd)}</span>}
+                  </span>
                 </div>
               ))}
               {o.discount_vnd > 0 && (
                 <>
                   <div className="row between small" style={{ padding: '8px 0 0' }}><span>Tạm tính</span><span className="num">{vnd(subtotal)}</span></div>
-                  <div className="row between small"><span>Giảm giá{o.discount_reason ? ` (${o.discount_reason})` : ''}</span><span className="num">− {vnd(o.discount_vnd)}</span></div>
+                  <div className="row between small"><span>{discParts > 0 ? `Giảm 10% cho ${discParts} phần` : 'Giảm giá'}{o.discount_reason ? ` (${o.discount_reason})` : ''}</span><span className="num">− {vnd(o.discount_vnd)}</span></div>
                 </>
               )}
               <div className="row between" style={{ padding: '10px 0 12px' }}><span className="strong">Tổng tiền</span><span className="num strong">{vnd(o.total_vnd)}</span></div>

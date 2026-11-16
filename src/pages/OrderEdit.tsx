@@ -4,7 +4,8 @@ import { useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { useLoad } from '../lib/data';
 import { timeHM, vnd } from '../lib/format';
-import { Header, Icon, Loading, MoneyInput, Nav, useToast } from '../components/ui';
+import { Header, Icon, Loading, Nav, useToast } from '../components/ui';
+import { allocate, discPayload, discTotal, unitDisc, type Disc } from '../lib/discount';
 
 type Line = { pid: string; container: 'chai' | 'coc'; qty: number };
 
@@ -17,12 +18,14 @@ export default function OrderEdit() {
   const from = new URLSearchParams(useLocation().search).get('from') === 'home' ? '?from=home' : '';
   const { data: o, loading } = useLoad(async () => {
     const { data } = await supabase.from('orders')
-      .select('id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,is_gift,payment_method,customer_name,order_lines(qty,product_id,container)')
+      .select('id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,is_gift,payment_method,customer_name,order_lines(qty,product_id,container,discount_qty)')
       .eq('id', id).maybeSingle();
     return (data as any) || null;
   }, [id]);
   const [lines, setLines] = useState<Line[]>([]);
-  const [disc, setDisc] = useState('');
+  // 'old' = đơn đang giảm một số tiền theo cách cũ (trước 16/11): giữ nguyên số đó cho tới khi chọn lại
+  const [dMode, setDMode] = useState<'none' | 'all' | 'some' | 'old'>('none');
+  const [dN, setDN] = useState(1);
   const [discWhy, setDiscWhy] = useState('');
   const [why, setWhy] = useState('');
   const [pay, setPay] = useState<'cash' | 'transfer' | 'gift' | null>(null);
@@ -34,7 +37,10 @@ export default function OrderEdit() {
   useEffect(() => {
     if (!o) return;
     setLines(o.order_lines.map((l: any) => ({ pid: l.product_id, container: l.container === 'coc' ? 'coc' : 'chai', qty: l.qty })));
-    setDisc(o.discount_vnd ? String(o.discount_vnd) : '');
+    const dq = o.order_lines.reduce((a: number, l: any) => a + (l.discount_qty || 0), 0);
+    const all = o.order_lines.reduce((a: number, l: any) => a + l.qty, 0);
+    setDMode(!o.discount_vnd ? 'none' : !dq ? 'old' : dq >= all ? 'all' : 'some');
+    setDN(dq && dq < all ? dq : 1);
     setDiscWhy(o.discount_reason || '');
     setPay(o.is_gift ? 'gift' : o.payment_method || null);
     setCust(o.customer_name || '');
@@ -46,9 +52,15 @@ export default function OrderEdit() {
   const kept = lines.filter((l) => l.qty > 0);
   const isGift = pay === 'gift';
   const gross = isGift ? 0 : kept.reduce((s, l) => s + l.qty * (prod(l.pid)?.price || 0), 0);
-  const discN = isGift ? 0 : Number(disc) || 0;
-  const total = gross - discN;
   const parts = kept.reduce((s, l) => s + l.qty, 0);
+  const someN = Math.max(1, Math.min(dN, parts));
+  const dSel: Disc = isGift || dMode === 'none' || dMode === 'old' ? null : { parts: dMode === 'all' ? null : someN };
+  const dLines = lines.map((l) => ({ price: prod(l.pid)?.price || 0, qty: l.qty }));
+  const ks = allocate(dLines, dSel);
+  const oldDisc = !isGift && dMode === 'old' ? o?.discount_vnd || 0 : 0;
+  const discN = dSel ? discTotal(dLines, ks) : oldDisc;
+  const discParts = ks.reduce((a, b) => a + b, 0);
+  const total = gross - discN;
 
   function step(i: number, d: number) {
     setErr(null);
@@ -70,7 +82,8 @@ export default function OrderEdit() {
     setBusy(true);
     const { data, error } = await supabase.rpc('fn_edit_order', {
       p_order: id,
-      p: { lines: kept.map((l) => ({ product_id: l.pid, qty: l.qty, container: l.container })), discount_vnd: discN, discount_reason: discN > 0 ? discWhy.trim() || null : null,
+      p: { lines: kept.map((l) => ({ product_id: l.pid, qty: l.qty, container: l.container })),
+           ...(dSel ? { discount_vnd: 0, ...discPayload(dSel, parts, discWhy) } : { discount_vnd: discN, discount_reason: discN > 0 ? discWhy.trim() || null : null }),
            is_gift: isGift, payment_method: isGift ? '' : pay || '', customer_name: cust.trim() },
       p_reason: why.trim() || null
     });
@@ -103,6 +116,7 @@ export default function OrderEdit() {
                   <span className="grow">
                     <span className="strong">{prod(l.pid)?.name || 'Món đã bỏ'}{l.container === 'coc' ? ' · cốc giấy' : ''}</span>
                     <span className="xs muted" style={{ display: 'block' }}>{l.qty ? `${vnd(prod(l.pid)?.price || 0)} mỗi phần` : 'Sẽ bỏ khỏi đơn'}</span>
+                    {ks[i] > 0 && <span className="xs strong" style={{ display: 'block', color: 'var(--ink-brand)' }}>Giảm 10% · {ks[i]} phần × {vnd(unitDisc(prod(l.pid)?.price || 0))}</span>}
                   </span>
                   <button type="button" className="icon-btn" aria-label="Bớt một" disabled={l.qty === 0} onClick={() => step(i, -1)}><Icon name="minus" size={18} sw={2.4} /></button>
                   <span className="num strong" style={{ minWidth: 28, textAlign: 'center' }}>{l.qty}</span>
@@ -138,11 +152,44 @@ export default function OrderEdit() {
 
             {!isGift && (
               <section className="card">
-                <div className="h2">Giảm giá</div>
-                <MoneyInput value={disc} onChange={setDisc} label="Số tiền giảm" placeholder="0" />
-                {discN > 0 && (
-                  <label className="input-wrap"><input value={discWhy} onChange={(e) => setDiscWhy(e.target.value)} placeholder="Lý do giảm (không bắt buộc)" aria-label="Lý do giảm giá" maxLength={80} /></label>
+                <div className="h2">Giảm giá 10%</div>
+                {dMode === 'old' && (
+                  <div className="alert warn small">
+                    Đơn này đang giảm {vnd(oldDisc)} theo cách cũ (một số tiền ở tổng đơn). Không chọn gì thì giữ nguyên số đó. Chọn một nút bên dưới thì app tính lại theo 10%.
+                  </div>
                 )}
+                <div className="seg3" role="radiogroup" aria-label="Giảm giá">
+                  {([['none', 'Không giảm'], ['all', 'Cả đơn'], ['some', 'Một số']] as ['none' | 'all' | 'some', string][]).map(([k, l]) => (
+                    <button key={k} type="button" role="radio" aria-checked={dMode === k} className={dMode === k ? 'on' : ''} style={{ fontSize: 14 }} onClick={() => setDMode(k)}>
+                      {dMode === k && <Icon name="check" size={16} sw={2.6} />}{l}
+                    </button>
+                  ))}
+                </div>
+                {dMode === 'some' && (
+                  <div className="row" style={{ gap: 12 }}>
+                    <span className="grow">
+                      <span className="strong" style={{ display: 'block' }}>Số phần được giảm</span>
+                      <span className="xs muted">Đơn có {parts} phần · giảm phần giá cao nhất trước</span>
+                    </span>
+                    <span className="stepper">
+                      <button type="button" aria-label="Bớt một phần" disabled={someN <= 1} onClick={() => setDN(someN - 1)}><Icon name="minus" size={20} sw={2.4} /></button>
+                      <span className="val" aria-live="polite">{someN}</span>
+                      <button type="button" className="plus" aria-label="Thêm một phần" disabled={someN >= parts} onClick={() => setDN(someN + 1)}><Icon name="plus" size={20} sw={2.4} /></button>
+                    </span>
+                  </div>
+                )}
+                {discN > 0 && (
+                  <>
+                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                      <div className="row between small"><span>Tạm tính</span><span className="num">{vnd(gross)}</span></div>
+                      <div className="row between small" style={{ color: 'var(--ink-brand)' }}>
+                        <span>{dSel ? `Giảm 10% cho ${discParts} phần` : 'Giảm theo cách cũ'}</span><span className="num">− {vnd(discN)}</span>
+                      </div>
+                    </div>
+                    <label className="input-wrap"><input value={discWhy} onChange={(e) => setDiscWhy(e.target.value)} placeholder="Lý do giảm (không bắt buộc)" aria-label="Lý do giảm giá" maxLength={80} /></label>
+                  </>
+                )}
+                {dSel && <span className="xs muted">Đổi số lượng món ở trên thì app tự chọn lại phần được giảm.</span>}
               </section>
             )}
 
