@@ -94,7 +94,7 @@ export default function StockItem() {
 
   return (
     <div className="screen">
-      <Header title={s.name} back="/kho" sub={`${s.kind === 'made' ? 'Tự làm' : 'Mua vào'} · đơn vị ${unitLabel(s.unit)}`} />
+      <Header title={s.name} back="/kho" sub={`${s.kind === 'made' ? 'Bán thành phẩm (tự nấu)' : 'Mua vào'} · đơn vị ${unitLabel(s.unit)}`} />
       <main className="main">
         <section className="card">
           <div className="grid3" style={{ textAlign: 'center' }}>
