@@ -43,7 +43,11 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
   const { outlet, canManage, bump, dataVersion } = useApp();
   const nav = useNavigate();
   const toast = useToast();
-  const [range, setRange] = useState<Range>('month');
+  const [range, setRange] = useState<Range>(canManage ? 'month' : 'week');
+  // Quyền có thể tải xong sau lần vẽ đầu: chủ cơ sở mặc định Tháng, nhân viên mặc định Tuần và không được ở Tháng, Toàn bộ
+  useEffect(() => {
+    setRange((r) => (canManage ? (r === 'week' ? 'month' : r) : r === 'month' || r === 'all' ? 'week' : r));
+  }, [canManage]);
   const [off, setOff] = useState(0);
   const [group, setGroup] = useState<string | null>(null); // bấm nhóm trên biểu đồ: xem theo loại
   const [listGroup, setListGroup] = useState<string | null>(null); // chip trong Lịch sử chi: chỉ lọc danh sách
@@ -146,14 +150,13 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
         }
       />
       <main className="main">
-        {/* Nhân viên: Ngày, Tuần, Tháng (lùi được về các kỳ trước); Toàn bộ chỉ chủ cơ sở */}
-        <div className="chips fit4" style={canManage ? undefined : { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+        {/* Nhân viên: Ngày, Tuần (lùi được về các kỳ trước); Tháng và Toàn bộ chỉ chủ cơ sở (Tùng 17/11) */}
+        <div className="chips fit4" style={canManage ? undefined : { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
           {(
             [
               ['day', 'Ngày'],
               ['week', 'Tuần'],
-              ['month', 'Tháng'],
-              ...(canManage ? [['all', 'Toàn bộ']] : [])
+              ...(canManage ? [['month', 'Tháng'], ['all', 'Toàn bộ']] : [])
             ] as [Range, string][]
           ).map(([k, l]) => (
             <button key={k} className={`chip ${range === k ? 'on' : ''}`} onClick={() => { setRange(k); setCust(null); setOff(0); setShowAll(false); }}>
