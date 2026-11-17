@@ -67,20 +67,12 @@ export default function Home() {
 
   if (!outlet) return null;
   const nameOf = (pid: string) => catalog?.allProducts.find((p) => p.id === pid)?.short_name || '';
-  const initial = (profile?.full_name || profile?.email || '?').trim()[0]?.toUpperCase();
 
   const header = (
     <Header
       title={outlet.name}
       sub={weekdayLabel(today)}
-      right={
-        <>
-          <BellLink />
-          <Link to="/tai-khoan" className="avatar" aria-label="Tài khoản">
-            {initial}
-          </Link>
-        </>
-      }
+      right={<BellLink />}
     />
   );
 
