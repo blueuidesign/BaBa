@@ -146,13 +146,14 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
         }
       />
       <main className="main">
-        <div className="chips fit4">
+        {/* Nhân viên: Ngày, Tuần, Tháng (lùi được về các kỳ trước); Toàn bộ chỉ chủ cơ sở */}
+        <div className="chips fit4" style={canManage ? undefined : { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
           {(
             [
               ['day', 'Ngày'],
               ['week', 'Tuần'],
               ['month', 'Tháng'],
-              ['all', 'Toàn bộ']
+              ...(canManage ? [['all', 'Toàn bộ']] : [])
             ] as [Range, string][]
           ).map(([k, l]) => (
             <button key={k} className={`chip ${range === k ? 'on' : ''}`} onClick={() => { setRange(k); setCust(null); setOff(0); setShowAll(false); }}>
