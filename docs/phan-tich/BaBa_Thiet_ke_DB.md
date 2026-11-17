@@ -1,6 +1,10 @@
 # Thiết kế cơ sở dữ liệu · Kho BaBa bản 1
 
-Phiên bản 1.2 · 09/11/2026 (đã đối chiếu với thiết kế màn hình và user story) · PostgreSQL trên Supabase (project `BaBa`, vùng ap-southeast-1)
+Phiên bản 1.4 · 17/11/2026 · PostgreSQL 17 trên Supabase (project `BaBa`, vùng ap-southeast-1) · khớp migration `0001`–`0062`
+
+> **Đọc trước:** các mục 1–8 là thiết kế gốc (bản 1.2, 09/11/2026) và được giữ nguyên để biết lý do ban đầu. Từ đó tới nay đã có 53 migration nữa.
+> Những chỗ thiết kế gốc **không còn đúng** được liệt kê ở mục 9.1; mọi bảng, cột, hàm thêm sau nằm ở mục 9.2–9.6.
+> Khi mục 9 mâu thuẫn với mục 1–8 thì mục 9 đúng. Chi phí (migration 0013, 0017, 0022) có tài liệu riêng: `BaBa_Chi_phi_DB1.3_US1.2.md`.
 
 Tài liệu này mô tả các bảng cần cho bản 1 theo đúng 28 màn hình đã thiết kế, và cách mỗi bảng được chuẩn bị sẵn cho các tính năng bản sau (phí 1.000 đ/chai, đối tác, nhà sáng lập xem toàn mạng lưới). Phần cuối là thứ tự tạo bảng và dữ liệu nạp sẵn.
 
@@ -537,3 +541,172 @@ Những thứ **cố ý chưa làm** vì chưa có nhu cầu và thêm sau khôn
 7. `0007_policies`: RLS cho toàn bộ bảng.
 8. `0008_jobs`: pg_cron, audit trigger.
 9. `0009_seed`: dữ liệu danh mục và cơ sở mẫu.
+
+---
+
+## 9. Thay đổi sau bản 1.2 (migration 0010–0062)
+
+Cấu trúc mô tả ở mục này đã được đối chiếu tự động với database production ngày 17/11/2026: dựng database trống từ 62 migration rồi so cột, ràng buộc, index, policy, trigger và nội dung hàm. Kết quả khớp (xem `tests/README.md`).
+
+### 9.1 Những chỗ thiết kế gốc không còn đúng
+
+| Mục gốc | Thiết kế gốc nói | Hiện nay | Từ migration |
+| --- | --- | --- | --- |
+| 3.4, 3.5 | Lưu đơn không trừ vật tư; nguyên liệu và bao bì trừ lúc ghi nấu | **Trừ lúc bán.** Mỗi đơn (kể cả đơn tặng) trừ nguyên liệu theo công thức, syrup và bao bì ngay khi lưu. Không còn ghi nấu; màn Nấu chỉ là tiện ích tính nguyên liệu, không trừ kho | 0057 |
+| 3.2 | Bao bì theo `packaging_rules`, `consume_at = 'cook'` | Bao bì trừ lúc bán do hàm `_parts_stock_need` và `_apply_sale_stock` quyết định (xem 9.4). `packaging_rules` còn trong database nhưng không còn dòng nào có hiệu lực với luồng bán | 0057, 0060, 0061 |
+| 3.7 | Tồn chai thành phẩm tính từ mẻ nấu trừ đơn | Không còn theo dõi tồn chai trên quầy. `fn_bottles_on_hand` còn đó nhưng app không dùng để chặn bán | 0057 |
+| 3.8 | Đối chiếu cuối ngày (`day_closes`): đếm chai, tính chai "chưa rõ", **khóa ngày** | Thay bằng **Ghi cuối ngày** (`day_ends`): chỉ ghi chai hủy, chai tồn, kiểm tiền (tùy chọn). Không bắt buộc, **không khóa ngày**, sửa và hoàn tác được. Bảng `day_closes` giữ lại cho dữ liệu trước 17/11 | 0057, 0058 |
+| 3.4 | `payment_method` null ở bản 1 | Đã dùng: `cash`, `transfer` hoặc null (chưa ghi). Thêm `customer_name` | 0031, 0041 |
+| 3.2 | `sweetness_levels` 0/10/20 ml, chưa dùng | Vẫn chưa dùng. Ghi chú đường nằm ở `order_lines.sugar`: null = đường thường (`products.cost_syrup_ml`, 30 hoặc 40 ml), `'less'` = ít đường 20 ml | 0056 |
+| 5 | `job_day_close_reminder` nhắc cơ sở chưa chốt ngày | Nhắc cơ sở có đơn hôm nay mà chưa ghi cuối ngày; tiêu đề "Chưa ghi cuối ngày", mở `/cuoi-ngay` | 0058 |
+| 4.2 | Policy mẫu dùng `outlet_id in (select my_outlets())` | Policy thực tế gọi `can_access_outlet(outlet_id)` cho từng dòng. Đúng về quyền nhưng chậm khi bảng lớn (xem 9.7) | 0007 |
+| 3.9 | `push_subscriptions` chỉ lưu, chưa gửi | Đã gửi thông báo đẩy qua Edge Function `send-push` | 0015, 0016 |
+| 8 | 9 migration | 62 migration; danh sách ở 9.6 | |
+
+### 9.2 Bảng mới
+
+**`day_ends`** — ghi cuối ngày. Mỗi (cơ sở, ngày) chỉ có một bản `active` (unique index riêng phần).
+
+| Cột | Kiểu | Ghi chú |
+| --- | --- | --- |
+| id, outlet_id | uuid | |
+| client_id | uuid UNIQUE | chống trùng khi gửi lại |
+| business_date | date | nhân viên chỉ ghi được hôm nay; chủ cơ sở ghi được ngày đã qua |
+| status | text | `active`, `reversed` (đã hoàn tác hoặc đã bị bản sửa thay thế) |
+| left_total, waste_total | int | tổng chai tồn, tổng chai hủy (cộng từ dòng) |
+| cash_counted_vnd | int | **tổng tiền mặt trong hộp** lúc đếm, gồm cả tiền đầu ngày. null = không kiểm |
+| transfer_counted_vnd | int | chuyển khoản nhận được. null = không kiểm |
+| cash_open_vnd | int | tiền đầu ngày của hôm đó, chụp lúc lưu |
+| expected_cash_vnd, expected_transfer_vnd | int | tổng đơn không tặng theo cách nhận tiền, chụp lúc lưu |
+| money_note | text | ghi chú khi lệch |
+| created_by, created_at, reversed_by, reversed_at | | |
+
+Tiền lệch = `cash_counted − cash_open + transfer_counted − expected_cash − expected_transfer`. Hôm sau app điền sẵn `cash_counted_vnd` vào ô Tiền đầu ngày, người dùng phải bấm Lưu mới ghi.
+
+**`day_end_lines`** — `(day_end_id, product_id, left_qty, waste_qty)`. Chai hủy trừ kho như một chai đã bán (nguyên liệu, syrup, bao bì chai; không trừ túi), `stock_movements.reason = 'waste'`, `ref_table = 'day_ends'`. Chai tồn không trừ kho, chỉ để thống kê.
+
+**`ingredient_std_costs`** — đơn giá chuẩn của nguyên liệu để tính giá vốn: `(org_id, ingredient_id, cost_per_unit, valid_from, note)`. Có phiên bản theo `valid_from`; lấy dòng mới nhất có `valid_from ≤ ngày bán`.
+
+**`container_std_costs`** — giá bao bì cho một phần: `(org_id, container, cost_vnd, breakdown jsonb, valid_from, note)`, `container` là `chai` hoặc `coc`. Hiện tại: chai 3.527 đ (từ 17/11, gồm túi 350 đ; trước đó 3.177 đ), cốc 2.299 đ.
+
+**`cash_opens`** — tiền đầu ngày: `(outlet_id, client_id, business_date, amount_vnd)`. Nối thêm; dòng mới nhất trong ngày là số hiệu lực.
+
+**`day_close_wastes`** — `(day_close_id, product_id, qty)`: chai hủy theo món của kiểu đối chiếu cũ (0032).
+
+**`day_unlocks`** — mở khóa một ngày đã chốt theo kiểu cũ (0013).
+
+**`expense_categories`, `expenses`, `historical_entries`** — chi phí và số liệu tháng cũ. Xem `BaBa_Chi_phi_DB1.3_US1.2.md`. Thêm sau tài liệu đó: `expenses.period_from`, `period_to` (khoản vận hành chia đều nhiều tháng, 0053).
+
+**`backup_tokens`** — mã băm của token cho hàm `fn_backup_export` (0025). Cách sao lưu này đã được thay bằng `pg_dump` chạy trên GitHub Actions (`.github/workflows/backup.yml`); bảng và hàm còn đó nhưng không dùng.
+
+### 9.3 Cột mới trên bảng cũ
+
+| Bảng | Cột | Ý nghĩa | Từ |
+| --- | --- | --- | --- |
+| `orders` | `customer_name` | tên khách gõ tay, tối đa 80 ký tự; "Khách lẻ" hoặc trống = khách vãng lai | 0031 |
+| `orders` | `discount_vnd`, `discount_reason` | tổng tiền giảm của đơn và lý do | 0017, 0021 |
+| `orders` | `source`, `import_ref` | `import` cho đơn nhập từ Knote | 0017 |
+| `orders` | `status` có thêm giá trị `reversal` | bản ghi đảo của một đơn đã hủy hoặc đã sửa (mục 3.4 gốc chỉ ghi `active`, `reversed`) | 0004 |
+| `order_lines` | `container` | `chai` (mặc định) hoặc `coc` | 0035 |
+| `order_lines` | `sugar` | null hoặc `'less'` (ít đường, 20 ml syrup) | 0056 |
+| `order_lines` | `discount_qty`, `discount_unit_vnd` | số phần của dòng được giảm và tiền giảm mỗi phần. `line_total_vnd` vẫn là tiền trước giảm | 0054 |
+| `order_lines` | `unit_cost_vnd` | giá vốn chuẩn một phần, trigger `trg_order_line_cost` chụp lúc ghi đơn | 0051 |
+| `products` | `cost_syrup_ml` | số ml syrup của một phần đường thường (30; Matcha, Cacao 40) | 0051 |
+| `ingredients` | `piece_g` | số gam một quả, để nhập hoa quả theo quả | 0031 |
+| `outlets.settings` | `deduct_on_sale` | cờ tính năng trừ kho lúc bán, mặc định `true` | 0057 |
+| `outlets.settings` | `depr_start`, `depr_months` | tháng bắt đầu và số tháng khấu hao thiết bị | 0053 |
+| `stock_movements` | `reason` có thêm `reversal` | dòng đảo khi hủy đơn, hoàn tác ghi cuối ngày (mục 3.6 gốc chưa liệt kê) | 0004 |
+
+Một ngoại lệ có chủ ý của nguyên tắc sổ cái nối thêm: `fn_set_order_gift` và `fn_set_order_info` **sửa thẳng** đơn cũ (đánh dấu tặng, ghi cách nhận tiền, tên khách) để số thứ tự đơn không đổi; thay đổi được ghi vào `audit_log` (0041).
+
+### 9.4 Trừ kho lúc bán
+
+`fn_post_order` gọi `_apply_sale_stock(order_id)` khi `outlet_deduct_on_sale(outlet)` là true. Mọi dòng trừ có `reason = 'sale_packaging'`, `ref_table = 'orders'`, nên `_reverse_order_core` đảo được hết khi hủy hoặc sửa đơn.
+
+| Thành phần | Quy tắc | Hàm |
+| --- | --- | --- |
+| Nguyên liệu | `recipe_items.qty × số phần`, theo `order_lines.recipe_id` | `_parts_stock_need` |
+| Syrup | `products.cost_syrup_ml × số phần`; ít đường thì tối đa 20 ml mỗi phần | `_parts_stock_need` |
+| Bao bì chai | mỗi phần: 1 `chai_330`, 1 `nhan`, 1 `card`, 1 `day_gai` | `_parts_stock_need` |
+| Bao bì cốc | mỗi phần: 1 `ly_giay` (nắp đi kèm), 1 `ong_hut`, 1 `nhan`, 1 `giay_chong_tran` (lót ly) | `_parts_stock_need` |
+| Túi | theo tổng số phần n của cả đơn, chai lẫn cốc: `n / 2` túi 2 ly (`tui_2`, phần nguyên) và thêm 1 túi 1 ly (`tui`) nếu n lẻ | `_apply_sale_stock` |
+
+Tồn kho được phép âm: số âm nghĩa là thiếu số nhập hoặc số kiểm kê, không chặn bán.
+
+### 9.5 Hàm hiện có (bổ sung cho mục 5)
+
+| Hàm | Ai gọi được | Việc |
+| --- | --- | --- |
+| `fn_post_order(p)` | thành viên cơ sở | Ghi đơn. Nhận thêm: `customer_name`, `payment_method`, `discount_pct` (5 hoặc 10), `discount_parts` (null = cả đơn; N = N phần giá cao nhất, cùng giá thì dòng trước được trước), `discount_reason`, `is_gift`; mỗi dòng nhận `container`, `sugar`. Dòng có số lượng ≤ 0 bị bỏ qua |
+| `fn_edit_order(order, p, reason)` | chủ cơ sở, admin | Sửa đơn = đảo đơn cũ + ghi đơn mới, giữ giờ bán |
+| `fn_reverse_order(order, reason)` | chủ cơ sở, admin mọi lúc; nhân viên chỉ đơn do mình ghi trong 10 phút | Hủy đơn, đảo kho |
+| `fn_set_order_info`, `fn_set_order_gift` | thành viên cơ sở; đổi cách nhận tiền đã ghi và một số trường hợp đánh dấu tặng thì chỉ chủ cơ sở (chi tiết trong 0041) | Ghi cách nhận tiền, tên khách, đánh dấu tặng (sửa thẳng, có audit) |
+| `fn_post_day_end(p)` | thành viên; nhân viên chỉ hôm nay | Ghi cuối ngày, trừ kho chai hủy |
+| `fn_edit_day_end(id, p)` | như trên | Đảo bản cũ và ghi bản mới trong một giao dịch |
+| `fn_reverse_day_end(id)` | như trên | Hoàn tác, cộng lại kho |
+| `fn_set_cash_open(p)` | thành viên | Ghi tiền đầu ngày |
+| `fn_post_expense_v2`, `fn_find_duplicate_expense`, `fn_set_expense_period` | thành viên (nhân viên thêm được, 0055) | Ghi khoản chi |
+| `fn_edit_expense`, `fn_reverse_expense`, `fn_create_ingredient` | chủ cơ sở, admin | Sửa, hủy khoản chi; thêm vật tư mới |
+| `fn_unit_cost_sugar(product, container, date, sugar)`, `fn_unit_cost`, `fn_unit_cost_detail` | không mở cho app gọi trực tiếp | Giá vốn chuẩn một phần = nguyên liệu + syrup + bao bì |
+| `fn_profit_report(outlet, from, to)`, `fn_net_report(outlet, from, to)` | chủ cơ sở, admin | Lãi gộp và lãi ròng; chai hủy lấy từ cả `day_closes` lẫn `day_ends` |
+| `fn_admin_save_product(p)` | admin | Thêm, sửa món; giá có phiên bản |
+| `fn_post_cook_run`, `fn_reverse_cook_run`, `fn_close_day`, `fn_unlock_day`, `fn_set_close_wastes` | còn trong database | Luồng Nấu và Đối chiếu cũ. Từ 17/11 các màn gọi chúng không còn đường vào (`/doi-chieu` trỏ sang Ghi cuối ngày, nút "Ghi đã nấu" đã bỏ); code gọi còn sót trong `DayClose.tsx`, `Ingredients.tsx`, `CookPlan.tsx`. Ứng viên dọn bỏ |
+| `fn_post_batch` | thành viên | Ghi mẻ syrup (màn Mẻ syrup vẫn dùng): trừ nguyên liệu mẻ, cộng syrup |
+| `fn_job_morning_alerts`, `fn_job_day_close_reminder` | chỉ pg_cron | Nhắc 06:00 và 21:00 (lịch lưu theo giờ UTC: `0 23 * * *` và `0 14 * * *`) |
+
+View hiện có: `v_activity` (thêm bản ghi cuối ngày và dòng hoàn tác, 0059), `v_daily_sales`, `v_sales_by_product`, `v_daily_payments`, `v_stock_balance`, `v_stock_status`, `v_order_changes`, `v_daily_expenses`, `v_daily_expenses_by_group`, `v_monthly_expenses`, `v_daily_pnl`, `v_daily_pnl_groups`, `v_monthly_pnl`. Tất cả dùng `security_invoker = true`.
+
+Edge Function: `send-push` (thông báo đẩy), `tro-ly` (trợ lý hỏi đáp trong Báo cáo).
+
+### 9.6 Danh sách migration 0010–0062
+
+| Số | Nội dung |
+| --- | --- |
+| 0010 | Định dạng số kiểu Việt Nam trong lịch sử |
+| 0011 | Siết bảo mật theo cảnh báo của Supabase advisor |
+| 0012 | Thực đơn 9 món theo biên bản 11/11 |
+| 0013 | Chi phí, số liệu tháng cũ, tiền đầu ngày, mở khóa ngày |
+| 0014 | Hai món mới, giá theo dòng, bỏ cốt cold brew |
+| 0015–0016 | Thông báo đẩy và khóa tự sinh |
+| 0017 | Chi phí theo 4 nhóm, cột cho dữ liệu nhập |
+| 0018 | 8 vật tư mới |
+| 0019–0020 | Nhập chi phí cũ (Excel, Knote) và doanh thu cũ (Knote) cho Phan Văn Hớn |
+| 0021 | Giảm giá khi ghi đơn |
+| 0022–0023 | RPC chi phí; thêm vật tư mới ngay khi ghi chi phí |
+| 0024 | Thêm admin thứ ba |
+| 0025 | Xuất dữ liệu ra JSON để sao lưu (đã thay bằng GitHub Actions) |
+| 0026 | Dọn dữ liệu demo 13/11 |
+| 0027–0028 | Bán lại 5 món cũ; sửa tên "Hồng Hào" |
+| 0029–0030, 0036 | Nhập đơn Knote 13/11 và 14/11 |
+| 0031 | Cách nhận tiền, tên khách; hoa quả nhập theo quả |
+| 0032 | Chai hủy theo món khi đối chiếu |
+| 0033 | Admin quản lý món trong app |
+| 0034 | Sửa công thức 7 món theo bảng 13/11 |
+| 0035 | Bán bằng cốc giấy (`order_lines.container`) |
+| 0037, 0039 | Món "Đậu đỏ, óc chó, điều" 30.000 đ (chưa có công thức) |
+| 0038, 0040 | Sửa đơn; quyền hủy đơn; lịch sử sửa, hủy |
+| 0041 | Ghi đơn hai bước, màn Hóa đơn |
+| 0042–0050 | Kiểm kê kho 15–16/11, mốc tồn, công thức syrup mới |
+| 0051–0052 | Giá vốn chuẩn và nhập đơn giá |
+| 0053 | Báo cáo lãi gộp, lãi ròng, khấu hao |
+| 0054 | Giảm giá 10% theo phần |
+| 0055 | Nhân viên xem và thêm chi phí |
+| 0056 | Ít đường; giảm 5% hoặc 10% |
+| 0057 | Trừ kho lúc bán; Ghi cuối ngày |
+| 0058 | Sửa ghi cuối ngày; quyền theo ngày; đổi nhắc 21:00 |
+| 0059 | Ghi cuối ngày vào Lịch sử bản ghi |
+| 0060–0061 | Bao bì cốc (lót ly), túi 1 ly và 2 ly dùng chung cho chai và cốc, giá túi |
+| 0062 | Đưa bản `fn_job_morning_alerts` đang chạy trên production vào repo |
+
+Các migration 0019, 0020, 0026, 0029, 0030, 0036, 0042–0050 là **dữ liệu của riêng cơ sở Phan Văn Hớn**, trỏ thẳng tới mã cơ sở và mã tài khoản admin. Muốn dựng lại database từ đầu thì hai bản ghi đó phải có trước migration 0019 (xem `tests/db/after_0018.sql`).
+
+### 9.7 Điểm cần xử lý, theo mức ảnh hưởng
+
+| Vấn đề | Số đo ngày 17/11 | Hướng xử lý |
+| --- | --- | --- |
+| Policy RLS gọi `can_access_outlet()` cho từng dòng, và hàm này không được Postgres gộp vào câu truy vấn | Với 153 đơn, 430 biến động kho: `v_daily_sales` một ngày 48 ms (không RLS 0,8 ms); `v_stock_status` 60 ms (9 ms); `v_activity` 152 ms (9 ms). Thời gian tăng theo số dòng | Đổi policy sang dạng `outlet_id in (select my_outlets())` hoặc tương đương để quyền được tính một lần mỗi truy vấn. Cần bộ kiểm thử `t_04_phan_quyen.sql` đạt trước và sau |
+| Đơn chỉ gồm dòng số lượng ≤ 0 tạo ra một đơn rỗng tổng 0 | Giao diện không gửi được đơn như vậy; chỉ xảy ra khi gọi API trực tiếp | Thêm kiểm tra "đơn chưa có món nào" sau vòng lặp trong `fn_post_order` |
+| Giá vốn túi tính 1 túi cho mỗi phần chai | Đơn nhiều phần dùng ít túi hơn, giá vốn dư tối đa 175 đ mỗi phần | Tách tiền túi ra dòng riêng trên báo cáo, tính theo số túi thực trừ |
+| Hàm và code của luồng Nấu, Đối chiếu cũ còn sót | 5 hàm trong database và 3 file giao diện còn code gọi; bảng `cook_runs`, `day_closes` cùng bảng con chỉ còn dữ liệu trước 17/11. `cook_plans` vẫn dùng cho tiện ích Tính nguyên liệu | Dọn code giao diện trước; hàm và bảng giữ lại vì báo cáo còn đọc dữ liệu cũ |
+| 63 khóa ngoại chưa có index (advisor) | Chưa ảnh hưởng ở quy mô hiện tại | Thêm index cho các cột hay lọc khi bảng lớn |
+
