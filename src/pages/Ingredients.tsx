@@ -96,24 +96,24 @@ export default function Ingredients() {
 
   return (
     <div className="screen">
-      <Header title="Nguyên liệu cần" back="/nau" sub={data ? `${weekdayLabel(data.plan.plan_date)} · ${totalBottles} chai · ${products.filter((p) => used[p.id]).length} món` : ''} />
+      <Header title="Nguyên liệu cần" back="/nau" sub={data ? `Bước 2/2 · ${totalBottles} chai · ${products.filter((p) => used[p.id]).length} món` : ''} />
       <main className="main with-bar">
         <div className="chips">
-          {tab('tong', 'Tổng để đi chợ')}
-          {tab('mon', 'Theo từng món để nấu')}
+          {tab('tong', 'Tổng tất cả')}
+          {tab('mon', 'Theo từng món')}
         </div>
         {!data || !catalog ? (
           <Loading />
         ) : (
           <>
             {short.length > 0 && (
-              <div className="alert danger" role="alert">
+              <div className="alert warn" role="status">
                 <Icon name="warn" size={22} sw={2} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <strong>Kho thiếu {short.length} vật tư</strong>
                   <span>
                     {short.map((s) => `${s.ing.name} thiếu ${fq(s.q - s.have, s.ing.unit)}`).join('; ')}. Ảnh hưởng: {shortProducts.map((p) => p.short_name).join(', ') || 'bao bì'}.{' '}
-                    <Link to="/kho/nhap">Nhập hàng</Link> hoặc giảm số chai.
+                    Chỉ để biết trước khi nấu; <Link to="/kho/nhap">nhập hàng</Link> nếu vừa mua thêm.
                   </span>
                 </div>
               </div>
@@ -179,43 +179,11 @@ export default function Ingredients() {
               </>
             )}
 
-            <section className="card">
-              <div className="h2">Ghi đã nấu</div>
-              <p className="small">
-                Nấu xong, ghi số chai <strong>thật sự</strong> ra lò. Kho trừ theo số này, không theo kế hoạch.
-              </p>
-              <div className="chips">
-                <button className={`chip ${mode === 'plan' ? 'on' : ''}`} onClick={() => setMode('plan')}>
-                  Đúng như kế hoạch
-                </button>
-                <button className={`chip ${mode === 'edit' ? 'on' : ''}`} onClick={() => setMode('edit')}>
-                  Sửa từng món
-                </button>
-              </div>
-              {mode === 'edit' &&
-                (catalog.products || []).map((p) => (
-                  <div key={p.id} className="list-row">
-                    <span className="dot-color" style={{ background: p.color || '#ddd' }} />
-                    <span className="grow strong">{p.short_name}</span>
-                    <Stepper value={actual[p.id] || 0} onChange={(v) => setActual((a) => ({ ...a, [p.id]: v }))} label={`chai ${p.short_name} thật`} editable />
-                  </div>
-                ))}
-              {short.length > 0 && (
-                <label className="row small" style={{ cursor: 'pointer' }}>
-                  <input type="checkbox" checked={haveIt} onChange={(e) => setHaveIt(e.target.checked)} style={{ width: 22, height: 22 }} />
-                  <span>Hàng đã có nhưng chưa nhập vào app, vẫn ghi đã nấu (kho sẽ hiện số âm để nhắc nhập).</span>
-                </label>
-              )}
-            </section>
           </>
         )}
       </main>
       <div className="bar">
-        {err && <span className="err">{err}</span>}
-        <button className="btn lg block" disabled={!totalBottles || busy || blocked || data?.plan?.status === 'cooked'} onClick={record}>
-          <Icon name="check" size={22} sw={2.2} /> {data?.plan?.status === 'cooked' ? 'Kế hoạch này đã ghi nấu' : busy ? 'Đang ghi…' : `Ghi đã nấu ${totalBottles} chai`}
-        </button>
-        {blocked && <span className="xs muted" style={{ textAlign: 'center' }}>Nút mở khi kho đủ, khi bạn giảm số chai, hoặc tích ô xác nhận hàng đã có.</span>}
+        <Link to="/tai-khoan" className="btn lg block" style={{ textDecoration: 'none' }}>Xong</Link>
       </div>
       <Nav />
     </div>

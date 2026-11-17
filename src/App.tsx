@@ -13,7 +13,7 @@ import StockItem from './pages/StockItem';
 import Purchase from './pages/Purchase';
 import StockCount from './pages/StockCount';
 import Bottles from './pages/Bottles';
-import DayClose from './pages/DayClose';
+import DayEnd from './pages/DayEnd';
 import OrderDetail from './pages/OrderDetail';
 import DayOrders from './pages/DayOrders';
 import Assistant from './pages/Assistant';
@@ -60,7 +60,8 @@ export default function App() {
       <Route path="/kho/kiem-ke" element={<StockCount />} />
       <Route path="/kho/chai" element={<Bottles />} />
       <Route path="/kho/:id" element={<StockItem />} />
-      <Route path="/doi-chieu" element={<DayClose />} />
+      <Route path="/cuoi-ngay" element={<DayEnd />} />
+      <Route path="/doi-chieu" element={<DayEnd />} />
       <Route path="/bao-cao" element={<Revenue />} />
       <Route path="/thong-bao" element={<Notifications />} />
       <Route path="/lich-su" element={<History />} />

@@ -117,6 +117,12 @@ export default function Account() {
           ))}
         </section>}
 
+        <section className="card tight">
+          <div className="h2" style={{ padding: '12px 0 2px' }}>Tiện ích</div>
+          <Item icon="blender" title="Tính nguyên liệu để nấu" sub="Chọn số chai, xem cần cân bao nhiêu. Không trừ kho." to="/nau" />
+          <Item icon="scale" title="Ghi cuối ngày" sub="Chai hủy, chai tồn, kiểm tiền. Không bắt buộc." to="/cuoi-ngay" />
+        </section>
+
         {confirm && (
           <div className="alert danger" role="alert">
             <Icon name="warn" size={20} sw={2} />
