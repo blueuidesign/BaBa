@@ -97,7 +97,6 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
   const typeOf = (r: ExpenseRow) => catLabel(r);
 
   if (!outlet) return null;
-  if (!canManage) return <Navigate to="/" replace />;
 
   const all = data?.rows || [];
   // Tổng theo nhóm: gồm cả bản gốc đã hủy và bản đảo (tự triệt tiêu), như báo cáo
@@ -224,20 +223,21 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
                     <span className="num">{vnd(rows.filter((r) => r.status === 'active').reduce((s, r) => s + r.amount_vnd, 0))}</span>
                   </div>
                   {rows.map((r) => {
-                    const gone = r.status !== 'active';
+                    // Nhân viên chỉ xem và thêm; sửa, hủy khoản chi là việc của chủ cơ sở
+                    const gone = r.status !== 'active' || !canManage;
                     return (
                       <button key={r.id} type="button" className="list-row" disabled={gone}
-                        style={{ border: 0, borderBottom: '1px solid var(--border)', background: 'transparent', width: '100%', textAlign: 'left', cursor: gone ? 'default' : 'pointer', color: 'var(--ink)' }}
+                        style={{ border: 0, borderBottom: '1px solid var(--border)', background: 'transparent', width: '100%', textAlign: 'left', cursor: gone ? 'default' : 'pointer', opacity: 1, color: 'var(--ink)' }}
                         onClick={() => setSheet({ row: r })}>
                         <span className="sw" style={{ width: 10, height: 10, borderRadius: 3, background: GROUP_COLOR[groupOf(r)], flexShrink: 0 }} />
                         <span className="grow" style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: 2 }}>
-                          <span className="strong" style={gone ? { textDecoration: 'line-through', color: 'var(--ink-muted)' } : undefined}>{r.item_name || catLabel(r)}</span>
+                          <span className="strong" style={r.status !== 'active' ? { textDecoration: 'line-through', color: 'var(--ink-muted)' } : undefined}>{r.item_name || catLabel(r)}</span>
                           <span className="xs muted row" style={{ gap: 6, flexWrap: 'wrap' }}>
                             <span>{catLabel(r)}{r.qty && r.purchase_id ? ` · ${r.qty}` : ''}</span>
                             {tag(r)}
                           </span>
                         </span>
-                        <strong className="num" style={gone ? { textDecoration: 'line-through', color: 'var(--ink-muted)' } : undefined}>{vnd(r.amount_vnd)}</strong>
+                        <strong className="num" style={r.status !== 'active' ? { textDecoration: 'line-through', color: 'var(--ink-muted)' } : undefined}>{vnd(r.amount_vnd)}</strong>
                       </button>
                     );
                   })}
@@ -247,7 +247,7 @@ export default function Expenses({ openNew = false }: { openNew?: boolean }) {
                 <button className="btn quiet block" onClick={() => setShowAll(true)}>Xem thêm {list.length - shown.length} khoản</button>
               )}
             </section>
-            <p className="xs muted">Bấm một khoản để sửa hoặc hủy. Sửa xong, khoản cũ vẫn còn với chữ "đã sửa". Khoản "Từ file cũ" chép từ file Excel và Knote trước khi dùng app.</p>
+            <p className="xs muted">{canManage ? 'Bấm một khoản để sửa hoặc hủy.' : 'Cần sửa hoặc hủy một khoản thì nhờ chủ cơ sở.'} Sửa xong, khoản cũ vẫn còn với chữ "đã sửa". Khoản "Từ file cũ" chép từ file Excel và Knote trước khi dùng app.</p>
           </>
         )}
       </main>

@@ -437,3 +437,7 @@ select.input { appearance: auto; }
 .disc-list > .row { padding: 8px 0; align-items: center; }
 .disc-list > .row + .row { border-top: 1px solid var(--border); }
 .line-disc { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--ink-brand); font-variant-numeric: tabular-nums; }
+
+/* Chi tiết đơn: nút Đơn tặng hẹp như ở màn Hóa đơn */
+.seg3-gift button { min-height: 48px; font-size: 14px; }
+.seg3-gift button:first-child { flex: 0 0 auto; padding: 0 14px; white-space: nowrap; }

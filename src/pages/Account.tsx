@@ -47,6 +47,7 @@ export default function Account() {
   }, [outlet]);
 
   const pending = readQueue().filter((q) => !q.rejected).length;
+  const stuck = readQueue().filter((q) => q.rejected && q.outletId === outlet?.id).length;
   async function logout() {
     if (pending > 0 && !confirm) return setConfirm(true);
     localStorage.removeItem('kho-baba-queue');
@@ -86,7 +87,8 @@ export default function Account() {
             <Item icon="truck" title="Nhà cung cấp" sub="Ai cung cấp vật tư nào" to="/nha-cung-cap" />
             <Item icon="bottle" title="Chai đang có" sub="Tồn thành phẩm theo món" to="/kho/chai" />
             {canManage && <Item icon="user" title="Nhân viên" sub="Thêm người bằng email, chọn cơ sở" to="/nhan-vien" />}
-            <Item icon="history" title="Lịch sử bản ghi" sub={canManage ? 'Đơn, nấu, nhập, kiểm kê, đối chiếu; sửa và hủy đơn' : 'Đơn, nấu, nhập, kiểm kê, đối chiếu'} to="/lich-su" />
+            {!canManage && stuck > 0 && <Item icon="warn" title="Bản ghi chưa gửi được" sub={`${stuck} bản ghi trên máy này bị máy chủ từ chối`} to="/lich-su" />}
+            {canManage && <Item icon="history" title="Lịch sử bản ghi" sub="Đơn, nấu, nhập, kiểm kê, đối chiếu; sửa và hủy đơn" to="/lich-su" />}
           </section>
         )}
 

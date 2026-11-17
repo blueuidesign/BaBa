@@ -179,7 +179,7 @@ export function Nav() {
     { to: '/', icon: 'home', label: 'Trang chủ', active: pathname === '/' || pathname.startsWith('/nau') },
     { to: '/ban', icon: 'cart', label: 'Bán' },
     { to: '/bao-cao', icon: 'chart', label: 'Báo cáo' },
-    ...(canManage ? [{ to: '/chi-phi', icon: 'coin', label: 'Chi phí' }] : []),
+    { to: '/chi-phi', icon: 'coin', label: 'Chi phí' },
     { to: '/tai-khoan', icon: 'user', label: 'Tài khoản' }
   ];
   return (
