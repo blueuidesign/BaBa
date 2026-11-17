@@ -10,6 +10,10 @@ import './styles.css';
 registerSW({ immediate: true });
 startQueueSync();
 
+// iOS bỏ qua user-scalable=no trong thẻ viewport, nên chặn thêm cử chỉ phóng to hai ngón tay
+for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
