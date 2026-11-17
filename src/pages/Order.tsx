@@ -250,8 +250,18 @@ export default function Order() {
   const discSheet = discOpen && bottles > 0 && (
     <>
       <div className="sheet-back" onClick={() => setDiscOpen(false)} />
-      <div className="sheet" role="dialog" aria-labelledby="disc-t">
-        <h2 id="disc-t" style={{ fontSize: 18 }}>Giảm giá</h2>
+      {/* Chiều cao cố định (cao tối đa) để sheet không nhảy khi đổi lựa chọn; phần giữa cuộn, nút chính ghim dưới */}
+      <div className="sheet sheet-fixed" role="dialog" aria-labelledby="disc-t">
+        <div className="row between" style={{ minHeight: 32 }}>
+          <h2 id="disc-t" style={{ fontSize: 18 }}>Giảm giá</h2>
+          {discount && (
+            <button type="button" className="small strong" style={{ border: 0, background: 'transparent', padding: '6px 0 6px 12px', cursor: 'pointer', color: 'var(--danger)' }}
+              onClick={() => { setDiscount(null); setReason(''); setDiscOpen(false); }}>
+              Bỏ giảm giá
+            </button>
+          )}
+        </div>
+        <div className="sheet-scroll">
         <p className="small muted">Đơn {partsLabel} · tạm tính {vnd(gross)}. Chọn mức giảm, rồi chọn giảm cả đơn hay một số phần.</p>
         <div className="seg3" role="radiogroup" aria-label="Mức giảm">
           {PCTS.map((v) => (
@@ -286,21 +296,21 @@ export default function Order() {
             </span>
           </div>
         )}
-        {discount && (
+        {(
           <div className="disc-list">
             {rows.map((r, i) => (
-              <div key={r.key} className="row" style={{ gap: 10, opacity: ks[i] ? 1 : 0.6 }}>
+              <div key={r.key} className="row" style={{ gap: 10, opacity: !discount || ks[i] ? 1 : 0.6 }}>
                 {r.container === 'coc' ? <Cup color={r.p.color} size={24} /> : <Bottle color={r.p.color} size={24} />}
                 <span className="grow">
                   <span className="small strong" style={{ display: 'block' }}>{r.qty} × {rowName(r)}{r.less ? ' · ít đường' : ''}</span>
-                  <span className="xs muted">{vnd(r.p.price)} mỗi phần · {!ks[i] ? 'giữ giá gốc' : ks[i] < r.qty ? `${ks[i]} trong ${r.qty} phần được giảm` : 'được giảm'}</span>
+                  <span className="xs muted">{vnd(r.p.price)} mỗi phần{!discount ? '' : ' · '}{!discount ? '' : !ks[i] ? 'giữ giá gốc' : ks[i] < r.qty ? `${ks[i]} trong ${r.qty} phần được giảm` : 'được giảm'}</span>
                 </span>
                 {ks[i] > 0 ? (
                   <span className="num" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <span className="small strong" style={{ display: 'block', color: 'var(--ink-brand)' }}>− {vnd(ks[i] * unitDisc(r.p.price, pct))}</span>
                     <span className="xs muted">{ks[i]} phần × {vnd(unitDisc(r.p.price, pct))}</span>
                   </span>
-                ) : <span className="xs muted" style={{ whiteSpace: 'nowrap' }}>không giảm</span>}
+                ) : discount ? <span className="xs muted" style={{ whiteSpace: 'nowrap' }}>không giảm</span> : <span className="small strong num">{vnd(r.qty * r.p.price)}</span>}
               </div>
             ))}
           </div>
@@ -310,14 +320,10 @@ export default function Order() {
             <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Lý do (không bắt buộc), vd: khách quen" aria-label="Lý do giảm giá" maxLength={80} />
           </label>
         )}
+        </div>
         <button className="btn lg block" onClick={() => setDiscOpen(false)}>
           {disc > 0 ? `Giảm ${vnd(disc)} · thu ${vnd(total)}` : 'Xong'}
         </button>
-        {discount && (
-          <button className="btn secondary block" onClick={() => { setDiscount(null); setReason(''); setDiscOpen(false); }}>
-            Bỏ giảm giá
-          </button>
-        )}
       </div>
     </>
   );
