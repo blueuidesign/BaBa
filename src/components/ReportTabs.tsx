@@ -28,17 +28,17 @@ export function ReportTabs({ active, onPick, staffLimited = false }: { active: R
     else nav(`/bao-cao?ky=${k}`);
   };
   const other = OTHER.find((o) => o[0] === active);
-  const dim = (on: boolean) => (staffLimited && !on ? { opacity: 0.45 } : undefined);
   return (
-    <div className="chips fit4" ref={box} style={{ position: 'relative', overflow: 'visible' }}>
-      {([['day', 'Ngày'], ['week', 'Tuần'], ['month', 'Tháng']] as [ReportKey, string][]).map(([k, l]) => (
-        <button key={k} className={`chip ${active === k ? 'on' : ''}`} disabled={staffLimited && k !== 'day' && k !== 'week'} style={dim(k === 'day' || k === 'week')} onClick={() => go(k)}>{l}</button>
+    // Nhân viên chỉ thấy Ngày, Tuần; Tháng và Khác ẩn hẳn (Tùng 17/11)
+    <div className="chips fit4" ref={box} style={{ position: 'relative', overflow: 'visible', ...(staffLimited ? { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } : {}) }}>
+      {([['day', 'Ngày'], ['week', 'Tuần'], ...(staffLimited ? [] : [['month', 'Tháng']])] as [ReportKey, string][]).map(([k, l]) => (
+        <button key={k} className={`chip ${active === k ? 'on' : ''}`} onClick={() => go(k)}>{l}</button>
       ))}
-      <button className={`chip ${other ? 'on' : ''}`} disabled={staffLimited} style={{ ...dim(false), gap: 2 }} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+      {!staffLimited && <button className={`chip ${other ? 'on' : ''}`} style={{ gap: 2 }} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
         {other ? other[2] : 'Khác'}
         <Icon name="chev" size={14} sw={2.2} style={{ transform: `rotate(${open ? -90 : 90}deg)` }} />
-      </button>
-      {open && (
+      </button>}
+      {open && !staffLimited && (
         <div className="menu-pop" role="listbox" aria-label="Báo cáo khác">
           {OTHER.map(([k, l]) => (
             <button key={k} role="option" aria-selected={active === k} className={active === k ? 'on' : ''} onClick={() => go(k)}>{l}</button>
