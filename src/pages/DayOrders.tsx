@@ -25,9 +25,9 @@ export default function Invoices() {
   const d = sp.get('d');
   const pinned = d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d < yesterday && canManage ? d : null; // ngày cụ thể mở từ Báo cáo
   const q = sp.get('loc');
-  // Nhân viên: Ngày · Tuần · Tháng, bấm lùi xem các kỳ trước (Tùng 17/11). Chủ cơ sở giữ Hôm nay, Hôm qua, Tháng này, Tất cả.
+  // Nhân viên: Ngày · Tuần (không xem Tháng, Tùng 17/11 08:44), bấm lùi xem các kỳ trước (Tùng 17/11). Chủ cơ sở giữ Hôm nay, Hôm qua, Tháng này, Tất cả.
   const sk = sp.get('ky');
-  const sRange: 'day' | 'week' | 'month' = sk === 'week' || sk === 'month' ? sk : 'day';
+  const sRange: 'day' | 'week' = sk === 'week' ? sk : 'day';
   const dOff = d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today ? Math.round((Date.parse(d) - Date.parse(today)) / 86400000) : 0;
   const sOff = Math.min(0, Number(sp.get('off')) || (sk ? 0 : dOff));
   const sBase = rangeOf(sRange, sOff, today);
@@ -107,8 +107,8 @@ export default function Invoices() {
       <main className="main">
         {!canManage && (
           <>
-            <div className="chips fit4" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
-              {([['day', 'Ngày'], ['week', 'Tuần'], ['month', 'Tháng']] as ['day' | 'week' | 'month', string][]).map(([k, l]) => (
+            <div className="chips fit4" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+              {([['day', 'Ngày'], ['week', 'Tuần']] as ['day' | 'week', string][]).map(([k, l]) => (
                 <button key={k} type="button" className={`chip ${sRange === k ? 'on' : ''}`} aria-pressed={sRange === k} onClick={() => setSp(k === 'day' ? {} : { ky: k }, { replace: true })}>{l}</button>
               ))}
             </div>

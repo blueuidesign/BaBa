@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../lib/app';
 import { GROUP_COLOR, monthLabel } from '../lib/reports';
@@ -22,6 +22,8 @@ export default function Revenue() {
   const [sp] = useSearchParams();
   const ky = sp.get('ky');
   const [range, setRange] = useState<Range>(ky === 'week' || ky === 'month' || ky === 'all' ? ky : 'day');
+  // Nhân viên chỉ xem Ngày, Tuần (Tùng 17/11 08:44): mở bằng ?ky=month hoặc quyền tải chậm thì đưa về Ngày
+  useEffect(() => { if (!canManage && (range === 'month' || range === 'all')) setRange('day'); }, [canManage, range]);
   const [off, setOff] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>('revenue');
@@ -234,7 +236,7 @@ export default function Revenue() {
             if (mode === 'profit' && k === 'day') setMode('revenue');
           }}
         />
-        {staffLimited && <p className="xs muted">Nhân viên xem được báo cáo ngày, tuần, tháng, kể cả các kỳ trước. Mục Khác và các số lãi chỉ chủ cơ sở xem được.</p>}
+        {staffLimited && <p className="xs muted">Nhân viên xem được báo cáo ngày, tuần, kể cả các kỳ trước. Tháng, mục Khác và các số lãi chỉ chủ cơ sở xem được.</p>}
         {range === 'all' && !staffLimited && (
           <>
             <DateRange from={custOn ? cust!.f : dataFirst} to={custOn ? cust!.t : dataLast} max={vnToday()} onChange={(f, t) => { setPicked(null); setCust({ f, t }); }} />
