@@ -102,8 +102,8 @@ export default function DayEnd() {
   };
   // Chủ cơ sở lùi, tiến ngày để ghi hoặc sửa ngày cũ
   const dateNav = (
-    <div className="row between card tight" style={{ padding: '6px 8px' }}>
-      <button type="button" className="icon-btn" aria-label="Ngày trước" onClick={() => go(shift(-1))}><Icon name="chev" size={20} sw={2} style={{ transform: 'rotate(180deg)' }} /></button>
+    <div className="row between">
+      <button type="button" className="icon-btn" aria-label="Ngày trước" onClick={() => go(shift(-1))}><Icon name="back" size={20} sw={2} /></button>
       <strong>{date === today ? `Hôm nay · ${ddmm(date)}` : `Ngày ${ddmm(date)}`}</strong>
       <button type="button" className="icon-btn" aria-label="Ngày sau" disabled={date >= today} style={date >= today ? { opacity: 0.3 } : undefined} onClick={() => go(shift(1))}><Icon name="chev" size={20} sw={2} /></button>
     </div>
