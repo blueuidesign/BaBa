@@ -234,7 +234,7 @@ export default function Revenue() {
             if (mode === 'profit' && k === 'day') setMode('revenue');
           }}
         />
-        {staffLimited && <p className="xs muted">Nhân viên xem được hôm nay và tuần này. Các kỳ khác và lãi chỉ chủ cơ sở xem được.</p>}
+        {staffLimited && <p className="xs muted">Nhân viên xem được báo cáo ngày và tuần, kể cả các ngày, tuần trước. Tháng, toàn bộ và lãi chỉ chủ cơ sở xem được.</p>}
         {range === 'all' && !staffLimited && (
           <>
             <DateRange from={custOn ? cust!.f : dataFirst} to={custOn ? cust!.t : dataLast} max={vnToday()} onChange={(f, t) => { setPicked(null); setCust({ f, t }); }} />
@@ -245,7 +245,7 @@ export default function Revenue() {
         )}
         {range !== 'all' && (
           <div className="row between" style={{ marginTop: -6 }}>
-            <button className="icon-btn" aria-label="Kỳ trước" disabled={staffLimited} onClick={() => { setOff(off - 1); setPicked(null); }}>
+            <button className="icon-btn" aria-label="Kỳ trước" onClick={() => { setOff(off - 1); setPicked(null); }}>
               <Icon name="back" size={20} sw={2} />
             </button>
             <span className="strong">{rangeLabel}</span>
