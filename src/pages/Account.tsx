@@ -101,7 +101,8 @@ export default function Account() {
 
         <PushCard />
 
-        <section className="card tight">
+        {/* Nhân viên không thấy mục Quản trị hệ thống (Tùng 17/11) */}
+        {canManage && <section className="card tight">
           <div className="h2" style={{ padding: '12px 0 2px' }}>Quản trị hệ thống</div>
           {isAdmin && <Item icon="chart" title="Báo cáo tất cả cơ sở" sub="Doanh thu từng cơ sở, chủ cơ sở" to="/quan-tri" />}
           {isAdmin && <Item icon="bottle" title="Quản lý món" to="/quan-tri/mon" />}
@@ -114,7 +115,7 @@ export default function Account() {
               <span className="badge ok">Admin</span>
             </div>
           ))}
-        </section>
+        </section>}
 
         {confirm && (
           <div className="alert danger" role="alert">
