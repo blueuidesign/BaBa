@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../lib/app';
 import { GROUP_COLOR, monthLabel } from '../lib/reports';
 import { addDays, addMonths, rangeOf, type Range } from '../lib/period';
+import TopCustomers from './TopCustomers';
 import { supabase } from '../lib/supabase';
 import { useLoad } from '../lib/data';
 import { ddmm, num, vnd, vndShort, vnToday } from '../lib/format';
@@ -470,6 +471,11 @@ export default function Revenue() {
               )}
               <p className="xs muted">Tính theo đơn đã đánh dấu sau khi lưu. Đơn tặng không tính.</p>
             </section>
+
+            <TopCustomers
+              from={picked ? picked : from}
+              to={picked ? (byMonth ? addMonths(picked, 1) : addDays(picked, 1)) : to}
+            />
 
             <Link to={`/bao-cao/don?d=${listDay}`} className="list-row card tight" style={{ textDecoration: 'none', color: 'inherit' }}>
               <span className="ico-box"><Icon name="cart" size={20} /></span>
