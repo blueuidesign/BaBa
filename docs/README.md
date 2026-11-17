@@ -6,7 +6,7 @@ Khi các tài liệu mâu thuẫn nhau, ưu tiên theo thứ tự trong bảng d
 | --- | --- | --- | --- |
 | 0 | [`bien-ban/`](bien-ban/) và [`../tasks/`](../tasks/) | Quyết định và việc giao | Quyết định mới nhất (thắng mọi tài liệu bên dưới) và task cho phiên design, phiên code |
 | 1 | [`phan-tich/BaBa_User_Stories.md`](phan-tich/BaBa_User_Stories.md) | Phân tích (v1.1) | Bản 1 phải làm gì: 24 story, tiêu chí nghiệm thu, ngoại lệ, phạm vi |
-| 2 | [`phan-tich/BaBa_Thiet_ke_DB.md`](phan-tich/BaBa_Thiet_ke_DB.md) | Phân tích (v1.2) | Bảng, RLS, hàm, phân quyền ba tầng, rà soát mở rộng |
+| 2 | [`phan-tich/BaBa_Thiet_ke_DB.md`](phan-tich/BaBa_Thiet_ke_DB.md) | Phân tích (v1.4, 17/11) | Bảng, RLS, hàm, phân quyền ba tầng, rà soát mở rộng; mục 9 ghi mọi thay đổi tới migration 0062 |
 | 3 | [`phan-tich/Ghi_chu_trien_khai.md`](phan-tich/Ghi_chu_trien_khai.md) | Phân tích | Code khác thiết kế ở đâu, màn hình ↔ file, việc còn thiếu |
 | 4 | [`phan-tich/BaBa_Project_Instructions.md`](phan-tich/BaBa_Project_Instructions.md) | Quy ước | Vai trò, ràng buộc kỹ thuật, giao diện, thương hiệu |
 | 5 | [`thiet-ke/man-hinh/`](thiet-ke/man-hinh/) | Thiết kế | 28 màn HTML (A01–G01, S01–S05, N01 sơ đồ điều hướng) |
