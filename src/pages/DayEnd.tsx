@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LINES, useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { useLoad } from '../lib/data';
@@ -16,10 +16,15 @@ type Saved = { id: string; waste: number; left: number; diff: number | null; at:
  * Ngày đã ghi thì hiện bản đã lưu, có Hoàn tác.
  */
 export default function DayEnd() {
-  const { outlet, catalog, bump } = useApp();
+  const { outlet, catalog, bump, canManage } = useApp();
   const nav = useNavigate();
   const toast = useToast();
   const today = vnToday();
+  const [sp, setSp] = useSearchParams();
+  // Nhân viên chỉ ghi và sửa trong ngày; chủ cơ sở mở được mọi ngày (DB cũng chặn như vậy)
+  const q = sp.get('ngay') || '';
+  const date = canManage && /^\d{4}-\d{2}-\d{2}$/.test(q) && q <= today ? q : today;
+  const [editId, setEditId] = useState<string | null>(null);
   const [step, setStep] = useState<Step>(1);
   const [waste, setWaste] = useState<Record<string, number>>({});
   const [left, setLeft] = useState<Record<string, number>>({});
@@ -36,10 +41,10 @@ export default function DayEnd() {
   const { data, loading } = useLoad(async (oid) => {
     const [ex, sold, pays, open] = await Promise.all([
       supabase.from('day_ends').select('id,created_at,left_total,waste_total,cash_counted_vnd,transfer_counted_vnd,cash_open_vnd,expected_cash_vnd,expected_transfer_vnd,money_note,day_end_lines(product_id,left_qty,waste_qty)')
-        .eq('outlet_id', oid).eq('business_date', today).eq('status', 'active').maybeSingle(),
-      supabase.from('v_sales_by_product').select('product_id,qty').eq('outlet_id', oid).eq('business_date', today),
-      supabase.from('orders').select('total_vnd,payment_method').eq('outlet_id', oid).eq('business_date', today).eq('status', 'active').eq('is_gift', false),
-      supabase.from('cash_opens').select('amount_vnd').eq('outlet_id', oid).eq('business_date', today).order('created_at', { ascending: false }).limit(1)
+        .eq('outlet_id', oid).eq('business_date', date).eq('status', 'active').maybeSingle(),
+      supabase.from('v_sales_by_product').select('product_id,qty').eq('outlet_id', oid).eq('business_date', date),
+      supabase.from('orders').select('total_vnd,payment_method').eq('outlet_id', oid).eq('business_date', date).eq('status', 'active').eq('is_gift', false),
+      supabase.from('cash_opens').select('amount_vnd').eq('outlet_id', oid).eq('business_date', date).order('created_at', { ascending: false }).limit(1)
     ]);
     const ps = (pays.data || []) as any[];
     const sum = (m: string | null) => ps.filter((o) => (o.payment_method || null) === m).reduce((a, o) => a + o.total_vnd, 0);
@@ -50,7 +55,7 @@ export default function DayEnd() {
       eCash: sum('cash'), eTransfer: sum('transfer'), unpaid: sum(null), nUnpaid: ps.filter((o) => !o.payment_method && o.total_vnd > 0).length,
       open: ((open.data || [])[0]?.amount_vnd as number | undefined) || 0
     };
-  }, [ver]);
+  }, [ver, date]);
 
   if (!outlet) return null;
   const products = catalog?.products || [];
@@ -67,8 +72,41 @@ export default function DayEnd() {
   const money = (v: number) => (v < 0 ? `− ${vnd(-v)}` : v > 0 ? `+ ${vnd(v)}` : vnd(0));
 
   async function quit() {
+    if (editId) { if (await confirmDialog({ title: 'Bỏ sửa?', text: 'Số vừa đổi sẽ không được lưu, bản cũ giữ nguyên.', ok: 'Bỏ sửa', cancel: 'Sửa tiếp', danger: true })) reset(); return; }
     if (!nWaste && !nLeft && !hasMoney) return nav('/');
     if (await confirmDialog({ title: 'Thoát, không lưu?', text: 'Số chai hủy, chai tồn và tiền vừa nhập sẽ mất.', ok: 'Thoát', cancel: 'Ở lại', danger: true })) nav('/');
+  }
+
+  function reset() {
+    setStep(1); setWaste({}); setLeft({}); setCash(''); setTransfer(''); setNote(''); setEditId(null); setErr(null); setRm(false); setTyping(false);
+  }
+  function go(d: string) {
+    reset();
+    setSaved(null);
+    setSp(d === today ? {} : { ngay: d }, { replace: true });
+  }
+  const shift = (n: number) => {
+    const t = new Date(date + 'T00:00:00Z');
+    t.setUTCDate(t.getUTCDate() + n);
+    return t.toISOString().slice(0, 10);
+  };
+  // Chủ cơ sở lùi, tiến ngày để ghi hoặc sửa ngày cũ
+  const dateNav = canManage && (
+    <div className="row between card tight" style={{ padding: '6px 8px' }}>
+      <button type="button" className="icon-btn" aria-label="Ngày trước" onClick={() => go(shift(-1))}><Icon name="chev" size={20} sw={2} style={{ transform: 'rotate(180deg)' }} /></button>
+      <strong>{date === today ? `Hôm nay · ${ddmm(date)}` : `Ngày ${ddmm(date)}`}</strong>
+      <button type="button" className="icon-btn" aria-label="Ngày sau" disabled={date >= today} style={date >= today ? { opacity: 0.3 } : undefined} onClick={() => go(shift(1))}><Icon name="chev" size={20} sw={2} /></button>
+    </div>
+  );
+  // Sửa: nạp bản đã lưu vào form; lưu thì DB đảo bản cũ và ghi bản mới
+  function startEdit(ex: any) {
+    const w: Record<string, number> = {}; const l: Record<string, number> = {};
+    ((ex.day_end_lines || []) as any[]).forEach((x) => { if (x.waste_qty > 0) w[x.product_id] = x.waste_qty; if (x.left_qty > 0) l[x.product_id] = x.left_qty; });
+    setWaste(w); setLeft(l);
+    setCash(ex.cash_counted_vnd != null ? String(ex.cash_counted_vnd) : '');
+    setTransfer(ex.transfer_counted_vnd != null ? String(ex.transfer_counted_vnd) : '');
+    setNote(ex.money_note || '');
+    setErr(null); setStep(1); setEditId(ex.id);
   }
 
   async function save() {
@@ -76,9 +114,10 @@ export default function DayEnd() {
     setBusy(true);
     setErr(null);
     const ids = new Set([...Object.keys(waste), ...Object.keys(left)]);
-    const { data: r, error } = await supabase.rpc('fn_post_day_end', {
+    const { data: r, error } = await supabase.rpc(editId ? 'fn_edit_day_end' : 'fn_post_day_end', {
+      ...(editId ? { p_id: editId } : {}),
       p: {
-        outlet_id: outlet!.id, client_id: uuid(), business_date: today,
+        outlet_id: outlet!.id, client_id: uuid(), business_date: date,
         lines: [...ids].map((pid) => ({ product_id: pid, waste_qty: waste[pid] || 0, left_qty: left[pid] || 0 })),
         ...(cash !== '' ? { cash_counted_vnd: Number(cash) || 0 } : {}), ...(transfer !== '' ? { transfer_counted_vnd: Number(transfer) || 0 } : {}),
         money_note: note
@@ -87,12 +126,13 @@ export default function DayEnd() {
     setBusy(false);
     if (error) return setErr(errorText(error));
     bump();
+    setEditId(null);
     setSaved({ id: (r as any).id, waste: nWaste, left: nLeft, diff, at: new Date().toISOString() });
   }
 
   async function undo(id: string) {
     const ok = await confirmDialog({
-      title: `Hoàn tác ghi cuối ngày ${ddmm(today)}?`,
+      title: `Hoàn tác ghi cuối ngày ${ddmm(date)}?`,
       text: 'Số hủy, số tồn và phần kiểm tiền vừa lưu sẽ bị bỏ. Nguyên liệu đã trừ vì chai hủy được cộng lại vào kho. Sau đó có thể ghi cuối ngày lại từ đầu.',
       ok: 'Hoàn tác', cancel: 'Giữ nguyên', danger: true
     });
@@ -103,7 +143,7 @@ export default function DayEnd() {
     if (error) return setErr(errorText(error));
     bump();
     setSaved(null);
-    setStep(1);
+    reset();
     setVer((v) => v + 1);
     toast.show('Đã hoàn tác ghi cuối ngày');
   }
@@ -119,15 +159,16 @@ export default function DayEnd() {
 
   // Ngày này đã ghi: xem lại và hoàn tác
   const ex = data?.existing;
-  if (ex && !saved) {
+  if (ex && !saved && !editId) {
     const exDiff = ex.cash_counted_vnd == null && ex.transfer_counted_vnd == null ? null
       : (ex.cash_counted_vnd || 0) + (ex.transfer_counted_vnd || 0) - (ex.cash_counted_vnd != null ? ex.cash_open_vnd || 0 : 0) - (ex.expected_cash_vnd || 0) - (ex.expected_transfer_vnd || 0);
     const ls = (ex.day_end_lines || []) as any[];
     return (
       <div className="screen">
-        <Header title="Ghi cuối ngày" back="/" sub={`${outlet.name} · ${ddmm(today)}`} />
+        <Header title="Ghi cuối ngày" back="/" sub={`${outlet.name} · ${ddmm(date)}`} />
         <main className="main">
-          <div className="alert ok" role="status"><Icon name="check" size={20} sw={2} /><span>Đã ghi cuối ngày {ddmm(today)} lúc {timeHM(ex.created_at)}. Muốn ghi lại thì hoàn tác bản này trước.</span></div>
+          {dateNav}
+          <div className="alert ok" role="status"><Icon name="check" size={20} sw={2} /><span>Đã ghi cuối ngày {ddmm(date)} lúc {timeHM(ex.created_at)}. Bấm Sửa để đổi số; bản cũ được giữ trong lịch sử.</span></div>
           <section className="card">
             <div className="row between"><span className="h2">Hủy</span><strong style={{ color: ex.waste_total ? 'var(--danger)' : undefined }}>{ex.waste_total} chai</strong></div>
             {ls.filter((l) => l.waste_qty > 0).map((l) => <div key={l.product_id} className="row between small"><span>{nameOf(l.product_id)}</span><span className="num">{l.waste_qty} chai</span></div>)}
@@ -148,7 +189,10 @@ export default function DayEnd() {
             )}
           </section>
           {err && <span className="err">{err}</span>}
-          <button className="btn secondary block" disabled={busy} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => undo(ex.id)}>Hoàn tác</button>
+          <div className="row" style={{ gap: 8 }}>
+            <button className="btn secondary" disabled={busy} style={{ flex: 1, color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => undo(ex.id)}>Hoàn tác</button>
+            <button className="btn" disabled={busy} style={{ flex: 1 }} onClick={() => startEdit(ex)}>Sửa</button>
+          </div>
         </main>
         <Nav />
         {toast.node}
@@ -173,8 +217,10 @@ export default function DayEnd() {
     });
     return (
       <div className="screen">
-        <Header title={isWaste ? 'CHAI HỦY' : 'CHAI TỒN'} sub={`Ghi cuối ngày · bước ${step}/4 · ${ddmm(today)}`} back={() => (isWaste ? quit() : setStep(1))} right={xBtn} />
+        <Header title={isWaste ? 'CHAI HỦY' : 'CHAI TỒN'} sub={`Ghi cuối ngày · bước ${step}/4 · ${ddmm(date)}`} back={() => (isWaste ? quit() : setStep(1))} right={xBtn} />
         <main className="main with-bar">
+          {isWaste && !editId && dateNav}
+          {editId && <div className="alert warn small" role="status"><Icon name="warn" size={18} sw={2} /><span>Đang sửa bản ghi cuối ngày {ddmm(date)}. Lưu xong, số cũ được thay bằng số mới.</span></div>}
           {stepsBar(step)}
           <div className="row" style={{ gap: 12, padding: '12px 14px', borderRadius: 'var(--radius-lg)', background: isWaste ? 'var(--danger-bg)' : 'var(--bg-brand-soft)' }}>
             <span style={{ width: 40, height: 40, borderRadius: 20, background: tone, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -244,15 +290,20 @@ export default function DayEnd() {
   if (step === 3)
     return (
       <div className="screen">
-        <Header title="Kiểm tiền" sub={`Ghi cuối ngày · bước 3/4 · ${ddmm(today)}`} back={() => setStep(2)} right={xBtn} />
+        <Header title="Kiểm tiền" sub={`Ghi cuối ngày · bước 3/4 · ${ddmm(date)}`} back={() => setStep(2)} right={xBtn} />
         <main className="main with-bar">
           {stepsBar(3)}
           <section className="card">
             <div className="h2">Kiểm tiền</div>
             <span className="small muted">Không bắt buộc. Để trống cả hai ô rồi bấm Tiếp theo nếu không kiểm.</span>
-            <div className="grid2">
-              <MoneyInput label="Tiền mặt đếm được" value={cash} onChange={setCash} placeholder="Để trống" />
-              <MoneyInput label="Chuyển khoản nhận" value={transfer} onChange={setTransfer} placeholder="Để trống" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span className="small strong">Tiền mặt đếm được</span>
+              <MoneyInput label="Tiền mặt đếm được" value={cash} onChange={setCash} placeholder="Để trống nếu không đếm" />
+              <span className="xs muted">Đếm cả hộp tiền{(data?.open || 0) > 0 ? `, app tự trừ ${vnd(data!.open)} tiền đầu ngày` : ''}.</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span className="small strong">Chuyển khoản nhận được</span>
+              <MoneyInput label="Chuyển khoản nhận được" value={transfer} onChange={setTransfer} placeholder="Để trống nếu không kiểm" />
             </div>
             {hasMoney && (
               <div>
@@ -286,7 +337,7 @@ export default function DayEnd() {
   const editBtn = (s: Step) => <button type="button" className="small strong" style={{ border: 0, background: 'transparent', padding: '4px 0 4px 8px', color: 'var(--ink-brand)', cursor: 'pointer' }} onClick={() => setStep(s)}>Sửa</button>;
   return (
     <div className="screen">
-      <Header title="Xác nhận" sub={`Ghi cuối ngày · bước 4/4 · ${ddmm(today)}`} back={() => setStep(3)} right={xBtn} />
+      <Header title="Xác nhận" sub={`Ghi cuối ngày · bước 4/4 · ${ddmm(date)}`} back={() => setStep(3)} right={xBtn} />
       <main className="main with-bar">
         {stepsBar(4)}
         <section className="card">
@@ -311,7 +362,7 @@ export default function DayEnd() {
       </main>
       <div className="bar" style={{ bottom: 0, paddingBottom: 'calc(12px + var(--safe-b))' }}>
         {err && <span className="err">{err}</span>}
-        <button className="btn lg block" disabled={busy} onClick={save}><Icon name="check" size={20} sw={2.2} /> {busy ? 'Đang lưu…' : 'Lưu cuối ngày'}</button>
+        <button className="btn lg block" disabled={busy} onClick={save}><Icon name="check" size={20} sw={2.2} /> {busy ? 'Đang lưu…' : editId ? 'Lưu bản sửa' : 'Lưu cuối ngày'}</button>
       </div>
 
       {saved && (
@@ -319,7 +370,7 @@ export default function DayEnd() {
           <div className="pop-back" />
           <div className="pop" role="status" aria-live="polite">
             <span className="pop-ok"><Icon name="check" size={34} sw={2.6} /></span>
-            <strong style={{ fontSize: 18 }}>Đã lưu cuối ngày {ddmm(today)}</strong>
+            <strong style={{ fontSize: 18 }}>Đã lưu cuối ngày {ddmm(date)}</strong>
             <div style={{ alignSelf: 'stretch', display: 'flex', flexDirection: 'column', gap: 2, padding: '10px 12px', background: 'var(--bg-200)', borderRadius: 'var(--radius-md)' }}>
               <div className="row between small"><span className="muted">Hủy{saved.waste ? ' · đã trừ kho' : ''}</span><strong style={{ color: saved.waste ? 'var(--danger)' : undefined }}>{saved.waste} chai</strong></div>
               <div className="row between small"><span className="muted">Tồn sang ngày mai</span><strong>{saved.left} chai</strong></div>
