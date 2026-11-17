@@ -123,21 +123,12 @@ export default function CookPlan() {
 
   return (
     <div className="screen">
-      <Header title="Kế hoạch nấu" back="/" sub={`${weekdayLabel(planDate)} · ${outlet.name}`} right={<BellLink />} />
+      <Header title="Tính nguyên liệu để nấu" back="/tai-khoan" sub={`Bước 1/2 · chọn số chai · ${outlet.name}`} />
       <main className="main with-bar">
-        {data?.recent && (
-          <div className="alert ok" role="status">
-            <Icon name="check" size={20} sw={2} />
-            <span className="grow">
-              Đã ghi nấu {recentBottles} chai cho ngày {ddmm(data.recent.business_date)}. {data.canUndo ? 'Ghi nhầm thì hoàn tác trong 10 phút.' : 'Đã bán một phần số chai này nên không hoàn tác được; sửa bằng đếm chai cuối ngày.'}
-            </span>
-            {data.canUndo && (
-              <button className="btn quiet" style={{ minHeight: 32 }} onClick={undoRecent}>
-                Hoàn tác
-              </button>
-            )}
-          </div>
-        )}
+        <div className="alert ok small" role="note">
+          <Icon name="check" size={20} sw={2} />
+          <span>Tiện ích để cân nguyên liệu đúng công thức. Không trừ kho: kho tự trừ khi bán.</span>
+        </div>
         <div className="chips">
           <button className={`chip ${kind === 'extra_today' ? 'on' : ''}`} onClick={() => setKind('extra_today')}>
             Nấu cho hôm nay
@@ -183,7 +174,7 @@ export default function CookPlan() {
         {err && <span className="err">{err}</span>}
         <div className="bar-row">
           <div className="bar-total">
-            <span className="label">Tổng kế hoạch</span>
+            <span className="label">Định nấu</span>
             <span className="value">
               {total} chai · {count} món
             </span>

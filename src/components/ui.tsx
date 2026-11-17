@@ -191,11 +191,11 @@ export function Nav() {
   const { canManage } = useApp();
   const { pathname } = useLocation();
   const items = [
-    { to: '/', icon: 'home', label: 'Trang chủ', active: pathname === '/' || pathname.startsWith('/nau') },
+    { to: '/', icon: 'home', label: 'Trang chủ', active: pathname === '/' },
     { to: '/ban', icon: 'cart', label: 'Bán' },
     { to: '/bao-cao', icon: 'chart', label: 'Báo cáo' },
     { to: '/chi-phi', icon: 'coin', label: 'Chi phí' },
-    { to: '/tai-khoan', icon: 'user', label: 'Tài khoản' }
+    { to: '/tai-khoan', icon: 'user', label: 'Tài khoản', active: pathname === '/tai-khoan' || pathname.startsWith('/nau') }
   ];
   return (
     <nav className="nav" aria-label="Điều hướng chính" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>

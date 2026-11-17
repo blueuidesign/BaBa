@@ -60,7 +60,7 @@ export default function Revenue() {
 
   const { data } = useLoad(
     async (oid) => {
-      const [days, prods, prev, closes, pnlQ, extra, pays] = await Promise.all([
+      const [days, prods, prev, closes, pnlQ, extra, pays, ends] = await Promise.all([
         supabase.from('v_daily_sales').select('*').eq('outlet_id', oid).gte('business_date', from).lt('business_date', to).order('business_date'),
         supabase.from('v_sales_by_product').select('*').eq('outlet_id', oid).gte('business_date', from).lt('business_date', to),
         pFrom ? supabase.from('v_daily_sales').select('revenue_vnd').eq('outlet_id', oid).gte('business_date', pFrom).lt('business_date', pTo!) : Promise.resolve({ data: [] as any[] }),
@@ -69,7 +69,8 @@ export default function Revenue() {
         canManage ? supabase.from('v_daily_pnl_groups').select('*').eq('outlet_id', oid).gte('business_date', range === 'all' && !custOn ? '2000-01-01' : from).lt('business_date', to) : Promise.resolve({ data: [] as any[] }),
         // Đơn có giảm giá hoặc nhập từ Knote trong kỳ
         supabase.from('orders').select('discount_vnd,source').eq('outlet_id', oid).eq('status', 'active').gte('business_date', from).lt('business_date', to).or('discount_vnd.gt.0,source.eq.import'),
-        supabase.from('v_daily_payments').select('business_date,payment_method,revenue_vnd,orders_count').eq('outlet_id', oid).gte('business_date', from).lt('business_date', to)
+        supabase.from('v_daily_payments').select('business_date,payment_method,revenue_vnd,orders_count').eq('outlet_id', oid).gte('business_date', from).lt('business_date', to),
+        supabase.from('day_ends').select('business_date,waste_total,left_total,day_end_lines(product_id,waste_qty)').eq('outlet_id', oid).eq('status', 'active').gte('business_date', from).lt('business_date', to)
       ]);
       const rows = (pnlQ.data || []) as any[];
       const sum = (k: string) => rows.reduce((s: number, r: any) => s + (r[k] || 0), 0);
@@ -80,7 +81,14 @@ export default function Revenue() {
       const ex = (extra.data || []) as any[];
       return {
         days: (days.data || []) as any[], prods: (prods.data || []) as any[], prevRev: (prev.data || []).reduce((s: number, r: any) => s + r.revenue_vnd, 0),
-        closes: (closes.data || []) as any[], pnl, pnlRows: rows, pays: (pays.data || []) as any[],
+        closes: [
+          ...((closes.data || []) as any[]),
+          // Ghi cuối ngày kiểu mới (từ 17/11): đưa về cùng dạng với bản đối chiếu cũ
+          ...((ends.data || []) as any[]).map((e) => ({
+            business_date: e.business_date, waste_total: e.waste_total, gift_total: 0, day_close_lines: [], end_avail: e.waste_total + e.left_total,
+            day_close_wastes: (e.day_end_lines || []).filter((l: any) => l.waste_qty > 0).map((l: any) => ({ product_id: l.product_id, qty: l.waste_qty }))
+          }))
+        ], pnl, pnlRows: rows, pays: (pays.data || []) as any[],
         discount: ex.reduce((s, o) => s + (o.discount_vnd || 0), 0), knoteOrders: ex.filter((o) => o.source === 'import').length
       };
     },
@@ -140,6 +148,9 @@ export default function Revenue() {
     // Tỉ lệ hủy = chai hủy ÷ (chai nấu + chai tồn qua) của các ngày đã chốt
     const madeAvail = closes.reduce((s: number, c: any) => s + (c.day_close_lines || []).reduce((t: number, l: any) => t + l.cooked_qty + l.carried_qty, 0), 0);
     const salesDays = data.days.filter((d) => inPick(d.business_date));
+    // Ngày ghi cuối ngày kiểu mới không có số nấu: số chai có trong ngày = bán + hủy + tồn
+    const soldOn = new Map(data.days.map((d) => [d.business_date, d.bottles] as [string, number]));
+    const endAvail = closes.reduce((s: number, c: any) => s + (c.end_avail != null ? c.end_avail + (soldOn.get(c.business_date) || 0) : 0), 0);
     const catchup = salesDays.reduce((s, d) => s + d.catchup_bottles, 0);
     const byProduct = new Map<string, { qty: number; rev: number }>();
     data.prods.filter((r) => inPick(r.business_date)).forEach((r) => {
@@ -158,7 +169,7 @@ export default function Revenue() {
       else if (r.payment_method === 'transfer') { pay.transfer += r.revenue_vnd; pay.nTransfer += r.orders_count; }
       else { pay.unknown += r.revenue_vnd; pay.nUnknown += r.orders_count; }
     });
-    return { revenue, sold, gift, waste, total: sold + gift + waste, madeAvail, catchup, ranked, nSalesDays: salesDays.length, pay, wasteRank };
+    return { revenue, sold, gift, waste, total: sold + gift + waste, madeAvail: madeAvail + endAvail, catchup, ranked, nSalesDays: salesDays.length, pay, wasteRank };
   }, [data, series, picked, byMonth]);
 
   if (!outlet) return null;
@@ -438,7 +449,7 @@ export default function Revenue() {
             <section className="card">
               <div className="h2">Tặng, hủy, bổ sung</div>
               <div className="row between small"><span>Chai tặng, dùng thử</span><span className="num strong">{view.gift} chai</span></div>
-              <div className="row between small"><span>Chai hủy (từ các ngày đã chốt)</span><span className="num strong">{view.waste} chai{view.madeAvail ? ` · ${num((view.waste / view.madeAvail) * 100, 1)}%` : ''}</span></div>
+              <div className="row between small"><span>Chai hủy (từ các ngày có ghi cuối ngày)</span><span className="num strong">{view.waste} chai{view.madeAvail ? ` · ${num((view.waste / view.madeAvail) * 100, 1)}%` : ''}</span></div>
               <p className="xs muted">Tỉ lệ hủy = chai hủy ÷ (chai nấu + chai tồn qua) của các ngày đã chốt.</p>
               {view.wasteRank.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 12 }}>

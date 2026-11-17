@@ -40,7 +40,7 @@ App bán hàng và quản lý kho cho sữa hạt **Sữa lành từ BaBa**: PWA
 - React 19 + Vite 7 + TypeScript ~5.9, react-router 7, `@supabase/supabase-js`, `vite-plugin-pwa`. Không có thư viện UI; style ở `src/styles.css`.
 - `npm run dev` · `npm run typecheck` · `npm run build`. Chạy typecheck và build trước mỗi commit.
 - Biến môi trường: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (xem `.env.example`; key là publishable key, để lộ được).
-- Supabase project ref `fsqpajvjjmpyrgllrhgz` (Singapore). Migration ở `supabase/migrations/`, đã chạy tới `0056` (12/11/2026). Edge Function `send-push` đã deploy. Migration mới đánh số từ `0035`. Dữ liệu cũ Excel + Knote của cơ sở Phan Văn Hớn đã nhập ở `0019`, `0020` (sinh bằng `scripts/import/build_import_sql.py`).
+- Supabase project ref `fsqpajvjjmpyrgllrhgz` (Singapore). Migration ở `supabase/migrations/`, đã chạy tới `0057` (17/11/2026). Edge Function `send-push` đã deploy. Migration mới đánh số từ `0035`. Dữ liệu cũ Excel + Knote của cơ sở Phan Văn Hớn đã nhập ở `0019`, `0020` (sinh bằng `scripts/import/build_import_sql.py`).
 - Địa chỉ app chính thức: https://khobaba.vxlab.vn (dùng trong email mời, hướng dẫn). `baba-wine.vercel.app` chỉ là tên miền mặc định của Vercel.
 
 ## Ràng buộc kỹ thuật bắt buộc
@@ -52,7 +52,7 @@ App bán hàng và quản lý kho cho sữa hạt **Sữa lành từ BaBa**: PWA
 - Tiền là số nguyên VND. `business_date` theo Asia/Ho_Chi_Minh (dùng `vn_today()` ở DB, `vnToday()` ở client).
 - **Phân quyền bằng RLS**; giao diện chỉ ẩn hoặc làm mờ. Ba tầng: `org_memberships` (admin thấy mọi cơ sở), `memberships.role = 'owner'` (chủ một hoặc nhiều cơ sở), `memberships.role = 'staff'` (nhân viên một cơ sở).
 - Migration chỉ thêm, không đổi nghĩa cột cũ. View dùng `security_invoker = true`.
-- Nguyên liệu và bao bì bị trừ **lúc ghi nấu**, không phải lúc bán. Lưu đơn chỉ làm giảm số chai trên quầy.
+- Từ 17/11/2026 (migration 0057): nguyên liệu, syrup và bao bì bị trừ **lúc bán** (theo công thức của từng dòng đơn), không còn ghi nấu. Màn Nấu chỉ là tiện ích "Tính nguyên liệu để nấu" (Tài khoản → Tiện ích), không trừ kho. "Ghi cuối ngày" (`/cuoi-ngay`, bảng `day_ends`) không bắt buộc, không khóa ngày: chai hủy trừ kho, chai tồn chỉ để thống kê.
 
 ## Giao diện
 
