@@ -225,7 +225,11 @@ export default function Home() {
                 aria-label={`Đơn lúc ${timeHM(o.placed_at)}, ${vnd(o.total_vnd)}. Mở chi tiết`}>
                 <span className="small muted num" style={{ width: 44 }}>{timeHM(o.placed_at)}</span>
                 <span className="grow">
-                  {o.order_lines.map((l: any) => `${l.qty} ${nameOf(l.product_id)}${l.container === 'coc' ? ' (cốc)' : ''}`).join(' · ')}
+                  {/* gộp dòng cùng món, cùng bao bì (dòng ít đường tách riêng trong sổ) */}
+                  {[...o.order_lines.reduce((m: Map<string, any>, l: any) => {
+                    const k = `${l.product_id}-${l.container}`;
+                    return m.set(k, { ...l, qty: (m.get(k)?.qty || 0) + l.qty });
+                  }, new Map<string, any>()).values()].map((l: any) => `${l.qty} ${nameOf(l.product_id)}${l.container === 'coc' ? ' (cốc)' : ''}`).join(' · ')}
                   {o.is_gift ? ' · tặng' : o.channel === 'aggregate' ? ' · bổ sung' : ''}
                 </span>
                 <span className="strong num">{vnd(o.total_vnd)}</span>
