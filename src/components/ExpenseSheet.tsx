@@ -28,7 +28,7 @@ export default function ExpenseSheet({
   onClose: () => void;
   onDone: (msg: string) => void;
 }) {
-  const { outlet, catalog, reloadCatalog } = useApp();
+  const { outlet, catalog, reloadCatalog, canManage } = useApp();
   const byId = useMemo(() => Object.fromEntries(cats.map((c) => [c.id, c])), [cats]);
   const exCat = existing?.category_id ? byId[existing.category_id] : undefined;
   // Cấp 1: 4 nhóm; cấp 2: các loại trong nhóm (bỏ dòng cha "Đầu tư thiết bị"). Không có cấp 3.
@@ -313,7 +313,7 @@ export default function ExpenseSheet({
                     onChange={(e) => { if (e.target.value === '__new') { setAdding(true); } else { setIngId(e.target.value || null); setAdding(false); } }}>
                     <option value="">Chọn {finalCat.name.toLowerCase()}…</option>
                     {stockOpts.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-                    <option value="__new">+ Thêm món mới…</option>
+                    {canManage && <option value="__new">+ Thêm món mới…</option>}
                   </select>
                 </label>
                 {adding && (

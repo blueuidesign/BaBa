@@ -4,7 +4,7 @@ import { useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { useLoad } from '../lib/data';
 import { timeHM, vnd } from '../lib/format';
-import { Header, Icon, Loading, Nav, reasonDialog, useToast } from '../components/ui';
+import { Header, Icon, Loading, Nav, confirmDialog, reasonDialog, useToast } from '../components/ui';
 
 /** Chi tiết một đơn (mở từ Các đơn trong ngày): món, tiền, khách, cách nhận tiền; hủy đơn bằng bản ghi đảo. */
 export default function OrderDetail() {
@@ -31,11 +31,15 @@ export default function OrderDetail() {
   const name = (pid: string) => catalog?.allProducts.find((p) => p.id === pid)?.name || 'Món đã bỏ';
   const d = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}`;
 
-  async function markPay(m: 'cash' | 'transfer') {
+  /** Đánh dấu giống màn Hóa đơn: Đơn tặng, Nhận t.mặt, Nhận c.khoản. Đã đánh dấu thì chỉ đổi qua Sửa đơn. */
+  async function markPay(m: 'cash' | 'transfer' | 'gift') {
+    if (busy || o.payment_method || o.is_gift) return;
     setErr(null);
+    if (m === 'gift' && !(await confirmDialog({ title: 'Đánh dấu đơn tặng?', text: `Đơn ${vnd(o.total_vnd)} sẽ tính 0 đ, hàng vẫn trừ, số đơn giữ nguyên. Sau khi đánh dấu, muốn đổi lại phải vào Sửa đơn.`, ok: 'Đơn tặng', cancel: 'Thôi' }))) return;
     setBusy(true);
-    if (o.payment_method || o.is_gift) return; // đã đánh dấu thì chỉ đổi qua Sửa đơn
-    const { error } = await supabase.rpc('fn_set_order_info', { p_order: o.id, p_payment: m });
+    const { error } = m === 'gift'
+      ? await supabase.rpc('fn_set_order_gift', { p_order: o.id, p_gift: true })
+      : await supabase.rpc('fn_set_order_info', { p_order: o.id, p_payment: m });
     setBusy(false);
     if (error) return setErr(errorText(error));
     bump();
@@ -115,22 +119,22 @@ export default function OrderDetail() {
             {active && (
               <section className="card">
                 <div className="h2">Nhận tiền</div>
-                {o.is_gift || o.payment_method ? (
-                  <>
-                    <span className="row strong" style={{ gap: 8, color: 'var(--ink-brand)' }}>
-                      <Icon name="check" size={18} sw={2.4} /> {o.is_gift ? 'Đơn tặng' : o.payment_method === 'cash' ? 'Đã nhận tiền mặt' : 'Đã nhận chuyển khoản'}
-                    </span>
-                    <span className="xs muted">Đã đánh dấu. Muốn đổi thì {canManage ? 'bấm Sửa đơn bên dưới.' : 'nhờ chủ cơ sở sửa đơn.'}</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="grid2">
-                      <button type="button" className="btn secondary" disabled={busy} onClick={() => markPay('cash')}>Đã nhận t.mặt</button>
-                      <button type="button" className="btn secondary" disabled={busy} onClick={() => markPay('transfer')}>Đã nhận c.khoản</button>
-                    </div>
-                    <span className="xs muted">Chưa đánh dấu. Bấm một lần là ghi; sau đó muốn đổi phải vào Sửa đơn.</span>
-                  </>
-                )}
+                <div className="seg3 seg3-gift" role="group" aria-label="Đánh dấu nhận tiền">
+                  {([['gift', 'Đơn tặng'], ['cash', 'Nhận t.mặt'], ['transfer', 'Nhận c.khoản']] as ['cash' | 'transfer' | 'gift', string][]).map(([k, l]) => {
+                    const on = o.is_gift ? 'gift' : o.payment_method;
+                    return (
+                      <button key={k} type="button" aria-pressed={on === k} className={on === k ? 'on' : ''} disabled={busy || (!!on && on !== k)}
+                        aria-disabled={!!on} style={on === k ? { cursor: 'default' } : undefined} onClick={() => markPay(k)}>
+                        {on === k && <Icon name="check" size={15} sw={2.6} />}{l}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="xs muted">
+                  {o.is_gift || o.payment_method
+                    ? `Đã đánh dấu. Muốn đổi thì ${canManage ? 'bấm Sửa đơn bên dưới.' : 'nhờ chủ cơ sở sửa đơn.'}`
+                    : 'Chưa đánh dấu. Bấm một lần là ghi; sau đó muốn đổi phải vào Sửa đơn.'}
+                </span>
               </section>
             )}
             {!active && o.payment_method && <p className="small muted">Cách nhận tiền đã ghi: {o.payment_method === 'cash' ? 'tiền mặt' : 'chuyển khoản'}.</p>}

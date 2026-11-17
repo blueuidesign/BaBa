@@ -24,6 +24,7 @@ const PAGE = 50;
 
 export default function History() {
   const { outlet, queue, dataVersion, canManage } = useApp();
+  // Lịch sử bản ghi chỉ dành cho chủ cơ sở và admin (Tùng 17/11)
   const [sp] = useSearchParams();
   const [filter, setFilter] = useState(sp.get('loc') === 'sua-huy' ? 'changes' : 'all');
   // Bộ lọc "Sửa, hủy đơn" chỉ chủ cơ sở và admin thấy; nội dung lấy từ audit_log, không phải v_activity
@@ -49,9 +50,9 @@ export default function History() {
   }
   useEffect(() => {
     setRows(null);
-    load(0);
+    if (canManage) load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [outlet?.id, filter, dataVersion]);
+  }, [outlet?.id, filter, dataVersion, canManage]);
 
   if (!outlet) return null;
   const rejected = queue.filter((q) => q.rejected && q.outletId === outlet.id);
@@ -60,6 +61,32 @@ export default function History() {
   const isReversedOrder = (r: any) => r.kind === 'order' && (r.status === 'reversed' || r.status === 'reversal');
   const hiddenCount = (rows || []).filter(isReversedOrder).length;
   (rows || []).filter((r) => showReversed || !isReversedOrder(r)).forEach((r) => byDay.set(r.business_date, [...(byDay.get(r.business_date) || []), r]));
+
+  const rejectedCard = rejected.length > 0 && (
+          <section className="card">
+            <div className="h2" style={{ color: 'var(--danger)' }}>Chưa gửi được</div>
+            {rejected.map((q) => (
+              <div key={q.id} className="list-row">
+                <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span className="strong">{q.summary}</span>
+                  <span className="xs muted">{dateVN(q.createdAt)} {timeHM(q.createdAt)} · {q.lastError}</span>
+                </span>
+                <button className="btn quiet" onClick={() => removeFromQueue(q.id)}>Bỏ</button>
+              </div>
+            ))}
+          </section>
+  );
+  // Nhân viên không xem lịch sử bản ghi (Tùng 17/11); chỉ thấy các bản ghi trên máy này bị máy chủ từ chối, để không mất đơn
+  if (!canManage)
+    return (
+      <div className="screen">
+        <Header title="Bản ghi chưa gửi được" back="/tai-khoan" sub={outlet.name} />
+        <main className="main">
+          {rejectedCard || <Empty icon="history" title="Không có bản ghi nào bị kẹt" text="Lịch sử bản ghi chỉ chủ cơ sở xem được." />}
+        </main>
+        <Nav />
+      </div>
+    );
 
   return (
     <div className="screen">
@@ -84,20 +111,7 @@ export default function History() {
           </label>
         ) : null}
 
-        {rejected.length > 0 && (
-          <section className="card">
-            <div className="h2" style={{ color: 'var(--danger)' }}>Chưa gửi được</div>
-            {rejected.map((q) => (
-              <div key={q.id} className="list-row">
-                <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span className="strong">{q.summary}</span>
-                  <span className="xs muted">{dateVN(q.createdAt)} {timeHM(q.createdAt)} · {q.lastError}</span>
-                </span>
-                <button className="btn quiet" onClick={() => removeFromQueue(q.id)}>Bỏ</button>
-              </div>
-            ))}
-          </section>
-        )}
+        {rejectedCard}
 
         {!rows ? (
           <Loading />

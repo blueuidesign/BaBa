@@ -147,7 +147,7 @@ export default function DayClose() {
             )}
             {err && <span className="err">{err}</span>}
           </section>
-          <button className="btn quiet" onClick={() => nav(`/lich-su`)}>Xem lịch sử ngày này</button>
+          {canManage && <button className="btn quiet" onClick={() => nav(`/lich-su`)}>Xem lịch sử ngày này</button>}
         </main>
         <Nav />
       </div>
