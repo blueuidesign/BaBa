@@ -14,7 +14,7 @@ const FILTERS: [string, string][] = [
   ['batch', 'Mẻ'],
   ['purchase', 'Nhập kho'],
   ['count', 'Kiểm kê'],
-  ['close', 'Đối chiếu'],
+  ['close', 'Cuối ngày'],
   ['expense', 'Chi phí']
 ];
 const ICON: Record<string, [string, string]> = {
