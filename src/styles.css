@@ -453,3 +453,6 @@ select.input { appearance: auto; }
 .sheet.sheet-fixed { height: 88dvh; max-height: 88dvh; overflow: hidden; }
 .sheet-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; scrollbar-width: none; }
 .sheet-scroll::-webkit-scrollbar { display: none; }
+
+/* Không cho phóng to app bằng hai ngón tay hay chạm đúp (Tùng 17/11); vẫn cuộn dọc, ngang bình thường */
+html, body { touch-action: pan-x pan-y; }
