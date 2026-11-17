@@ -32,7 +32,7 @@ export function ReportTabs({ active, onPick, staffLimited = false }: { active: R
   return (
     <div className="chips fit4" ref={box} style={{ position: 'relative', overflow: 'visible' }}>
       {([['day', 'Ngày'], ['week', 'Tuần'], ['month', 'Tháng']] as [ReportKey, string][]).map(([k, l]) => (
-        <button key={k} className={`chip ${active === k ? 'on' : ''}`} disabled={staffLimited && k !== 'day' && k !== 'week'} style={dim(k === 'day' || k === 'week')} onClick={() => go(k)}>{l}</button>
+        <button key={k} className={`chip ${active === k ? 'on' : ''}`} disabled={staffLimited && k === 'all'} style={dim(k !== 'all')} onClick={() => go(k)}>{l}</button>
       ))}
       <button className={`chip ${other ? 'on' : ''}`} disabled={staffLimited} style={{ ...dim(false), gap: 2 }} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
         {other ? other[2] : 'Khác'}

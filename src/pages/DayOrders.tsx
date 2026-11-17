@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
-import { addDays } from '../lib/period';
+import { addDays, rangeOf } from '../lib/period';
 import { timeHM, vnd, vnToday, weekdayLabel } from '../lib/format';
 import { Empty, Header, Icon, Loading, Nav, confirmDialog, useToast } from '../components/ui';
 
@@ -25,10 +25,15 @@ export default function Invoices() {
   const d = sp.get('d');
   const pinned = d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d < yesterday && canManage ? d : null; // ngày cụ thể mở từ Báo cáo
   const q = sp.get('loc');
-  // Nhân viên chỉ xem được hôm nay, giống Báo cáo
-  const range: Range = !canManage ? 'today' : pinned ? 'day' : d === yesterday || q === 'hom-qua' ? 'yesterday' : q === 'thang' ? 'month' : q === 'tat-ca' ? 'all' : 'today';
-  const from = range === 'today' ? today : range === 'yesterday' ? yesterday : range === 'day' ? pinned! : range === 'month' ? today.slice(0, 8) + '01' : null;
-  const to = range === 'yesterday' ? yesterday : range === 'day' ? pinned! : today;
+  // Nhân viên: Ngày · Tuần · Tháng, bấm lùi xem các kỳ trước (Tùng 17/11). Chủ cơ sở giữ Hôm nay, Hôm qua, Tháng này, Tất cả.
+  const sk = sp.get('ky');
+  const sRange: 'day' | 'week' | 'month' = sk === 'week' || sk === 'month' ? sk : 'day';
+  const dOff = d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today ? Math.round((Date.parse(d) - Date.parse(today)) / 86400000) : 0;
+  const sOff = Math.min(0, Number(sp.get('off')) || (sk ? 0 : dOff));
+  const sBase = rangeOf(sRange, sOff, today);
+  const range: Range = !canManage ? 'day' : pinned ? 'day' : d === yesterday || q === 'hom-qua' ? 'yesterday' : q === 'thang' ? 'month' : q === 'tat-ca' ? 'all' : 'today';
+  const from = !canManage ? sBase[0] : range === 'today' ? today : range === 'yesterday' ? yesterday : range === 'day' ? pinned! : range === 'month' ? today.slice(0, 8) + '01' : null;
+  const to = !canManage ? (addDays(sBase[1], -1) < today ? addDays(sBase[1], -1) : today) : range === 'yesterday' ? yesterday : range === 'day' ? pinned! : today;
 
   const [rows, setRows] = useState<any[] | null>(null);
   const [more, setMore] = useState(false);
@@ -73,7 +78,7 @@ export default function Invoices() {
     setErr(null);
     load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [outlet?.id, range, pinned, dataVersion]);
+  }, [outlet?.id, range, pinned, dataVersion, from, to]);
 
   if (!outlet) return null;
   const name = (pid: string) => catalog?.allProducts.find((x) => x.id === pid)?.name || 'Món đã bỏ';
@@ -100,16 +105,29 @@ export default function Invoices() {
     <div className="screen">
       <Header title="Hóa đơn" sub={outlet.name} back />
       <main className="main">
-        <div className="chips">
+        {!canManage && (
+          <>
+            <div className="chips fit4" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+              {([['day', 'Ngày'], ['week', 'Tuần'], ['month', 'Tháng']] as ['day' | 'week' | 'month', string][]).map(([k, l]) => (
+                <button key={k} type="button" className={`chip ${sRange === k ? 'on' : ''}`} aria-pressed={sRange === k} onClick={() => setSp(k === 'day' ? {} : { ky: k }, { replace: true })}>{l}</button>
+              ))}
+            </div>
+            <div className="row between" style={{ marginTop: -6 }}>
+              <button className="icon-btn" aria-label="Kỳ trước" onClick={() => setSp({ ky: sRange, off: String(sOff - 1) }, { replace: true })}><Icon name="back" size={20} sw={2} /></button>
+              <span className="strong">{sBase[4]}</span>
+              <button className="icon-btn" aria-label="Kỳ sau" disabled={sOff >= 0} style={sOff >= 0 ? { opacity: 0.3 } : undefined} onClick={() => setSp({ ky: sRange, off: String(sOff + 1) }, { replace: true })}><Icon name="chev" size={20} sw={2} /></button>
+            </div>
+          </>
+        )}
+        {canManage && <div className="chips">
           {pinned && <button type="button" className="chip on" aria-pressed>{dmy(pinned)}</button>}
           {([['today', 'Hôm nay'], ['yesterday', 'Hôm qua'], ['month', 'Tháng này'], ['all', 'Tất cả']] as [Range, string][])
-            .filter(([k]) => canManage || k === 'today')
             .map(([k, l]) => <button key={k} type="button" className={`chip ${range === k ? 'on' : ''}`} aria-pressed={range === k} onClick={() => pick(k)}>{l}</button>)}
-        </div>
+        </div>}
         {!rows ? (
           <Loading />
         ) : rows.length === 0 ? (
-          <Empty icon="cart" title={range === 'today' ? 'Hôm nay chưa có đơn nào' : 'Không có đơn nào trong khoảng này'} text="Đơn ghi ở màn Bán sẽ hiện ở đây.">
+          <Empty icon="cart" title={(canManage ? range === 'today' : sRange === 'day' && sOff === 0) ? 'Hôm nay chưa có đơn nào' : 'Không có đơn nào trong khoảng này'} text="Đơn ghi ở màn Bán sẽ hiện ở đây.">
             <Link to="/ban" className="btn">Ghi đơn</Link>
           </Empty>
         ) : (

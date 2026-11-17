@@ -234,7 +234,7 @@ export default function Revenue() {
             if (mode === 'profit' && k === 'day') setMode('revenue');
           }}
         />
-        {staffLimited && <p className="xs muted">Nhân viên xem được báo cáo ngày và tuần, kể cả các ngày, tuần trước. Tháng, toàn bộ và lãi chỉ chủ cơ sở xem được.</p>}
+        {staffLimited && <p className="xs muted">Nhân viên xem được báo cáo ngày, tuần, tháng, kể cả các kỳ trước. Mục Khác và các số lãi chỉ chủ cơ sở xem được.</p>}
         {range === 'all' && !staffLimited && (
           <>
             <DateRange from={custOn ? cust!.f : dataFirst} to={custOn ? cust!.t : dataLast} max={vnToday()} onChange={(f, t) => { setPicked(null); setCust({ f, t }); }} />
