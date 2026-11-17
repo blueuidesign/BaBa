@@ -1,0 +1,86 @@
+# Sao lưu database Supabase lên Google Drive mỗi tối (22:30 giờ Việt Nam).
+# Cần 2 secret của repo: SUPABASE_DB_URL (chuỗi Session pooler, cổng 5432) và RCLONE_CONF (cấu hình rclone có mục [gdrive]).
+# Chạy tay: tab Actions → "Backup database" → Run workflow.
+name: Backup database
+
+on:
+  schedule:
+    - cron: '30 15 * * *' # 15:30 UTC = 22:30 Asia/Ho_Chi_Minh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-database
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
+      REMOTE: gdrive:BaBa-backup
+      KEEP_DAYS: 60
+      MIN_BYTES: 50000
+    steps:
+      - name: Kiểm tra đã có đủ secret
+        run: |
+          [ -n "$SUPABASE_DB_URL" ] || { echo "::error::Thiếu secret SUPABASE_DB_URL"; exit 1; }
+          [ -n "$RCLONE_CONF" ] || { echo "::error::Thiếu secret RCLONE_CONF"; exit 1; }
+          case "$SUPABASE_DB_URL" in
+            *pooler.supabase.com:5432*) ;;
+            *) echo "::error::SUPABASE_DB_URL phải là chuỗi Session pooler (…pooler.supabase.com:5432)"; exit 1 ;;
+          esac
+
+      - name: Cài pg_dump 17 và rclone
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17 rclone
+          /usr/lib/postgresql/17/bin/pg_dump --version
+          rclone version | head -1
+
+      - name: Xuất dữ liệu
+        run: |
+          set -euo pipefail
+          STAMP=$(TZ=Asia/Ho_Chi_Minh date +%Y-%m-%d_%H%M)
+          FILE="$RUNNER_TEMP/baba_${STAMP}.dump"
+          # public: dữ liệu app; auth: tài khoản đăng nhập; storage, supabase_migrations: tệp và lịch sử migration
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" \
+            --format=custom --no-owner --no-privileges \
+            --schema=public --schema=auth --schema=storage --schema=supabase_migrations \
+            --file="$FILE"
+          # Lịch pg_cron không nằm trong các schema trên, lưu riêng thành CSV (lỗi thì bỏ qua)
+          /usr/lib/postgresql/17/bin/psql "$SUPABASE_DB_URL" -At \
+            -c "copy (select jobname, schedule, command, active from cron.job order by jobname) to stdout with csv header" \
+            > "$RUNNER_TEMP/baba_${STAMP}_cron.csv" || echo "::warning::Không xuất được lịch pg_cron"
+          SIZE=$(stat -c %s "$FILE")
+          echo "Kích thước: $SIZE byte"
+          [ "$SIZE" -ge "$MIN_BYTES" ] || { echo "::error::File backup quá nhỏ ($SIZE byte), có thể xuất thiếu"; exit 1; }
+          # Đọc lại mục lục để chắc file không hỏng
+          TABLES=$(/usr/lib/postgresql/17/bin/pg_restore --list "$FILE" | grep -c "TABLE DATA" || true)
+          echo "Số bảng có dữ liệu: $TABLES"
+          [ "$TABLES" -ge 20 ] || { echo "::error::File backup chỉ có $TABLES bảng, ít bất thường"; exit 1; }
+          echo "FILE=$FILE" >> "$GITHUB_ENV"
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+
+      - name: Đẩy lên Google Drive
+        run: |
+          set -euo pipefail
+          CONF="$RUNNER_TEMP/rclone.conf"
+          printf '%s\n' "$RCLONE_CONF" > "$CONF"
+          chmod 600 "$CONF"
+          rclone --config "$CONF" copy "$FILE" "$REMOTE"
+          [ -s "$RUNNER_TEMP/baba_${STAMP}_cron.csv" ] && rclone --config "$CONF" copy "$RUNNER_TEMP/baba_${STAMP}_cron.csv" "$REMOTE" || true
+          # Kiểm tra file đã nằm trên Drive đúng kích thước
+          rclone --config "$CONF" check "$FILE" "$REMOTE" --one-way --size-only
+          # Xóa bản cũ hơn KEEP_DAYS ngày
+          rclone --config "$CONF" delete "$REMOTE" --min-age "${KEEP_DAYS}d"
+          echo "Các bản đang có trên Drive:"
+          rclone --config "$CONF" lsl "$REMOTE" | sort -k2,3 | tail -10
+          rm -f "$CONF"
