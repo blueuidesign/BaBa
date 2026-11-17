@@ -153,7 +153,7 @@ export default function Home() {
             <span className="ico-box"><Icon name="coin" size={20} /></span>
             <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
               <span className="strong">Tiền đầu ngày</span>
-              <span className="small muted">{data.cashOpen != null ? `${vnd(data.cashOpen)} trong hộp lúc mở bán` : 'Chưa nhập. Nhập để cuối ngày app tự trừ ra.'}</span>
+              <span className="small muted">{data.cashOpen != null ? `${vnd(data.cashOpen)} trong hộp lúc mở bán` : data.cashHint && data.cashHint.amount > 0 ? `Chưa lưu. Ngày ${ddmm(data.cashHint.date)} đếm được ${vnd(data.cashHint.amount)}, bấm để kiểm lại và lưu.` : 'Chưa nhập. Nhập để cuối ngày app tự trừ ra.'}</span>
             </span>
             <span className="small strong" style={{ color: 'var(--ink-brand)' }}>{data.cashOpen != null ? 'Sửa' : 'Nhập'}</span>
           </button>
@@ -207,7 +207,10 @@ export default function Home() {
             <span className="small muted">Số tiền có sẵn trong hộp trước khi bán (tiền lẻ để thối). Cuối ngày bạn có thể đếm cả hộp, app tự trừ số này.</span>
             <MoneyInput value={cashIn} onChange={setCashIn} label="Tiền đầu ngày" big />
             {data.cashOpen == null && data.cashHint && data.cashHint.amount > 0 && (
-              <span className="small muted">Điền sẵn {vnd(data.cashHint.amount)}: tổng tiền mặt trong hộp lúc đối chiếu ngày {ddmm(data.cashHint.date)}. Đếm lại, sửa nếu khác, rồi bấm Lưu. Chưa bấm Lưu thì chưa ghi nhận.</span>
+              <div className="alert warn small" role="note">
+                <Icon name="warn" size={18} sw={2} />
+                <span>Điền sẵn {vnd(data.cashHint.amount)}: đây là tổng tiền mặt đếm được lúc ghi cuối ngày {ddmm(data.cashHint.date)}. Số này chưa được lưu. Đếm lại, sửa nếu khác, rồi bấm Lưu để ghi tiền đầu ngày.</span>
+              </div>
             )}
             {cashErr && <span className="err">{cashErr}</span>}
             <button
