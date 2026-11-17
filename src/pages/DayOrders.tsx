@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { addDays, rangeOf } from '../lib/period';
+import { pctOf } from '../lib/discount';
 import { timeHM, vnd, vnToday, weekdayLabel } from '../lib/format';
 import { Empty, Header, Icon, Loading, Nav, confirmDialog, useToast } from '../components/ui';
 
@@ -39,16 +40,19 @@ export default function Invoices() {
   const [more, setMore] = useState(false);
   const [days, setDays] = useState<Record<string, { orders: number; parts: number; revenue: number }>>({});
   const [unpaid, setUnpaid] = useState<{ n: number; vnd: number } | null>(null);
+  const [only, setOnly] = useState(false); // đang lọc đơn chưa nhận tiền
   const [busyId, setBusyId] = useState<string | null>(null);
   const [err, setErr] = useState<{ id: string; text: string } | null>(null);
 
   async function load(offset: number) {
     if (!outlet) return;
     let qy = supabase.from('orders')
-      .select('id,seq_in_day,business_date,placed_at,total_vnd,discount_vnd,is_gift,payment_method,customer_name,channel,order_lines(qty,product_id,container,discount_qty,discount_unit_vnd)')
+      .select('id,seq_in_day,business_date,placed_at,total_vnd,discount_vnd,is_gift,payment_method,customer_name,channel,order_lines(qty,product_id,container,unit_price_vnd,discount_qty,discount_unit_vnd)')
       .eq('outlet_id', outlet.id).eq('status', 'active').lte('business_date', to)
       .order('business_date', { ascending: false }).order('placed_at', { ascending: false }).range(offset, offset + PAGE - 1);
     if (from) qy = qy.gte('business_date', from);
+    // Lọc: chỉ đơn chưa đánh dấu nhận tiền và không phải đơn tặng (cùng điều kiện với con số Chưa nhận)
+    if (only) qy = qy.eq('is_gift', false).is('payment_method', null).gt('total_vnd', 0);
     const { data } = await qy;
     const got = (data || []) as any[];
     setRows((r) => (offset === 0 ? got : [...(r || []), ...got]));
@@ -78,7 +82,7 @@ export default function Invoices() {
     setErr(null);
     load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [outlet?.id, range, pinned, dataVersion, from, to]);
+  }, [outlet?.id, range, pinned, dataVersion, from, to, only]);
 
   if (!outlet) return null;
   const name = (pid: string) => catalog?.allProducts.find((x) => x.id === pid)?.name || 'Món đã bỏ';
@@ -100,6 +104,17 @@ export default function Invoices() {
     bump();
   }
 
+  /** Danh sách đơn không tách ít đường: gộp các dòng cùng món, cùng bao bì (chi tiết đơn mới hiện ít đường). */
+  const merged = (ls: any[]) => {
+    const m = new Map<string, any>();
+    ls.forEach((l) => {
+      const k = `${l.product_id}-${l.container}`;
+      const x = m.get(k);
+      if (x) { x.qty += l.qty; x.discount_qty += l.discount_qty || 0; x.discount_unit_vnd = x.discount_unit_vnd || l.discount_unit_vnd; }
+      else m.set(k, { ...l, discount_qty: l.discount_qty || 0 });
+    });
+    return [...m.values()];
+  };
   let lastDay = '';
   return (
     <div className="screen">
@@ -126,25 +141,37 @@ export default function Invoices() {
         </div>}
         {!rows ? (
           <Loading />
-        ) : rows.length === 0 ? (
+        ) : rows.length === 0 && !only ? (
           <Empty icon="cart" title={(canManage ? range === 'today' : sRange === 'day' && sOff === 0) ? 'Hôm nay chưa có đơn nào' : 'Không có đơn nào trong khoảng này'} text="Đơn ghi ở màn Bán sẽ hiện ở đây.">
             <Link to="/ban" className="btn">Ghi đơn</Link>
           </Empty>
         ) : (
           <>
             <section className="card" style={{ display: 'flex', flexDirection: 'row', alignItems: 'stretch', gap: 14 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1, opacity: only ? 0.45 : 1 }}>
                 <span className="small strong muted">{sum.orders} đơn · {sum.parts} phần</span>
                 <span style={{ fontSize: 26, fontWeight: 700 }} className="num">{vnd(sum.revenue)}</span>
               </div>
-              {unpaid && <span aria-hidden style={{ width: 1, alignSelf: 'stretch', background: 'var(--border)' }} />}
+              {unpaid && !only && <span aria-hidden style={{ width: 1, alignSelf: 'stretch', background: 'var(--border)' }} />}
               {unpaid && (
-                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 2, flex: 1, minWidth: 0 }}>
-                  <span className="small strong muted">{unpaid.n > 0 ? `Chưa nhận · ${unpaid.n} đơn` : 'Chưa nhận'}</span>
+                <div className={only ? 'unpaid-on' : ''} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 2, flex: 1, minWidth: 0,
+                  ...(only ? { margin: '-16px -16px -16px 0', padding: '16px 16px 16px 14px', borderRadius: '0 var(--radius-lg) var(--radius-lg) 0' } : {}) }}>
+                  <span className="row between" style={{ gap: 8, alignItems: 'baseline' }}>
+                    <span className={`small strong ${only ? '' : 'muted'}`} style={{ whiteSpace: 'nowrap', color: only ? 'var(--warn)' : undefined }}>{unpaid.n > 0 ? `Chưa nhận · ${unpaid.n} đơn` : 'Chưa nhận'}</span>
+                    {(unpaid.n > 0 || only) && (
+                      <button type="button" aria-pressed={only} className="small strong" style={{ border: 0, background: 'transparent', padding: 0, cursor: 'pointer', whiteSpace: 'nowrap', color: only ? 'var(--warn)' : 'var(--ink-brand)' }}
+                        onClick={() => setOnly((v) => !v)}>{only ? 'Bỏ lọc' : 'Lọc'}</button>
+                    )}
+                  </span>
                   <span style={{ fontSize: 18, fontWeight: 700, color: unpaid.vnd > 0 ? 'var(--warn)' : 'var(--ink-muted)' }} className="num">{vnd(unpaid.vnd)}</span>
                 </div>
               )}
             </section>
+            {only && (
+              <span className="xs strong" style={{ color: 'var(--warn)' }}>
+                {rows.length > 0 ? `Đang chỉ hiện ${unpaid?.n ?? rows.length} đơn chưa nhận tiền. Đánh dấu xong đơn nào thì đơn đó rời khỏi danh sách.` : 'Không còn đơn nào chưa nhận tiền trong khoảng này. Bấm Bỏ lọc để xem lại mọi đơn.'}
+              </span>
+            )}
             {rows.map((o: any) => {
               const head = o.business_date !== lastDay;
               lastDay = o.business_date;
@@ -166,11 +193,11 @@ export default function Invoices() {
                         <Icon name="chev" size={18} style={{ color: 'var(--ink-muted)' }} />
                       </span>
                       <span className="strong" style={{ fontSize: 16 }}>{o.customer_name || 'Khách lẻ'}</span>
-                      {o.order_lines.map((l: any, i: number) => (
+                      {merged(o.order_lines).map((l: any, i: number) => (
                         <span key={i} style={{ display: 'contents' }}>
                           <span className="ln"><span>{name(l.product_id)}{l.container === 'coc' ? ' · cốc giấy' : ''}</span><span className="num">× {l.qty}</span></span>
                           {l.discount_qty > 0 && (
-                            <span className="line-disc" style={{ marginTop: -4 }}><span>Giảm 10% · {l.discount_qty} phần × {vnd(l.discount_unit_vnd)}</span><span>− {vnd(l.discount_qty * l.discount_unit_vnd)}</span></span>
+                            <span className="line-disc" style={{ marginTop: -4 }}><span>Giảm {pctOf(l.unit_price_vnd, l.discount_unit_vnd)}% · {l.discount_qty} phần × {vnd(l.discount_unit_vnd)}</span><span>− {vnd(l.discount_qty * l.discount_unit_vnd)}</span></span>
                           )}
                         </span>
                       ))}

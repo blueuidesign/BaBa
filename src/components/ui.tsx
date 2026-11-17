@@ -64,6 +64,21 @@ export function Bottle({ color, size = 40 }: { color: string | null; size?: numb
   );
 }
 
+/** Nút Ít đường: thìa đường đang rắc kèm dấu trừ. Tắt = hình xám trên nền trắng; bật = hình trắng trên nền tím. */
+export function SugarLess({ on, size = 28 }: { on: boolean; size?: number }) {
+  const c = on ? '#fff' : '#8A8A86';
+  const m = on ? 'var(--sugar)' : '#fff';
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <ellipse cx="10.5" cy="9.5" rx="6.5" ry="4.5" transform="rotate(-25 10.5 9.5)" fill={c} />
+      <path d="M16 7.5 28 3" stroke={c} strokeWidth="2.6" strokeLinecap="round" />
+      {[[8, 17], [12.5, 19.5], [6.5, 22], [10.5, 24.5], [15, 24], [7.5, 27.5]].map(([x, y]) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.3" fill={c} />)}
+      <circle cx="24.5" cy="24.5" r="6" fill={c} />
+      <path d="M21.5 24.5h6" stroke={m} strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function Cup({ color, size = 40 }: { color: string | null; size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 48 64" aria-hidden="true">

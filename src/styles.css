@@ -441,3 +441,10 @@ select.input { appearance: auto; }
 /* Chi tiết đơn: nút Đơn tặng hẹp như ở màn Hóa đơn */
 .seg3-gift button { min-height: 48px; font-size: 14px; }
 .seg3-gift button:first-child { flex: 0 0 auto; padding: 0 14px; white-space: nowrap; }
+
+/* Ít đường: nút thìa đường cạnh nút cốc giấy, nhãn tím trên món và trên dòng đơn */
+:root { --sugar: #8E5BA8; }
+.sugar-btn.on { border-color: var(--sugar); background: var(--sugar); }
+.less-tag { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 9px; background: var(--sugar); color: #fff; font-size: 11px; line-height: 18px; font-weight: 700; white-space: nowrap; vertical-align: 2px; }
+/* Hóa đơn: nửa Chưa nhận khi đang lọc */
+.unpaid-on { background: var(--warn-bg); box-shadow: inset 0 0 0 1.5px var(--warn); }
