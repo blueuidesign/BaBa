@@ -6,6 +6,7 @@ import { useLoad } from '../lib/data';
 import { ddmm, timeHM, uuid, vnd, vnToday } from '../lib/format';
 import { Bottle, Header, Icon, Loading, MoneyInput, Nav, confirmDialog, useToast } from '../components/ui';
 
+const QUICK = [500000, 200000, 100000, 50000, 20000, 10000];
 type Step = 1 | 2 | 3 | 4;
 type Saved = { id: string; waste: number; left: number; diff: number | null; at: string };
 
@@ -31,6 +32,7 @@ export default function DayEnd() {
   const [rm, setRm] = useState(false); // chạm món để bớt 1
   const [typing, setTyping] = useState(false); // gõ thẳng số
   const [cash, setCash] = useState('');
+  const [cashMode, setCashMode] = useState<'collected' | 'box' | null>(null);
   const [transfer, setTransfer] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -65,10 +67,16 @@ export default function DayEnd() {
   const nWaste = total(waste);
   const nLeft = total(left);
   const hasMoney = cash !== '' || transfer !== '';
-  const got = (Number(cash) || 0) + (Number(transfer) || 0);
+  // Hai cách nhập tiền mặt như màn đối chiếu cũ: số thu được, hoặc tổng trong hộp (app trừ tiền đầu ngày).
+  // DB luôn lưu TỔNG tiền mặt trong hộp, để hôm sau điền sẵn vào Tiền đầu ngày.
+  const open = data?.open || 0;
+  const mode = cashMode ?? (open > 0 ? 'box' : 'collected');
+  const cashGot = cash === '' ? 0 : mode === 'box' ? Math.max(0, Number(cash) - open) : Number(cash) || 0;
+  const cashBox = mode === 'box' ? Number(cash) || 0 : (Number(cash) || 0) + open;
+  const got = cashGot + (Number(transfer) || 0);
   const expected = (data?.eCash || 0) + (data?.eTransfer || 0);
   // Tiền mặt trong hộp gồm cả tiền đầu ngày, nên trừ ra trước khi so với đơn
-  const diff = hasMoney ? got - (cash !== '' ? data?.open || 0 : 0) - expected : null;
+  const diff = hasMoney ? got - expected : null;
   const money = (v: number) => (v < 0 ? `− ${vnd(-v)}` : v > 0 ? `+ ${vnd(v)}` : vnd(0));
 
   async function quit() {
@@ -78,7 +86,7 @@ export default function DayEnd() {
   }
 
   function reset() {
-    setStep(1); setWaste({}); setLeft({}); setCash(''); setTransfer(''); setNote(''); setEditId(null); setErr(null); setRm(false); setTyping(false);
+    setStep(1); setWaste({}); setLeft({}); setCash(''); setCashMode(null); setTransfer(''); setNote(''); setEditId(null); setErr(null); setRm(false); setTyping(false);
   }
   function go(d: string) {
     reset();
@@ -104,6 +112,7 @@ export default function DayEnd() {
     ((ex.day_end_lines || []) as any[]).forEach((x) => { if (x.waste_qty > 0) w[x.product_id] = x.waste_qty; if (x.left_qty > 0) l[x.product_id] = x.left_qty; });
     setWaste(w); setLeft(l);
     setCash(ex.cash_counted_vnd != null ? String(ex.cash_counted_vnd) : '');
+    setCashMode('box'); // số đã lưu là tổng trong hộp
     setTransfer(ex.transfer_counted_vnd != null ? String(ex.transfer_counted_vnd) : '');
     setNote(ex.money_note || '');
     setErr(null); setStep(1); setEditId(ex.id);
@@ -119,7 +128,7 @@ export default function DayEnd() {
       p: {
         outlet_id: outlet!.id, client_id: uuid(), business_date: date,
         lines: [...ids].map((pid) => ({ product_id: pid, waste_qty: waste[pid] || 0, left_qty: left[pid] || 0 })),
-        ...(cash !== '' ? { cash_counted_vnd: Number(cash) || 0 } : {}), ...(transfer !== '' ? { transfer_counted_vnd: Number(transfer) || 0 } : {}),
+        ...(cash !== '' ? { cash_counted_vnd: cashBox } : {}), ...(transfer !== '' ? { transfer_counted_vnd: Number(transfer) || 0 } : {}),
         money_note: note
       }
     });
@@ -182,7 +191,8 @@ export default function DayEnd() {
             <div className="h2">Kiểm tiền</div>
             {exDiff == null ? <span className="small muted">Không kiểm tiền.</span> : (
               <>
-                <div className="row between small"><span>Thu được</span><span className="num">{vnd((ex.cash_counted_vnd || 0) + (ex.transfer_counted_vnd || 0))}</span></div>
+                <div className="row between small"><span>Thu được</span><span className="num">{vnd(Math.max(0, (ex.cash_counted_vnd || 0) - (ex.cash_counted_vnd != null ? ex.cash_open_vnd || 0 : 0)) + (ex.transfer_counted_vnd || 0))}</span></div>
+                {ex.cash_counted_vnd != null && <div className="row between small"><span>Tổng tiền mặt trong hộp</span><span className="num">{vnd(ex.cash_counted_vnd)}</span></div>}
                 <div className="row between small"><span>Lệch so với đơn</span><strong className="num" style={{ color: exDiff ? 'var(--danger)' : 'var(--ink-brand)' }}>{money(exDiff)}</strong></div>
                 {ex.money_note && <span className="xs muted">Ghi chú: {ex.money_note}</span>}
               </>
@@ -296,10 +306,23 @@ export default function DayEnd() {
           <section className="card">
             <div className="h2">Kiểm tiền</div>
             <span className="small muted">Không bắt buộc. Để trống cả hai ô rồi bấm Tiếp theo nếu không kiểm.</span>
+            <div className="seg" role="tablist" aria-label="Cách nhập tiền mặt">
+              <button type="button" className={mode === 'collected' ? 'on' : ''} onClick={() => setCashMode('collected')}>Số tiền thu được</button>
+              <button type="button" className={mode === 'box' ? 'on' : ''} onClick={() => setCashMode('box')}>Tổng tiền trong hộp</button>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span className="small strong">Tiền mặt đếm được</span>
-              <MoneyInput label="Tiền mặt đếm được" value={cash} onChange={setCash} placeholder="Để trống nếu không đếm" />
-              <span className="xs muted">Đếm cả hộp tiền{(data?.open || 0) > 0 ? `, app tự trừ ${vnd(data!.open)} tiền đầu ngày` : ''}.</span>
+              <span className="small strong">{mode === 'box' ? 'Tổng tiền mặt trong hộp' : 'Tiền mặt thu được hôm nay'}</span>
+              <MoneyInput label={mode === 'box' ? 'Tổng tiền mặt trong hộp' : 'Tiền mặt thu được hôm nay'} value={cash} onChange={setCash} placeholder="Để trống nếu không đếm" />
+              <span className="xs muted">
+                {mode === 'box'
+                  ? open > 0 ? `App trừ tiền đầu ngày ${vnd(open)} → thu được ${vnd(cashGot)}.` : 'Hôm nay chưa ghi tiền đầu ngày nên app không trừ gì. Nếu trong hộp có tiền lẻ sẵn, chọn "Số tiền thu được".'
+                  : open > 0 ? `Không tính ${vnd(open)} tiền đầu ngày. Tổng trong hộp sẽ là ${vnd(cashBox)}.` : 'Đã trừ tiền lẻ có sẵn lúc mở bán.'}
+              </span>
+              <div className="chips wrap">
+                <span className="xs muted strong" style={{ alignSelf: 'center' }}>Cộng nhanh</span>
+                {QUICK.map((q) => <button type="button" key={q} className="chip action" style={{ minHeight: 34, fontSize: 13, padding: '0 10px' }} onClick={() => setCash(String(Number(cash || 0) + q))}>+{q / 1000}k</button>)}
+                {cash && <button type="button" className="chip action" style={{ minHeight: 34, fontSize: 13, padding: '0 10px' }} onClick={() => setCash('')}>Xóa</button>}
+              </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <span className="small strong">Chuyển khoản nhận được</span>
@@ -308,7 +331,6 @@ export default function DayEnd() {
             {hasMoney && (
               <div>
                 <div className="row between small"><span>Thu được</span><span className="num">{vnd(got)}</span></div>
-                {cash !== '' && (data?.open || 0) > 0 && <div className="row between small"><span>Trừ tiền đầu ngày</span><span className="num">− {vnd(data!.open)}</span></div>}
                 <div className="row between small"><span>Theo đơn đã đánh dấu nhận tiền</span><span className="num">{vnd(expected)}</span></div>
                 <div className="row between"><strong>Lệch</strong><strong className="num" style={{ color: diff ? 'var(--danger)' : 'var(--ink-brand)' }}>{money(diff || 0)}</strong></div>
               </div>
@@ -355,9 +377,11 @@ export default function DayEnd() {
           {diff == null ? <span className="small muted">Không kiểm tiền.</span> : (
             <>
               <div className="row between small"><span>Thu được</span><span className="num">{vnd(got)}</span></div>
+              {cash !== '' && <div className="row between small"><span>Tổng tiền mặt trong hộp</span><span className="num">{vnd(cashBox)}</span></div>}
               <div className="row between small"><span>Lệch so với đơn</span><strong className="num" style={{ color: diff ? 'var(--danger)' : 'var(--ink-brand)' }}>{money(diff)}</strong></div>
             </>
           )}
+        {cash !== '' && <span className="xs muted">Tổng tiền mặt trong hộp sẽ được điền sẵn vào Tiền đầu ngày của hôm sau, bạn bấm Lưu thì mới ghi.</span>}
         </section>
       </main>
       <div className="bar" style={{ bottom: 0, paddingBottom: 'calc(12px + var(--safe-b))' }}>
