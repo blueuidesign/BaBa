@@ -41,7 +41,9 @@ export default function Home() {
         .eq('status', 'active')
         .order('placed_at', { ascending: false })
         .limit(5),
-      supabase.from('day_ends').select('id').eq('outlet_id', oid).eq('business_date', today).eq('status', 'active').limit(1),
+      // Bản ghi cuối ngày gần nhất (hôm nay hoặc ngày trước) để hiện báo cáo trên Trang chủ
+      supabase.from('day_ends').select('id,business_date,left_total,waste_total,cash_counted_vnd,transfer_counted_vnd,cash_open_vnd,expected_cash_vnd,expected_transfer_vnd')
+        .eq('outlet_id', oid).eq('status', 'active').lte('business_date', today).order('business_date', { ascending: false }).limit(1),
       supabase.from('cash_opens').select('amount_vnd').eq('outlet_id', oid).eq('business_date', today).order('created_at', { ascending: false }).limit(1)
     ]);
     // Gợi ý tiền đầu ngày: số tiền mặt đếm được trong hộp ở lần ghi cuối ngày gần nhất
@@ -54,7 +56,7 @@ export default function Home() {
     return {
       cashHint,
       sales, stock, recent: recent.data || [],
-      ended: (closes.data || []).length > 0,
+      ended: (closes.data || [])[0]?.business_date === today, lastEnd: ((closes.data || [])[0] as any) || null,
       cashOpen: (cashOpen.data || [])[0]?.amount_vnd as number | undefined
     };
   });
@@ -158,6 +160,24 @@ export default function Home() {
             <span className="small strong" style={{ color: 'var(--ink-brand)' }}>{data.cashOpen != null ? 'Sửa' : 'Nhập'}</span>
           </button>
         )}
+
+        {data.lastEnd && (() => {
+          const e = data.lastEnd;
+          const counted = e.cash_counted_vnd != null || e.transfer_counted_vnd != null;
+          const diff = (e.cash_counted_vnd || 0) - (e.cash_counted_vnd != null ? e.cash_open_vnd || 0 : 0) + (e.transfer_counted_vnd || 0) - (e.expected_cash_vnd || 0) - (e.expected_transfer_vnd || 0);
+          return (
+            <Link to={e.business_date === today ? '/cuoi-ngay' : `/cuoi-ngay?ngay=${e.business_date}`} className="card" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <div className="row between">
+                <span className="h2">Báo cáo cuối ngày · {e.business_date === today ? 'hôm nay' : ddmm(e.business_date)}</span>
+                <Icon name="chev" size={20} style={{ color: 'var(--ink-muted)' }} />
+              </div>
+              <div className="row between small"><span>Hủy</span><strong style={{ color: e.waste_total ? 'var(--danger)' : undefined }}>{e.waste_total} chai</strong></div>
+              <div className="row between small"><span>Tồn sang ngày mai</span><strong>{e.left_total} chai</strong></div>
+              <div className="row between small"><span>Kiểm tiền</span><strong className="num" style={{ color: counted && diff ? 'var(--danger)' : undefined }}>{!counted ? 'không kiểm' : diff === 0 ? 'khớp với đơn' : `lệch ${diff > 0 ? '+ ' : '− '}${vnd(Math.abs(diff))}`}</strong></div>
+              <span className="xs muted">Bấm để xem chi tiết và các ngày trước.</span>
+            </Link>
+          );
+        })()}
 
         <section className="card tight">
           <div className="h2" style={{ padding: '12px 0 2px' }}>Việc hôm nay</div>

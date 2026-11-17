@@ -24,7 +24,9 @@ export default function DayEnd() {
   const [sp, setSp] = useSearchParams();
   // Nhân viên chỉ ghi và sửa trong ngày; chủ cơ sở mở được mọi ngày (DB cũng chặn như vậy)
   const q = sp.get('ngay') || '';
-  const date = canManage && /^\d{4}-\d{2}-\d{2}$/.test(q) && q <= today ? q : today;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(q) && q <= today ? q : today;
+  const canWrite = canManage || date === today; // nhân viên chỉ ghi, sửa trong ngày; ngày cũ chỉ xem
+  const [fillPast, setFillPast] = useState(false); // chủ cơ sở bấm ghi bù cho ngày cũ
   const [editId, setEditId] = useState<string | null>(null);
   const [step, setStep] = useState<Step>(1);
   const [waste, setWaste] = useState<Record<string, number>>({});
@@ -86,7 +88,7 @@ export default function DayEnd() {
   }
 
   function reset() {
-    setStep(1); setWaste({}); setLeft({}); setCash(''); setCashMode(null); setTransfer(''); setNote(''); setEditId(null); setErr(null); setRm(false); setTyping(false);
+    setStep(1); setWaste({}); setLeft({}); setCash(''); setCashMode(null); setTransfer(''); setNote(''); setEditId(null); setErr(null); setRm(false); setTyping(false); setFillPast(false);
   }
   function go(d: string) {
     reset();
@@ -99,7 +101,7 @@ export default function DayEnd() {
     return t.toISOString().slice(0, 10);
   };
   // Chủ cơ sở lùi, tiến ngày để ghi hoặc sửa ngày cũ
-  const dateNav = canManage && (
+  const dateNav = (
     <div className="row between card tight" style={{ padding: '6px 8px' }}>
       <button type="button" className="icon-btn" aria-label="Ngày trước" onClick={() => go(shift(-1))}><Icon name="chev" size={20} sw={2} style={{ transform: 'rotate(180deg)' }} /></button>
       <strong>{date === today ? `Hôm nay · ${ddmm(date)}` : `Ngày ${ddmm(date)}`}</strong>
@@ -174,10 +176,10 @@ export default function DayEnd() {
     const ls = (ex.day_end_lines || []) as any[];
     return (
       <div className="screen">
-        <Header title="Ghi cuối ngày" back="/" sub={`${outlet.name} · ${ddmm(date)}`} />
+        <Header title="Báo cáo cuối ngày" back="/" sub={`${outlet.name} · ${ddmm(date)}`} />
         <main className="main">
           {dateNav}
-          <div className="alert ok" role="status"><Icon name="check" size={20} sw={2} /><span>Đã ghi cuối ngày {ddmm(date)} lúc {timeHM(ex.created_at)}. Bấm Sửa để đổi số; bản cũ được giữ trong lịch sử.</span></div>
+          <span className="xs muted">Ghi lúc {timeHM(ex.created_at)}{ex.created_at.slice(0, 10) !== date ? ` ngày ${ddmm(ex.created_at.slice(0, 10))}` : ''}.{canWrite ? ' Bấm Sửa để đổi số; bản cũ được giữ trong lịch sử.' : ''}</span>
           <section className="card">
             <div className="row between"><span className="h2">Hủy</span><strong style={{ color: ex.waste_total ? 'var(--danger)' : undefined }}>{ex.waste_total} chai</strong></div>
             {ls.filter((l) => l.waste_qty > 0).map((l) => <div key={l.product_id} className="row between small"><span>{nameOf(l.product_id)}</span><span className="num">{l.waste_qty} chai</span></div>)}
@@ -199,16 +201,41 @@ export default function DayEnd() {
             )}
           </section>
           {err && <span className="err">{err}</span>}
-          <div className="row" style={{ gap: 8 }}>
-            <button className="btn secondary" disabled={busy} style={{ flex: 1, color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => undo(ex.id)}>Hoàn tác</button>
-            <button className="btn" disabled={busy} style={{ flex: 1 }} onClick={() => startEdit(ex)}>Sửa</button>
-          </div>
+          {canWrite ? (
+            <div className="row" style={{ gap: 8 }}>
+              <button className="btn secondary" disabled={busy} style={{ flex: 1, color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => undo(ex.id)}>Hoàn tác</button>
+              <button className="btn" disabled={busy} style={{ flex: 1 }} onClick={() => startEdit(ex)}>Sửa</button>
+            </div>
+          ) : <span className="xs muted">Bản ghi của ngày đã qua chỉ chủ cơ sở sửa được.</span>}
         </main>
         <Nav />
         {toast.node}
       </div>
     );
   }
+
+  // Ngày đã qua mà chưa ghi: màn trống, không nhảy thẳng vào form
+  if (date !== today && !saved && !editId && !fillPast)
+    return (
+      <div className="screen">
+        <Header title="Báo cáo cuối ngày" back="/" sub={`${outlet.name} · ${ddmm(date)}`} />
+        <main className="main">
+          {dateNav}
+          <section className="card">
+            <div className="empty" style={{ padding: '8px 0 4px' }}>
+              <span className="circle"><Icon name="scale" size={26} /></span>
+              <strong>Ngày {ddmm(date)} chưa ghi cuối ngày</strong>
+              <span className="small muted">{canManage ? 'Có thể ghi bù số hủy, số tồn và tiền của ngày này.' : 'Bấm mũi tên để xem ngày khác.'}</span>
+            </div>
+            {canManage
+              ? <button className="btn block" onClick={() => setFillPast(true)}>Ghi cuối ngày cho {ddmm(date)}</button>
+              : <button className="btn secondary block" onClick={() => go(today)}>Về hôm nay</button>}
+          </section>
+        </main>
+        <Nav />
+        {toast.node}
+      </div>
+    );
 
   // Bước 1 (CHAI HỦY) và bước 2 (CHAI TỒN): lưới ô món như màn Ghi đơn
   if (step === 1 || step === 2) {
