@@ -1,11 +1,11 @@
-# Sao lưu database Supabase lên Google Drive mỗi tối (22:30 giờ Việt Nam).
+# Sao lưu database Supabase lên Google Drive mỗi đêm (02:00 giờ Việt Nam).
 # Cần 2 secret của repo: SUPABASE_DB_URL (chuỗi Session pooler, cổng 5432) và RCLONE_CONF (cấu hình rclone có mục [gdrive]).
 # Chạy tay: tab Actions → "Backup database" → Run workflow.
 name: Backup database
 
 on:
   schedule:
-    - cron: '30 15 * * *' # 15:30 UTC = 22:30 Asia/Ho_Chi_Minh
+    - cron: '0 19 * * *' # 19:00 UTC hôm trước = 02:00 Asia/Ho_Chi_Minh
   workflow_dispatch:
 
 permissions:
