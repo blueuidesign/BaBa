@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useApp } from './lib/app';
-import { DialogHost, Loading } from './components/ui';
+import { DialogHost, Loading, OfflineGate } from './components/ui';
 import Login from './pages/Login';
 import Outlets from './pages/Outlets';
 import Home from './pages/Home';
@@ -35,8 +35,11 @@ import HourReport from './pages/HourReport';
 import OutletModel from './pages/OutletModel';
 
 export default function App() {
-  const { session, loading, outlet, outlets } = useApp();
+  const { session, loading, outlet, outlets, online } = useApp();
   const loc = useLocation();
+
+  // Không có mạng thì không cho dùng (Tùng 18/11)
+  if (!online) return <OfflineGate />;
 
   if (loading) return <Loading text="Đang mở Kho BaBa…" />;
   if (!session) return <Login />;
