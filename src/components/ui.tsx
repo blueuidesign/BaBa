@@ -90,6 +90,34 @@ export function Cup({ color, size = 40 }: { color: string | null; size?: number 
   );
 }
 
+/** Màn chặn khi mất mạng (Tùng 18/11): app chỉ dùng khi có mạng, để số liệu luôn là số trên máy chủ. */
+export function OfflineGate() {
+  const { recheckOnline, queue } = useApp();
+  const [busy, setBusy] = useState(false);
+  const pending = queue.filter((q) => !q.rejected).length;
+  return (
+    <div className="screen" style={{ justifyContent: 'center' }}>
+      <main className="main" style={{ justifyContent: 'center', minHeight: '100dvh' }} role="alert">
+        <div className="empty">
+          <span className="circle"><Icon name="wifi" size={28} sw={2} /></span>
+          <strong style={{ fontSize: 18 }}>Mất mạng</strong>
+          <span className="small muted">
+            Kho BaBa cần có mạng để ghi đơn và xem số liệu. Bật 4G hoặc Wi-Fi. Có mạng lại là app tự mở, không cần làm gì thêm.
+          </span>
+          {pending > 0 && (
+            <span className="small" style={{ color: 'var(--warn)' }}>
+              {pending} đơn lưu lúc rớt mạng vẫn nằm trên máy, sẽ tự gửi khi có mạng. Đừng đăng xuất.
+            </span>
+          )}
+        </div>
+        <button className="btn block" disabled={busy} onClick={async () => { setBusy(true); await recheckOnline(); setBusy(false); }}>
+          {busy ? 'Đang kiểm tra…' : 'Thử lại'}
+        </button>
+      </main>
+    </div>
+  );
+}
+
 export function Header({ title, sub, back, right }: { title: string; sub?: ReactNode; back?: string | true | (() => void); right?: ReactNode }) {
   const nav = useNavigate();
   const { online, queue } = useApp();
@@ -108,13 +136,10 @@ export function Header({ title, sub, back, right }: { title: string; sub?: React
         </div>
         {right}
       </header>
-      {(!online || pending > 0) && (
+      {online && pending > 0 && (
         <div className="banner" role="status">
-          <Icon name={online ? 'warn' : 'wifi'} size={18} sw={2} style={{ color: 'var(--warn)' }} />
-          <span>
-            {!online ? <strong>Mất mạng. </strong> : null}
-            {pending > 0 ? `${pending} đơn đang chờ gửi, sẽ tự gửi khi có mạng.` : 'Vẫn ghi đơn được, app sẽ gửi khi có mạng lại.'}
-          </span>
+          <Icon name="warn" size={18} sw={2} style={{ color: 'var(--warn)' }} />
+          <span>{pending} đơn lưu lúc rớt mạng đang được gửi lên máy chủ.</span>
         </div>
       )}
     </>

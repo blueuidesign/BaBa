@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
-import { readQueue, subscribeQueue, type QueuedCall } from './queue';
+import { NET_FAIL_EVENT, pingServer, readQueue, subscribeQueue, type QueuedCall } from './queue';
 import { vnToday } from './format';
 
 export type Outlet = { id: string; name: string; model: string; settings: any; price_list_id: string | null; org_id: string };
@@ -43,6 +43,8 @@ type Ctx = {
   reloadOutlets: () => Promise<void>;
   queue: QueuedCall[];
   online: boolean;
+  /** Kiểm tra lại kết nối tới máy chủ (nút Thử lại trên màn Mất mạng). */
+  recheckOnline: () => Promise<boolean>;
   dataVersion: number;
   bump: () => void; // báo cho các màn tải lại số liệu
 };
@@ -94,16 +96,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
       un();
     };
   }, []);
+  // App chỉ dùng khi có mạng (Tùng 18/11). navigator.onLine hay báo "có mạng" dù không ra được internet,
+  // nên khi nghi mất mạng thì gọi thử máy chủ để chắc chắn.
+  const recheckOnline = useCallback(async () => {
+    const ok = await pingServer();
+    setOnline(ok);
+    return ok;
+  }, []);
   useEffect(() => {
-    const on = () => setOnline(true);
+    const on = () => void recheckOnline();
     const off = () => setOnline(false);
     window.addEventListener('online', on);
     window.addEventListener('offline', off);
+    window.addEventListener(NET_FAIL_EVENT, on);
+    void recheckOnline();
     return () => {
       window.removeEventListener('online', on);
       window.removeEventListener('offline', off);
+      window.removeEventListener(NET_FAIL_EVENT, on);
     };
-  }, []);
+  }, [recheckOnline]);
+  // Đang mất mạng: 5 giây thử lại một lần, có mạng là tự mở lại app
+  useEffect(() => {
+    if (online) return;
+    const t = setInterval(() => void recheckOnline(), 5000);
+    return () => clearInterval(t);
+  }, [online, recheckOnline]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -245,6 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     reloadOutlets,
     queue,
     online,
+    recheckOnline,
     dataVersion,
     bump: () => setDataVersion((v) => v + 1)
   };

@@ -49,6 +49,7 @@ App bán hàng và quản lý kho cho sữa hạt **Sữa lành từ BaBa**: PWA
 - **Sổ cái chỉ thêm:** không UPDATE nội dung, không DELETE bản ghi nghiệp vụ. Sai thì tạo bản ghi đảo hoặc điều chỉnh kèm lý do. Không có policy DELETE cho người dùng.
 - **Mọi thao tác ghi đi qua hàm `fn_*`** (`SECURITY DEFINER`, `search_path` cố định), hàm tự kiểm quyền bằng `can_access_outlet` / `can_manage_outlet` / `is_org_admin`. Client không INSERT thẳng vào `stock_movements`.
 - **Bản ghi tạo từ máy có `client_id` uuid** để gửi lại không bị trùng.
+- **App chỉ dùng khi có mạng** (Tùng 18/11/2026): mất mạng thì hiện màn "Mất mạng" chặn toàn bộ app (`OfflineGate`), có mạng lại tự mở. Hàng đợi `src/lib/queue.ts` chỉ còn giữ đơn đang gửi dở đúng lúc rớt mạng. Không làm tính năng dùng ngoại tuyến.
 - **Danh mục có phiên bản** (`valid_from`/`valid_to`); dòng đơn lưu giá và `recipe_id` lúc bán.
 - Tiền là số nguyên VND. `business_date` theo Asia/Ho_Chi_Minh (dùng `vn_today()` ở DB, `vnToday()` ở client).
 - **Phân quyền bằng RLS**; giao diện chỉ ẩn hoặc làm mờ. Ba tầng: `org_memberships` (admin thấy mọi cơ sở), `memberships.role = 'owner'` (chủ một hoặc nhiều cơ sở), `memberships.role = 'staff'` (nhân viên một cơ sở).

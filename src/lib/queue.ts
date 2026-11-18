@@ -1,8 +1,10 @@
 import { supabase } from './supabase';
 
 /**
- * Hàng đợi ngoại tuyến cho các lệnh ghi (bản 1 dùng cho đơn hàng).
- * Mỗi lệnh mang client_id riêng; máy chủ bỏ qua lệnh trùng, nên gửi lại bao nhiêu lần cũng an toàn.
+ * Hàng đợi gửi lại cho lệnh ghi đơn.
+ * Từ 18/11 app chặn hẳn khi mất mạng (màn Mất mạng), nên hàng đợi chỉ còn giữ đơn đang gửi dở
+ * đúng lúc rớt mạng, để có mạng lại thì tự gửi tiếp. Mỗi lệnh mang client_id riêng; máy chủ bỏ qua
+ * lệnh trùng, nên gửi lại bao nhiêu lần cũng an toàn.
  */
 export type QueuedCall = {
   id: string; // = client_id
@@ -45,8 +47,30 @@ export function removeFromQueue(id: string) {
   writeQueue(readQueue().filter((c) => c.id !== id));
 }
 
-const isNetworkError = (e: any) =>
-  !navigator.onLine || /Failed to fetch|NetworkError|network|timeout|aborted/i.test(e?.message || '');
+/** Báo cho app biết vừa gặp lỗi mạng, để app kiểm tra lại và hiện màn Mất mạng nếu đúng là mất. */
+export const NET_FAIL_EVENT = 'kho-baba-net-fail';
+const isNetworkError = (e: any) => {
+  const yes = !navigator.onLine || /Failed to fetch|NetworkError|network|timeout|aborted/i.test(e?.message || '');
+  if (yes) window.dispatchEvent(new Event(NET_FAIL_EVENT));
+  return yes;
+};
+
+/** Gọi thử máy chủ (tối đa 5 giây). Trả lời được, kể cả lỗi, nghĩa là có mạng. */
+export async function pingServer(): Promise<boolean> {
+  if (!navigator.onLine) return false;
+  const url = import.meta.env.VITE_SUPABASE_URL as string;
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    await fetch(`${url}/auth/v1/health`, { headers: { apikey: key }, cache: 'no-store', signal: ctrl.signal });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(t);
+  }
+}
 
 /** Gọi RPC; nếu lỗi mạng thì xếp hàng và trả về { queued: true }. */
 export async function callOrQueue(call: QueuedCall, timeoutMs = 10000): Promise<{ data?: any; queued?: boolean }> {
