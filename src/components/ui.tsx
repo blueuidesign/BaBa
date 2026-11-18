@@ -96,8 +96,8 @@ export function OfflineGate() {
   const [busy, setBusy] = useState(false);
   const pending = queue.filter((q) => !q.rejected).length;
   return (
-    <div className="screen" style={{ justifyContent: 'center' }}>
-      <main className="main" style={{ justifyContent: 'center', minHeight: '100dvh' }} role="alert">
+    <div className="screen">
+      <main className="main no-nav" style={{ alignContent: 'center', minHeight: '100dvh' }} role="alert">
         <div className="empty">
           <span className="circle"><Icon name="wifi" size={28} sw={2} /></span>
           <strong style={{ fontSize: 18 }}>Mất mạng</strong>
