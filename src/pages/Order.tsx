@@ -5,7 +5,8 @@ import { callOrQueue, enqueue, type QueuedCall } from '../lib/queue';
 import { errorText } from '../lib/supabase';
 import { ddmm, timeHM, uuid, vnd, vnToday } from '../lib/format';
 import { Bottle, Cup, Header, Icon, Loading, Nav, SugarLess, confirmDialog } from '../components/ui';
-import { PCTS, allocate, discPayload, discTotal, unitDisc, type Disc } from '../lib/discount';
+import { DEFAULT_DISC, allocate, discError, discLabel, discPayload, discTotal, lineLabel, unitsOf, type Disc } from '../lib/discount';
+import DiscountPicker from '../components/DiscountPicker';
 
 
 export default function Order() {
@@ -30,7 +31,7 @@ export default function Order() {
   const [step, setStep] = useState<'pick' | 'review'>('pick');
   const [pay, setPay] = useState<'cash' | 'transfer' | 'gift' | null>(null);
   const [cust, setCust] = useState('');
-  const [saved, setSaved] = useState<null | { seq?: number; at: string; parts: string; total: number; queued: boolean; cust: string; pay: string | null; disc: number; discParts: number; pct: number }>(null);
+  const [saved, setSaved] = useState<null | { seq?: number; at: string; parts: string; total: number; queued: boolean; cust: string; pay: string | null; disc: number; discText: string }>(null);
   const today = vnToday();
 
   const { data } = useLoad(async (oid) => {
@@ -81,13 +82,15 @@ export default function Order() {
   const setterOf = (cup: boolean, less: boolean) => (cup ? (less ? setCupsL : setCups) : less ? setCountsL : setCounts);
   const mapOf = (cup: boolean, less: boolean) => (cup ? (less ? cupsL : cups) : less ? countsL : counts);
   const isGift = pay === 'gift';
-  // Giảm 5% hoặc 10%: số phần được giảm của từng dòng (giá cao trước), cùng thứ tự với rows
+  // Giảm giá (5%, 10%, theo tiền mỗi phần hoặc tổng đơn): số phần được giảm và tiền giảm mỗi phần của từng dòng, cùng thứ tự với rows
   const dLines = rows.map((r) => ({ price: r.p.price, qty: r.qty }));
-  const ks = allocate(dLines, isGift ? null : discount);
-  const pct = discount?.pct ?? 10;
-  const disc = discTotal(dLines, ks, pct);
+  const dSel = isGift ? null : discount;
+  const ks = allocate(dLines, dSel);
+  const us = unitsOf(dLines, dSel);
+  const discErr = discError(dLines, dSel);
+  const disc = discErr ? 0 : discTotal(dLines, dSel);
   const discParts = ks.reduce((a, b) => a + b, 0);
-  const someN = discount?.parts != null ? Math.min(discount.parts, bottles) : null;
+  const discText = discLabel(dSel, discParts, bottles);
   const total = isGift ? 0 : Math.max(0, gross - disc);
   // Gợi ý khách: chưa gõ thì hiện khách mua gần đây; đang gõ thì lọc theo chữ đã gõ, tên bắt đầu bằng chữ đó xếp trước
   const custKey = cust.trim().toLowerCase();
@@ -199,7 +202,7 @@ export default function Order() {
     setSaved({
       seq: result?.seq_in_day, at: call.payload.placed_at, parts: partsLabel, total: result?.total_vnd ?? total, queued,
       cust: call.payload.customer_name || '', pay: call.payload.is_gift ? 'gift' : call.payload.payment_method || null,
-      disc: result?.discount_vnd ?? disc, discParts, pct
+      disc: result?.discount_vnd ?? disc, discText
     });
     reset();
     bump();
@@ -262,67 +265,19 @@ export default function Order() {
           )}
         </div>
         <div className="sheet-scroll">
-        <p className="small muted">Đơn {partsLabel} · tạm tính {vnd(gross)}. Chọn mức giảm, rồi chọn giảm cả đơn hay một số phần.</p>
-        <div className="seg3" role="radiogroup" aria-label="Mức giảm">
-          {PCTS.map((v) => (
-            <button key={v} type="button" role="radio" aria-checked={discount?.pct === v} className={discount?.pct === v ? 'on' : ''} style={{ minHeight: 44, fontSize: 16 }}
-              onClick={() => setDiscount({ pct: v, parts: discount?.parts ?? null })}>
-              Giảm {v}%
-            </button>
-          ))}
-        </div>
-        <div className="seg3" role="radiogroup" aria-label="Giảm cho">
-          <button type="button" role="radio" aria-checked={!!discount && discount.parts == null} className={discount && discount.parts == null ? 'on' : ''}
-            style={{ flexDirection: 'column', gap: 2, minHeight: 60 }} onClick={() => setDiscount({ pct, parts: null })}>
-            <span>Cả đơn</span>
-            <span className="xs num" style={{ fontWeight: 500, opacity: 0.85 }}>{bottles} phần · − {vnd(discTotal(dLines, allocate(dLines, { pct, parts: null }), pct))}</span>
-          </button>
-          <button type="button" role="radio" aria-checked={discount?.parts != null} className={discount?.parts != null ? 'on' : ''}
-            style={{ flexDirection: 'column', gap: 2, minHeight: 60 }} onClick={() => setDiscount({ pct, parts: someN ?? 1 })}>
-            <span>Một số phần</span>
-            <span className="xs" style={{ fontWeight: 500, opacity: 0.85 }}>chọn số phần được giảm</span>
-          </button>
-        </div>
-        {someN != null && (
-          <div className="row" style={{ gap: 12 }}>
-            <span className="grow">
-              <span className="strong" style={{ display: 'block' }}>Số phần được giảm</span>
-              <span className="xs muted">Đơn có {bottles} phần · giảm phần giá cao nhất trước</span>
-            </span>
-            <span className="stepper">
-              <button type="button" aria-label="Bớt một phần" disabled={someN <= 1} onClick={() => setDiscount({ pct, parts: someN - 1 })}><Icon name="minus" size={20} sw={2.4} /></button>
-              <span className="val" aria-live="polite">{someN}</span>
-              <button type="button" className="plus" aria-label="Thêm một phần" disabled={someN >= bottles} onClick={() => setDiscount({ pct, parts: someN + 1 })}><Icon name="plus" size={20} sw={2.4} /></button>
-            </span>
-          </div>
-        )}
-        {(
-          <div className="disc-list">
-            {rows.map((r, i) => (
-              <div key={r.key} className="row" style={{ gap: 10, opacity: !discount || ks[i] ? 1 : 0.6 }}>
-                {r.container === 'coc' ? <Cup color={r.p.color} size={24} /> : <Bottle color={r.p.color} size={24} />}
-                <span className="grow">
-                  <span className="small strong" style={{ display: 'block' }}>{r.qty} × {rowName(r)}{r.less ? ' · ít đường' : ''}</span>
-                  <span className="xs muted">{vnd(r.p.price)} mỗi phần{!discount ? '' : ' · '}{!discount ? '' : !ks[i] ? 'giữ giá gốc' : ks[i] < r.qty ? `${ks[i]} trong ${r.qty} phần được giảm` : 'được giảm'}</span>
-                </span>
-                {ks[i] > 0 ? (
-                  <span className="num" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <span className="small strong" style={{ display: 'block', color: 'var(--ink-brand)' }}>− {vnd(ks[i] * unitDisc(r.p.price, pct))}</span>
-                    <span className="xs muted">{ks[i]} phần × {vnd(unitDisc(r.p.price, pct))}</span>
-                  </span>
-                ) : discount ? <span className="xs muted" style={{ whiteSpace: 'nowrap' }}>không giảm</span> : <span className="small strong num">{vnd(r.qty * r.p.price)}</span>}
-              </div>
-            ))}
-          </div>
-        )}
+        <p className="small muted" style={{ margin: 0 }}>Đơn {partsLabel} · tạm tính {vnd(gross)}.</p>
+        <DiscountPicker
+          rows={rows.map((r) => ({ key: r.key, name: `${rowName(r)}${r.less ? ' · ít đường' : ''}`, price: r.p.price, qty: r.qty,
+            icon: r.container === 'coc' ? <Cup color={r.p.color} size={24} /> : <Bottle color={r.p.color} size={24} /> }))}
+          disc={discount} setDisc={setDiscount} />
         {discount && (
           <label className="input-wrap">
             <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Lý do (không bắt buộc), vd: khách quen" aria-label="Lý do giảm giá" maxLength={80} />
           </label>
         )}
         </div>
-        <button className="btn lg block" onClick={() => setDiscOpen(false)}>
-          {disc > 0 ? `Giảm ${vnd(disc)} · thu ${vnd(total)}` : 'Xong'}
+        <button className="btn lg block" disabled={!!discErr} onClick={() => setDiscOpen(false)}>
+          {disc > 0 ? `Giảm ${vnd(disc)} · thu ${vnd(total)}` : discErr ? 'Giảm giá' : 'Xong'}
         </button>
       </div>
     </>
@@ -343,7 +298,7 @@ export default function Order() {
             {disc > 0 && !isGift && (
               <div className="row between xs num">
                 <span className="muted">Tạm tính {vnd(gross)}</span>
-                <span className="strong" style={{ color: 'var(--ink-brand)' }}>Giảm {pct}% cho {discParts} phần · − {vnd(disc)}</span>
+                <span className="strong" style={{ color: 'var(--ink-brand)' }}>{discText} · − {vnd(disc)}</span>
               </div>
             )}
             <div style={{ height: 1, background: 'var(--border)' }} />
@@ -354,17 +309,17 @@ export default function Order() {
                   <span className="grow strong">{r.qty} × {rowName(r)}{r.less && <span className="less-tag" style={{ marginLeft: 6 }}>ít đường</span>}</span>
                   <span className="num strong">{vnd(isGift ? 0 : r.qty * r.p.price)}</span>
                 </div>
-                {ks[i] > 0 && (
+                {disc > 0 && ks[i] > 0 && us[i] > 0 && (
                   <div className="row between xs strong num" style={{ paddingLeft: 34, color: 'var(--ink-brand)' }}>
-                    <span>Giảm {pct}% · {ks[i]} phần × {vnd(unitDisc(r.p.price, pct))}</span>
-                    <span>− {vnd(ks[i] * unitDisc(r.p.price, pct))}</span>
+                    <span>{lineLabel(dSel, ks[i], us[i])}</span>
+                    <span>− {vnd(ks[i] * us[i])}</span>
                   </div>
                 )}
               </div>
             ))}
             {disc > 0 && !isGift && (
               <button type="button" className="chip on" style={{ alignSelf: 'flex-start', minHeight: 34, fontSize: 13 }} onClick={() => setDiscOpen(true)}>
-                <Icon name="tag" size={15} /> Giảm {pct}% · {discParts} phần · sửa
+                <Icon name="tag" size={15} /> {discText} · sửa
               </button>
             )}
           </section>
@@ -525,10 +480,10 @@ export default function Order() {
         <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
           {bottles > 0 && (disc > 0 ? (
               <button type="button" className="chip on" style={{ minHeight: 34, fontSize: 13 }} onClick={() => setDiscOpen(true)} aria-label={`Đang giảm ${vnd(disc)}, bấm để sửa`}>
-                <Icon name="tag" size={15} /> Giảm {pct}% · {discount?.parts == null ? 'cả đơn' : `${discParts} phần`} · {vnd(disc)}
+                <Icon name="tag" size={15} /> {discText} · {vnd(disc)}
               </button>
             ) : (
-              <button type="button" className="chip" style={{ minHeight: 34, fontSize: 13 }} onClick={() => setDiscOpen(true)}>
+              <button type="button" className="chip" style={{ minHeight: 34, fontSize: 13 }} onClick={() => { if (!discount) setDiscount(DEFAULT_DISC); setDiscOpen(true); }}>
                 <Icon name="tag" size={15} /> Giảm giá
               </button>
             ))}
@@ -581,7 +536,7 @@ export default function Order() {
             </span>
             <span className="strong">{saved.parts}</span>
             <span className="num" style={{ fontSize: 30, fontWeight: 700, lineHeight: '36px' }}>{vnd(saved.total)}</span>
-            {saved.disc > 0 && <span className="small strong num" style={{ color: 'var(--ink-brand)' }}>Đã giảm {saved.pct}% cho {saved.discParts} phần · − {vnd(saved.disc)}</span>}
+            {saved.disc > 0 && <span className="small strong num" style={{ color: 'var(--ink-brand)' }}>Đã {saved.discText.charAt(0).toLowerCase() + saved.discText.slice(1)} · − {vnd(saved.disc)}</span>}
             <button className="btn secondary block" style={{ marginTop: 8 }} onClick={() => setSaved(null)}>Đóng</button>
             <span className="xs muted">Tự đóng sau 5 giây</span>
             <div className="pop-timer"><div /></div>

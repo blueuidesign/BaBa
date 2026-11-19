@@ -4,7 +4,7 @@ import { useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { useLoad } from '../lib/data';
 import { timeHM, vnd } from '../lib/format';
-import { pctOf } from '../lib/discount';
+import { pctOf, savedLabel } from '../lib/discount';
 import { Header, Icon, Loading, Nav, confirmDialog, reasonDialog, useToast } from '../components/ui';
 
 /** Chi tiết một đơn (mở từ Các đơn trong ngày): món, tiền, khách, cách nhận tiền; hủy đơn bằng bản ghi đảo. */
@@ -19,7 +19,7 @@ export default function OrderDetail() {
   const { data: o, loading } = useLoad(
     async () => {
       const { data } = await supabase.from('orders')
-        .select('id,outlet_id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,is_gift,payment_method,customer_name,note,source,channel,order_lines(qty,product_id,container,sugar,unit_price_vnd,discount_qty,discount_unit_vnd,line_total_vnd)')
+        .select('id,outlet_id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,discount_kind,discount_value,is_gift,payment_method,customer_name,note,source,channel,order_lines(qty,product_id,container,sugar,unit_price_vnd,discount_qty,discount_unit_vnd,line_total_vnd)')
         .eq('id', id).maybeSingle();
       return (data as any) || null;
     },
@@ -68,9 +68,10 @@ export default function OrderDetail() {
   const subtotal = o ? o.order_lines.reduce((a: number, l: any) => a + l.qty * l.unit_price_vnd, 0) : 0;
   const parts = o ? o.order_lines.reduce((a: number, l: any) => a + l.qty, 0) : 0;
   const active = o?.status === 'active';
-  const dLine = o?.order_lines.find((l: any) => l.discount_qty > 0);
-  const discPct = dLine ? pctOf(dLine.unit_price_vnd, dLine.discount_unit_vnd) : 10;
-  const discParts = o ? o.order_lines.reduce((a: number, l: any) => a + (l.discount_qty || 0), 0) : 0;
+  const discText = o && o.discount_vnd > 0 ? savedLabel(o, o.order_lines) : '';
+  const lineDisc = (l: any) => o?.discount_kind === 'order' ? `Phần chia giảm tổng đơn · ${l.discount_qty} phần × ${vnd(l.discount_unit_vnd)}`
+    : o?.discount_kind === 'per_part' ? `Giảm · ${l.discount_qty} phần × ${vnd(l.discount_unit_vnd)}`
+    : `Giảm ${pctOf(l.unit_price_vnd, l.discount_unit_vnd)}% · ${l.discount_qty} phần × ${vnd(l.discount_unit_vnd)}`;
 
   return (
     <div className="screen">
@@ -102,7 +103,7 @@ export default function OrderDetail() {
                   <span className="grow">
                     <span className="strong">{l.qty} × {name(l.product_id)}{l.container === 'coc' ? ' · cốc giấy' : ''}{l.sugar === 'less' && <span className="less-tag" style={{ marginLeft: 6 }}>ít đường</span>}</span>
                     <span className="xs muted" style={{ display: 'block' }}>{vnd(l.unit_price_vnd)} mỗi phần</span>
-                    {l.discount_qty > 0 && <span className="xs strong" style={{ display: 'block', color: 'var(--ink-brand)' }}>Giảm {pctOf(l.unit_price_vnd, l.discount_unit_vnd)}% · {l.discount_qty} phần × {vnd(l.discount_unit_vnd)}</span>}
+                    {l.discount_qty > 0 && <span className="xs strong" style={{ display: 'block', color: 'var(--ink-brand)' }}>{lineDisc(l)}</span>}
                   </span>
                   <span className="num" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <span className="strong" style={{ display: 'block' }}>{vnd(l.qty * l.unit_price_vnd)}</span>
@@ -113,7 +114,7 @@ export default function OrderDetail() {
               {o.discount_vnd > 0 && (
                 <>
                   <div className="row between small" style={{ padding: '8px 0 0' }}><span>Tạm tính</span><span className="num">{vnd(subtotal)}</span></div>
-                  <div className="row between small"><span>{discParts > 0 ? `Giảm ${discPct}% cho ${discParts} phần` : 'Giảm giá'}{o.discount_reason ? ` (${o.discount_reason})` : ''}</span><span className="num">− {vnd(o.discount_vnd)}</span></div>
+                  <div className="row between small"><span>{discText || 'Giảm giá'}{o.discount_reason ? ` (${o.discount_reason})` : ''}</span><span className="num">− {vnd(o.discount_vnd)}</span></div>
                 </>
               )}
               <div className="row between" style={{ padding: '10px 0 12px' }}><span className="strong">Tổng tiền</span><span className="num strong">{vnd(o.total_vnd)}</span></div>

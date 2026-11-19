@@ -1,6 +1,6 @@
 # Mô tả chức năng · Kho BaBa bản 1 · User story
 
-Phiên bản 1.1 · 09/11/2026 · Đã đối chiếu với bản thiết kế 28 màn và thiết kế DB 1.2
+Phiên bản 1.2 · 19/11/2026 · Thêm B-3 (giảm giá), B-4 (đổi ngày bán). Các phần khác còn theo bản 1.1 (09/11/2026), một số đã cũ: xem `Ghi_chu_trien_khai.md` mục 4 và Thiết kế DB mục 9
 
 **Cách đọc.** Mỗi story có: mã, tên, mô tả ngắn (ai, muốn gì, để làm gì), tiêu chí nghiệm thu (Acceptance criteria, viết dạng *Khi… thì…*), và các trường hợp ngoại lệ (Exception) kèm cách app xử lý. Mã màn hình (A04, B01…) trỏ về bản thiết kế.
 
@@ -109,6 +109,41 @@ Phiên bản 1.1 · 09/11/2026 · Đã đối chiếu với bản thiết kế 2
 **Ngoại lệ**
 - Hoàn tác đơn của ngày đã chốt: không cho; muốn sửa thì chủ cơ sở chốt lại ngày đó (E-3) kèm lý do.
 - Hoàn tác khi đơn chưa gửi được lên máy chủ: xóa khỏi hàng chờ, không tạo bản ghi nào.
+
+### B-3 Giảm giá khi ghi đơn hoặc sửa đơn
+**Mô tả.** Là người đứng bán, tôi muốn bớt tiền cho khách quen trong vài chạm, để không phải tính nhẩm và báo cáo vẫn đúng. Thiết kế X01–X05 (thay Y05).
+
+**Tiêu chí nghiệm thu**
+- Khi bấm "Giảm giá" ở màn Ghi đơn thì bảng giảm giá mở với lựa chọn có sẵn **Theo tiền · Mỗi phần · 5.000 đ · Tất cả phần**.
+- Hàng đầu có ba nút theo thứ tự **5% · 10% · Theo tiền**.
+- Khi chọn 5% hoặc 10% thì giảm theo phần trăm giá mỗi phần, cho tất cả phần hoặc một số phần (phần giá cao trước).
+- Khi chọn Theo tiền · Mỗi phần thì mỗi phần bớt một số tiền (nút +/− bước 1.000 đ, nút nhanh 2.000 · 3.000 · 5.000 · 10.000), cho tất cả phần hoặc một số phần.
+- Khi chọn Theo tiền · Tổng đơn thì gõ một khoản cho cả đơn (nút nhanh 5.000 · 10.000 · 15.000 · 20.000); app tự chia theo giá trị từng món để báo cáo lãi từng món đúng.
+- Màn rà soát, hóa đơn, chi tiết đơn ghi rõ kiểu giảm, ví dụ "Giảm 5.000 đ/phần · 5 phần", "Giảm 10.000 đ tổng đơn".
+- Sửa đơn (chủ cơ sở) dùng cùng bộ chọn.
+
+**Ngoại lệ**
+- Giảm mỗi phần lớn hơn giá món rẻ nhất được giảm: nút + khóa, báo "Tối đa … mỗi phần".
+- Giảm tổng đơn lớn hơn tạm tính: báo lỗi, gợi ý chọn Tặng nếu muốn cho không cả đơn.
+- Đơn tặng: không giảm.
+- Đơn mà mọi món có số lượng 0: máy chủ từ chối, không tạo đơn rỗng.
+
+### B-4 Đổi ngày bán của đơn
+**Mô tả.** Là chủ cơ sở, tôi muốn chuyển đơn ghi nhầm ngày sang đúng ngày, một hoặc nhiều đơn một lúc, để doanh thu và kho từng ngày đúng. Thiết kế X06–X10.
+
+**Tiêu chí nghiệm thu**
+- Màn Sửa đơn có dòng **Ngày bán** và nút **Đổi ngày** (chỉ chủ cơ sở, quản trị thấy).
+- Màn Hóa đơn có nút **Chọn**: chạm từng đơn để chọn, có Chọn tất cả, Bỏ chọn; thanh dưới "Đổi ngày N đơn · tổng tiền".
+- Bảng đổi ngày có nút nhanh Hôm kia, Hôm qua, Hôm nay và ô chọn ngày khác. Chỉ chọn được trong 7 ngày gần nhất, không chọn ngày sau hôm nay. Không cần lý do.
+- Trước khi chuyển, bảng hiện thay đổi ở từng ngày: tiền, tiền mặt, số phần kho cộng lại hoặc trừ.
+- Khi chuyển thì đơn cũ thành đã hủy ở ngày cũ (kho cộng lại), đơn mới ở ngày mới mang số tiếp theo của ngày đó, giữ giờ bán, giữ giá, giảm giá, cách nhận tiền, tên khách. Hóa đơn ngày mới ghi "Chuyển từ dd/mm".
+- Lịch sử sửa đơn ghi ai chuyển, lúc nào, từ ngày nào.
+
+**Ngoại lệ**
+- Một đơn trong lô không chuyển được (đã hủy, quá 7 ngày, số liệu nhập gộp): cả lô giữ nguyên, báo rõ đơn nào.
+- Ngày cũ đã ghi cuối ngày và đếm tiền: cảnh báo trước là tiền cần có của ngày đó sẽ lệch.
+- Ngày đã chốt theo cách cũ (trước 17/11): không chuyển vào hoặc ra được.
+- Nhân viên: không thấy nút; gọi thẳng máy chủ cũng bị từ chối.
 
 ---
 

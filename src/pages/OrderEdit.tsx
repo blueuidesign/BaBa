@@ -3,9 +3,11 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { useLoad } from '../lib/data';
-import { timeHM, vnd } from '../lib/format';
+import { ddmm, timeHM, vnd, weekdayLabel } from '../lib/format';
 import { Header, Icon, Loading, Nav, SugarLess, useToast } from '../components/ui';
-import { PCTS, allocate, discPayload, discTotal, pctOf, unitDisc, type Disc, type Pct } from '../lib/discount';
+import { DEFAULT_DISC, allocate, discError, discFromOrder, discLabel, discPayload, discTotal, lineLabel, unitsOf, type Disc } from '../lib/discount';
+import DiscountPicker from '../components/DiscountPicker';
+import MoveDateSheet from '../components/MoveDateSheet';
 
 type Line = { pid: string; container: 'chai' | 'coc'; qty: number; less: boolean };
 
@@ -18,15 +20,14 @@ export default function OrderEdit() {
   const from = new URLSearchParams(useLocation().search).get('from') === 'home' ? '?from=home' : '';
   const { data: o, loading } = useLoad(async () => {
     const { data } = await supabase.from('orders')
-      .select('id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,is_gift,payment_method,customer_name,order_lines(qty,product_id,container,sugar,unit_price_vnd,discount_qty,discount_unit_vnd)')
+      .select('id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,discount_kind,discount_value,is_gift,payment_method,customer_name,order_lines(qty,product_id,container,sugar,unit_price_vnd,discount_qty,discount_unit_vnd)')
       .eq('id', id).maybeSingle();
     return (data as any) || null;
   }, [id]);
   const [lines, setLines] = useState<Line[]>([]);
   // 'old' = đơn đang giảm một số tiền theo cách cũ (trước 16/11): giữ nguyên số đó cho tới khi chọn lại
-  const [dMode, setDMode] = useState<'none' | 'all' | 'some' | 'old'>('none');
-  const [dN, setDN] = useState(1);
-  const [dPct, setDPct] = useState<Pct>(10);
+  const [disc, setDisc] = useState<Disc | 'old'>(null);
+  const [moveOpen, setMoveOpen] = useState(false);
   const [addLess, setAddLess] = useState(false);
   const [discWhy, setDiscWhy] = useState('');
   const [why, setWhy] = useState('');
@@ -39,12 +40,7 @@ export default function OrderEdit() {
   useEffect(() => {
     if (!o) return;
     setLines(o.order_lines.map((l: any) => ({ pid: l.product_id, container: l.container === 'coc' ? 'coc' : 'chai', qty: l.qty, less: l.sugar === 'less' })));
-    const dl = o.order_lines.find((l: any) => l.discount_qty > 0);
-    if (dl) setDPct(pctOf(dl.unit_price_vnd, dl.discount_unit_vnd));
-    const dq = o.order_lines.reduce((a: number, l: any) => a + (l.discount_qty || 0), 0);
-    const all = o.order_lines.reduce((a: number, l: any) => a + l.qty, 0);
-    setDMode(!o.discount_vnd ? 'none' : !dq ? 'old' : dq >= all ? 'all' : 'some');
-    setDN(dq && dq < all ? dq : 1);
+    setDisc(discFromOrder(o, o.order_lines));
     setDiscWhy(o.discount_reason || '');
     setPay(o.is_gift ? 'gift' : o.payment_method || null);
     setCust(o.customer_name || '');
@@ -57,12 +53,13 @@ export default function OrderEdit() {
   const isGift = pay === 'gift';
   const gross = isGift ? 0 : kept.reduce((s, l) => s + l.qty * (prod(l.pid)?.price || 0), 0);
   const parts = kept.reduce((s, l) => s + l.qty, 0);
-  const someN = Math.max(1, Math.min(dN, parts));
-  const dSel: Disc = isGift || dMode === 'none' || dMode === 'old' ? null : { pct: dPct, parts: dMode === 'all' ? null : someN };
+  const dSel: Disc = isGift || disc === 'old' ? null : disc;
   const dLines = lines.map((l) => ({ price: prod(l.pid)?.price || 0, qty: l.qty }));
   const ks = allocate(dLines, dSel);
-  const oldDisc = !isGift && dMode === 'old' ? o?.discount_vnd || 0 : 0;
-  const discN = dSel ? discTotal(dLines, ks, dPct) : oldDisc;
+  const us = unitsOf(dLines, dSel);
+  const discErr = discError(dLines, dSel);
+  const oldDisc = !isGift && disc === 'old' ? o?.discount_vnd || 0 : 0;
+  const discN = dSel ? (discErr ? 0 : discTotal(dLines, dSel)) : oldDisc;
   const discParts = ks.reduce((a, b) => a + b, 0);
   const total = gross - discN;
 
@@ -82,6 +79,7 @@ export default function OrderEdit() {
   async function save() {
     setErr(null);
     if (!kept.length) return setErr('Đơn phải còn ít nhất một món. Muốn bỏ cả đơn thì quay lại và bấm Hủy đơn.');
+    if (discErr) return setErr(discErr);
     if (discN > gross) return setErr(`Giảm ${vnd(discN)} lớn hơn tiền đơn ${vnd(gross)}. Sửa lại số giảm giá.`);
     setBusy(true);
     const { data, error } = await supabase.rpc('fn_edit_order', {
@@ -113,6 +111,17 @@ export default function OrderEdit() {
             <p className="small muted">
               Đơn lúc {timeHM(o.placed_at)}, {o.customer_name || 'khách lẻ'}, đang là {vnd(o.total_vnd)}. Khi lưu, đơn cũ được đánh dấu đã sửa và một đơn mới thay thế, cùng giờ bán. Giá tính theo bảng giá của ngày bán.
             </p>
+            <section className="card">
+              <div className="row" style={{ gap: 10 }}>
+                <span className="muted" style={{ display: 'flex' }}><Icon name="calendar" size={20} /></span>
+                <span className="grow">
+                  <span className="xs strong muted" style={{ display: 'block', textTransform: 'uppercase', letterSpacing: '.04em' }}>Ngày bán</span>
+                  <span className="strong">{weekdayLabel(o.business_date)} · {timeHM(o.placed_at)}</span>
+                </span>
+                <button type="button" className="chip" style={{ minHeight: 40 }} onClick={() => setMoveOpen(true)}>Đổi ngày</button>
+              </div>
+              <span className="xs muted">Đổi ngày thì lưu ngay, không cần bấm Lưu sửa đổi. Muốn vừa đổi món vừa đổi ngày: lưu sửa món trước.</span>
+            </section>
             <section className="card tight">
               <div className="h2" style={{ padding: '12px 0 2px' }}>Món</div>
               {lines.map((l, i) => (
@@ -120,7 +129,7 @@ export default function OrderEdit() {
                   <span className="grow">
                     <span className="strong">{prod(l.pid)?.name || 'Món đã bỏ'}{l.container === 'coc' ? ' · cốc giấy' : ''}{l.less && <span className="less-tag" style={{ marginLeft: 6 }}>ít đường</span>}</span>
                     <span className="xs muted" style={{ display: 'block' }}>{l.qty ? `${vnd(prod(l.pid)?.price || 0)} mỗi phần` : 'Sẽ bỏ khỏi đơn'}</span>
-                    {ks[i] > 0 && <span className="xs strong" style={{ display: 'block', color: 'var(--ink-brand)' }}>Giảm {dPct}% · {ks[i]} phần × {vnd(unitDisc(prod(l.pid)?.price || 0, dPct))}</span>}
+                    {discN > 0 && ks[i] > 0 && us[i] > 0 && <span className="xs strong" style={{ display: 'block', color: 'var(--ink-brand)' }}>{lineLabel(dSel, ks[i], us[i])}</span>}
                   </span>
                   <button type="button" className="icon-btn" aria-label="Bớt một" disabled={l.qty === 0} onClick={() => step(i, -1)}><Icon name="minus" size={18} sw={2.4} /></button>
                   <span className="num strong" style={{ minWidth: 28, textAlign: 'center' }}>{l.qty}</span>
@@ -157,51 +166,39 @@ export default function OrderEdit() {
 
             {!isGift && (
               <section className="card">
-                <div className="h2">Giảm giá</div>
-                {dMode === 'old' && (
-                  <div className="alert warn small">
-                    Đơn này đang giảm {vnd(oldDisc)} theo cách cũ (một số tiền ở tổng đơn). Không chọn gì thì giữ nguyên số đó. Chọn một nút bên dưới thì app tính lại theo 5% hoặc 10%.
-                  </div>
-                )}
-                <div className="seg3" role="radiogroup" aria-label="Giảm giá">
-                  {([['none', 'Không giảm'], ['all', 'Cả đơn'], ['some', 'Một số']] as ['none' | 'all' | 'some', string][]).map(([k, l]) => (
-                    <button key={k} type="button" role="radio" aria-checked={dMode === k} className={dMode === k ? 'on' : ''} style={{ fontSize: 14 }} onClick={() => setDMode(k)}>
-                      {dMode === k && <Icon name="check" size={16} sw={2.6} />}{l}
-                    </button>
-                  ))}
+                <div className="row between">
+                  <div className="h2">Giảm giá</div>
+                  {disc ? (
+                    <button type="button" className="small strong" style={{ border: 0, background: 'transparent', color: 'var(--danger)', cursor: 'pointer', minHeight: 36 }}
+                      onClick={() => setDisc(null)}>Bỏ giảm giá</button>
+                  ) : (
+                    <button type="button" className="chip" style={{ minHeight: 36, fontSize: 13 }} onClick={() => setDisc(DEFAULT_DISC)}><Icon name="tag" size={15} /> Thêm giảm giá</button>
+                  )}
                 </div>
-                {(dMode === 'all' || dMode === 'some') && (
-                  <div className="seg3" role="radiogroup" aria-label="Mức giảm">
-                    {PCTS.map((v) => (
-                      <button key={v} type="button" role="radio" aria-checked={dPct === v} className={dPct === v ? 'on' : ''} style={{ minHeight: 44 }} onClick={() => setDPct(v)}>Giảm {v}%</button>
-                    ))}
+                {disc === 'old' && (
+                  <div className="alert warn small">
+                    Đơn này đang giảm {vnd(oldDisc)} theo cách cũ (một số tiền ở tổng đơn, chưa chia vào món). Không chọn gì thì giữ nguyên số đó.
+                    <button type="button" className="chip" style={{ marginTop: 8, minHeight: 36 }} onClick={() => setDisc({ kind: 'order', amount: oldDisc })}>Chuyển sang giảm tổng đơn {vnd(oldDisc)}</button>
                   </div>
                 )}
-                {dMode === 'some' && (
-                  <div className="row" style={{ gap: 12 }}>
-                    <span className="grow">
-                      <span className="strong" style={{ display: 'block' }}>Số phần được giảm</span>
-                      <span className="xs muted">Đơn có {parts} phần · giảm phần giá cao nhất trước</span>
-                    </span>
-                    <span className="stepper">
-                      <button type="button" aria-label="Bớt một phần" disabled={someN <= 1} onClick={() => setDN(someN - 1)}><Icon name="minus" size={20} sw={2.4} /></button>
-                      <span className="val" aria-live="polite">{someN}</span>
-                      <button type="button" className="plus" aria-label="Thêm một phần" disabled={someN >= parts} onClick={() => setDN(someN + 1)}><Icon name="plus" size={20} sw={2.4} /></button>
-                    </span>
-                  </div>
+                {disc && disc !== 'old' && (
+                  <DiscountPicker
+                    rows={lines.map((l) => ({ key: l.pid + l.container + (l.less ? 'l' : ''), name: `${prod(l.pid)?.name || 'Món đã bỏ'}${l.container === 'coc' ? ' · cốc giấy' : ''}${l.less ? ' · ít đường' : ''}`,
+                      price: prod(l.pid)?.price || 0, qty: l.qty }))}
+                    disc={disc} setDisc={setDisc} />
                 )}
                 {discN > 0 && (
                   <>
                     <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                       <div className="row between small"><span>Tạm tính</span><span className="num">{vnd(gross)}</span></div>
                       <div className="row between small" style={{ color: 'var(--ink-brand)' }}>
-                        <span>{dSel ? `Giảm ${dPct}% cho ${discParts} phần` : 'Giảm theo cách cũ'}</span><span className="num">− {vnd(discN)}</span>
+                        <span>{dSel ? discLabel(dSel, discParts, parts) : 'Giảm theo cách cũ'}</span><span className="num">− {vnd(discN)}</span>
                       </div>
                     </div>
                     <label className="input-wrap"><input value={discWhy} onChange={(e) => setDiscWhy(e.target.value)} placeholder="Lý do giảm (không bắt buộc)" aria-label="Lý do giảm giá" maxLength={80} /></label>
                   </>
                 )}
-                {dSel && <span className="xs muted">Đổi số lượng món ở trên thì app tự chọn lại phần được giảm.</span>}
+                {!disc && <span className="xs muted">Đơn không giảm giá.</span>}
               </section>
             )}
 
@@ -226,6 +223,19 @@ export default function OrderEdit() {
             </button>
           </div>
         </div>
+      )}
+      {moveOpen && o && (
+        <MoveDateSheet outletId={outlet.id}
+          orders={[{ id: o.id, seq: o.seq_in_day, date: o.business_date, time: timeHM(o.placed_at), customer: o.customer_name || 'Khách lẻ', total: o.total_vnd,
+            cash: o.payment_method === 'cash', parts: o.order_lines.reduce((a: number, l: any) => a + l.qty, 0) }]}
+          onClose={() => setMoveOpen(false)}
+          onDone={(r) => {
+            setMoveOpen(false);
+            bump();
+            const m = r.moved[0];
+            toast.show(`Đã chuyển sang ${ddmm(r.business_date)}, số mới #${m.seq_in_day}`);
+            nav(`/bao-cao/don/${m.id}${from}`, { replace: true });
+          }} />
       )}
       <Nav />
     </div>

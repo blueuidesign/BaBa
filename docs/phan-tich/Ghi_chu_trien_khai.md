@@ -28,6 +28,9 @@ Bản thiết kế gốc là artifact Design `5a78cd59-3e4a-4a15-b6be-f7d2cb82e6
 | Mã | Tên | Route | File |
 | --- | --- | --- | --- |
 | A01, A02, S01 | Đăng nhập, nhập mã, lỗi mã | (khi chưa đăng nhập) | `src/pages/Login.tsx` |
+| X01–X05 | Giảm giá: 5% · 10% · Theo tiền (19/11) | sheet trong Ghi đơn, thẻ trong Sửa đơn | `src/components/DiscountPicker.tsx`, `src/lib/discount.ts` |
+| X06–X08 | Sửa đơn: Ngày bán, Đổi ngày | `/bao-cao/don/:id/sua` | `src/pages/OrderEdit.tsx`, `src/components/MoveDateSheet.tsx` |
+| X09–X10 | Hóa đơn: Chọn nhiều đơn, đổi ngày | `/hoa-don` | `src/pages/DayOrders.tsx`, `src/components/MoveDateSheet.tsx` |
 | A03 | Chọn / tạo cơ sở | `/co-so` | `src/pages/Outlets.tsx` |
 | A04, S02 | Trang chủ, trang chủ trống đầu ngày | `/` | `src/pages/Home.tsx` |
 | B01, S03, S04 | Ghi đơn, mất mạng / món hết, lỗi lưu | `/ban` | `src/pages/Order.tsx` |

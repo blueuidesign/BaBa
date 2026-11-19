@@ -456,3 +456,7 @@ select.input { appearance: auto; }
 
 /* Không cho phóng to app bằng hai ngón tay hay chạm đúp (Tùng 17/11); vẫn cuộn dọc, ngang bình thường */
 html, body { touch-action: pan-x pan-y; }
+
+/* Ô tích khi chọn nhiều đơn (Hóa đơn → Chọn, đổi ngày bán) */
+.check-box { width: 24px; height: 24px; flex-shrink: 0; border-radius: 7px; border: 2px solid #bdbdbd; background: var(--bg-100, #fff); display: inline-flex; align-items: center; justify-content: center; color: #fff; }
+.check-box.on { border-color: var(--brand); background: var(--brand); }
