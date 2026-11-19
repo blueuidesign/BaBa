@@ -1,6 +1,6 @@
 # Thiết kế cơ sở dữ liệu · Kho BaBa bản 1
 
-Phiên bản 1.4 · 17/11/2026 · PostgreSQL 17 trên Supabase (project `BaBa`, vùng ap-southeast-1) · khớp migration `0001`–`0062`
+Phiên bản 1.5 · 19/11/2026 · PostgreSQL 17 trên Supabase (project `BaBa`, vùng ap-southeast-1) · khớp migration `0001`–`0063`
 
 > **Đọc trước:** các mục 1–8 là thiết kế gốc (bản 1.2, 09/11/2026) và được giữ nguyên để biết lý do ban đầu. Từ đó tới nay đã có 53 migration nữa.
 > Những chỗ thiết kế gốc **không còn đúng** được liệt kê ở mục 9.1; mọi bảng, cột, hàm thêm sau nằm ở mục 9.2–9.6.
@@ -544,7 +544,7 @@ Những thứ **cố ý chưa làm** vì chưa có nhu cầu và thêm sau khôn
 
 ---
 
-## 9. Thay đổi sau bản 1.2 (migration 0010–0062)
+## 9. Thay đổi sau bản 1.2 (migration 0010–0063)
 
 Cấu trúc mô tả ở mục này đã được đối chiếu tự động với database production ngày 17/11/2026: dựng database trống từ 62 migration rồi so cột, ràng buộc, index, policy, trigger và nội dung hàm. Kết quả khớp (xem `tests/README.md`).
 
@@ -610,6 +610,7 @@ Tiền lệch = `cash_counted − cash_open + transfer_counted − expected_cash
 | `order_lines` | `container` | `chai` (mặc định) hoặc `coc` | 0035 |
 | `order_lines` | `sugar` | null hoặc `'less'` (ít đường, 20 ml syrup) | 0056 |
 | `order_lines` | `discount_qty`, `discount_unit_vnd` | số phần của dòng được giảm và tiền giảm mỗi phần. `line_total_vnd` vẫn là tiền trước giảm | 0054 |
+| `orders` | `discount_kind`, `discount_value` | kiểu giảm: `pct` (giá trị 5 hoặc 10), `per_part` (số đồng mỗi phần), `order` (số đồng cho cả đơn). Null = không giảm hoặc đơn trước 0063 (app suy 5%/10% từ dòng) | 0063 |
 | `order_lines` | `unit_cost_vnd` | giá vốn chuẩn một phần, trigger `trg_order_line_cost` chụp lúc ghi đơn | 0051 |
 | `products` | `cost_syrup_ml` | số ml syrup của một phần đường thường (30; Matcha, Cacao 40) | 0051 |
 | `ingredients` | `piece_g` | số gam một quả, để nhập hoa quả theo quả | 0031 |
@@ -618,6 +619,20 @@ Tiền lệch = `cash_counted − cash_open + transfer_counted − expected_cash
 | `stock_movements` | `reason` có thêm `reversal` | dòng đảo khi hủy đơn, hoàn tác ghi cuối ngày (mục 3.6 gốc chưa liệt kê) | 0004 |
 
 Một ngoại lệ có chủ ý của nguyên tắc sổ cái nối thêm: `fn_set_order_gift` và `fn_set_order_info` **sửa thẳng** đơn cũ (đánh dấu tặng, ghi cách nhận tiền, tên khách) để số thứ tự đơn không đổi; thay đổi được ghi vào `audit_log` (0041).
+
+### 9.3a Giảm giá và đổi ngày bán (0063)
+
+**Giảm giá.** `fn_post_order(p)` nhận `discount_kind` và `discount_amount` (app cũ gửi `discount_pct`, vẫn chạy).
+
+| Kiểu | Cách tính | Chặn |
+| --- | --- | --- |
+| `pct` | 5% hoặc 10% giá mỗi phần, làm tròn tới đồng; cả đơn hoặc N phần giá cao nhất | chỉ 5 hoặc 10 |
+| `per_part` | bớt `discount_amount` đồng mỗi phần; cả đơn hoặc N phần giá cao nhất | không quá giá của món được giảm |
+| `order` | một khoản cho cả đơn. Mỗi phần chịu `floor(khoản × giá / tạm tính)`; phần lẻ vài đồng tính ở `orders.discount_vnd` | không quá tạm tính |
+
+Đơn tặng bỏ qua giảm giá. Đơn mà mọi dòng có số lượng ≤ 0 bị từ chối.
+
+**Đổi ngày bán.** `fn_move_orders(p_orders uuid[], p_date date)`: chủ cơ sở, quản trị. Ngày mới và ngày cũ đều phải trong 7 ngày gần nhất, ngày mới không sau hôm nay, không vào ngày đã chốt kiểu cũ (`day_closes`). Với mỗi đơn theo thứ tự giờ bán: `_reverse_order_core` (ngày cũ cộng lại kho), ghi đơn mới ở ngày mới với số thứ tự tiếp theo, chép nguyên dòng đơn (giá, giảm, giá vốn) và các dòng trừ kho, giữ giờ bán, ghi `audit_log` `action = 'move'` (`new_row.moved_from`). Một đơn lỗi thì cả lô hoàn lại.
 
 ### 9.4 Trừ kho lúc bán
 
@@ -638,6 +653,7 @@ Tồn kho được phép âm: số âm nghĩa là thiếu số nhập hoặc s�
 | Hàm | Ai gọi được | Việc |
 | --- | --- | --- |
 | `fn_post_order(p)` | thành viên cơ sở | Ghi đơn. Nhận thêm: `customer_name`, `payment_method`, `discount_pct` (5 hoặc 10), `discount_parts` (null = cả đơn; N = N phần giá cao nhất, cùng giá thì dòng trước được trước), `discount_reason`, `is_gift`; mỗi dòng nhận `container`, `sugar`. Dòng có số lượng ≤ 0 bị bỏ qua |
+| `fn_move_orders(orders[], date)` | chủ cơ sở, admin | Đổi ngày bán một hoặc nhiều đơn trong 7 ngày gần nhất, nguyên khối (0063) |
 | `fn_edit_order(order, p, reason)` | chủ cơ sở, admin | Sửa đơn = đảo đơn cũ + ghi đơn mới, giữ giờ bán |
 | `fn_reverse_order(order, reason)` | chủ cơ sở, admin mọi lúc; nhân viên chỉ đơn do mình ghi trong 10 phút | Hủy đơn, đảo kho |
 | `fn_set_order_info`, `fn_set_order_gift` | thành viên cơ sở; đổi cách nhận tiền đã ghi và một số trường hợp đánh dấu tặng thì chỉ chủ cơ sở (chi tiết trong 0041) | Ghi cách nhận tiền, tên khách, đánh dấu tặng (sửa thẳng, có audit) |
@@ -658,7 +674,7 @@ View hiện có: `v_activity` (thêm bản ghi cuối ngày và dòng hoàn tác
 
 Edge Function: `send-push` (thông báo đẩy), `tro-ly` (trợ lý hỏi đáp trong Báo cáo).
 
-### 9.6 Danh sách migration 0010–0062
+### 9.6 Danh sách migration 0010–0063
 
 | Số | Nội dung |
 | --- | --- |
@@ -697,6 +713,7 @@ Edge Function: `send-push` (thông báo đẩy), `tro-ly` (trợ lý hỏi đáp
 | 0059 | Ghi cuối ngày vào Lịch sử bản ghi |
 | 0060–0061 | Bao bì cốc (lót ly), túi 1 ly và 2 ly dùng chung cho chai và cốc, giá túi |
 | 0062 | Đưa bản `fn_job_morning_alerts` đang chạy trên production vào repo |
+| 0063 | Giảm theo số tiền (mỗi phần, tổng đơn); chặn đơn rỗng; `fn_move_orders` đổi ngày bán |
 
 Các migration 0019, 0020, 0026, 0029, 0030, 0036, 0042–0050 là **dữ liệu của riêng cơ sở Phan Văn Hớn**, trỏ thẳng tới mã cơ sở và mã tài khoản admin. Muốn dựng lại database từ đầu thì hai bản ghi đó phải có trước migration 0019 (xem `tests/db/after_0018.sql`).
 
@@ -705,7 +722,6 @@ Các migration 0019, 0020, 0026, 0029, 0030, 0036, 0042–0050 là **dữ liệu
 | Vấn đề | Số đo ngày 17/11 | Hướng xử lý |
 | --- | --- | --- |
 | Policy RLS gọi `can_access_outlet()` cho từng dòng, và hàm này không được Postgres gộp vào câu truy vấn | Với 153 đơn, 430 biến động kho: `v_daily_sales` một ngày 48 ms (không RLS 0,8 ms); `v_stock_status` 60 ms (9 ms); `v_activity` 152 ms (9 ms). Thời gian tăng theo số dòng | Đổi policy sang dạng `outlet_id in (select my_outlets())` hoặc tương đương để quyền được tính một lần mỗi truy vấn. Cần bộ kiểm thử `t_04_phan_quyen.sql` đạt trước và sau |
-| Đơn chỉ gồm dòng số lượng ≤ 0 tạo ra một đơn rỗng tổng 0 | Giao diện không gửi được đơn như vậy; chỉ xảy ra khi gọi API trực tiếp | Thêm kiểm tra "đơn chưa có món nào" sau vòng lặp trong `fn_post_order` |
 | Giá vốn túi tính 1 túi cho mỗi phần chai | Đơn nhiều phần dùng ít túi hơn, giá vốn dư tối đa 175 đ mỗi phần | Tách tiền túi ra dòng riêng trên báo cáo, tính theo số túi thực trừ |
 | Hàm và code của luồng Nấu, Đối chiếu cũ còn sót | 5 hàm trong database và 3 file giao diện còn code gọi; bảng `cook_runs`, `day_closes` cùng bảng con chỉ còn dữ liệu trước 17/11. `cook_plans` vẫn dùng cho tiện ích Tính nguyên liệu | Dọn code giao diện trước; hàm và bảng giữ lại vì báo cáo còn đọc dữ liệu cũ |
 | 63 khóa ngoại chưa có index (advisor) | Chưa ảnh hưởng ở quy mô hiện tại | Thêm index cho các cột hay lọc khi bảng lớn |

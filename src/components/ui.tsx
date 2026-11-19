@@ -21,6 +21,7 @@ const PATHS: Record<string, string> = {
   undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
   gift: '<rect x="3" y="8" width="18" height="4"/><path d="M12 8v13M5 12v9h14v-9"/><path d="M12 8c-2-3-6-3-6 0h6Zm0 0c2-3 6-3 6 0h-6Z"/>',
   trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   warn: '<path d="M12 3 2 20h20Z"/><path d="M12 9v5M12 17h.01"/>',
   check: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5L11 15.5L16.5 9.5"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',

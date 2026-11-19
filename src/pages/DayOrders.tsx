@@ -4,7 +4,8 @@ import { useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { addDays, rangeOf } from '../lib/period';
 import { pctOf } from '../lib/discount';
-import { timeHM, vnd, vnToday, weekdayLabel } from '../lib/format';
+import MoveDateSheet from '../components/MoveDateSheet';
+import { ddmm, timeHM, vnd, vnToday, weekdayLabel } from '../lib/format';
 import { Empty, Header, Icon, Loading, Nav, confirmDialog, useToast } from '../components/ui';
 
 const PAGE = 40;
@@ -43,11 +44,15 @@ export default function Invoices() {
   const [only, setOnly] = useState(false); // đang lọc đơn chưa nhận tiền
   const [busyId, setBusyId] = useState<string | null>(null);
   const [err, setErr] = useState<{ id: string; text: string } | null>(null);
+  // Chọn nhiều đơn để đổi ngày bán (chủ cơ sở, quản trị; thiết kế X09)
+  const [sel, setSel] = useState<Set<string> | null>(null);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [movedFrom, setMovedFrom] = useState<Record<string, string>>({});
 
   async function load(offset: number) {
     if (!outlet) return;
     let qy = supabase.from('orders')
-      .select('id,seq_in_day,business_date,placed_at,total_vnd,discount_vnd,is_gift,payment_method,customer_name,channel,order_lines(qty,product_id,container,unit_price_vnd,discount_qty,discount_unit_vnd)')
+      .select('id,seq_in_day,business_date,placed_at,total_vnd,discount_vnd,discount_kind,is_gift,payment_method,customer_name,channel,order_lines(qty,product_id,container,unit_price_vnd,discount_qty,discount_unit_vnd)')
       .eq('outlet_id', outlet.id).eq('status', 'active').lte('business_date', to)
       .order('business_date', { ascending: false }).order('placed_at', { ascending: false }).range(offset, offset + PAGE - 1);
     if (from) qy = qy.gte('business_date', from);
@@ -56,6 +61,13 @@ export default function Invoices() {
     const { data } = await qy;
     const got = (data || []) as any[];
     setRows((r) => (offset === 0 ? got : [...(r || []), ...got]));
+    // Đơn được chuyển ngày: ghi "Chuyển từ dd/mm" (đọc lịch sử sửa đơn; nhân viên không đọc được thì bỏ qua)
+    if (canManage && got.length) {
+      const { data: mv } = await supabase.from('audit_log').select('row_id,new_row').eq('table_name', 'orders').eq('action', 'move').in('row_id', got.map((x) => x.id));
+      const m: Record<string, string> = {};
+      ((mv || []) as any[]).forEach((x) => { if (x.new_row?.moved_from) m[x.row_id] = x.new_row.moved_from; });
+      setMovedFrom((old) => (offset === 0 ? m : { ...old, ...m }));
+    }
     setMore(got.length === PAGE);
     if (offset === 0) {
       let dq = supabase.from('v_daily_sales').select('business_date,orders_count,bottles,revenue_vnd').eq('outlet_id', outlet.id).lte('business_date', to);
@@ -80,6 +92,7 @@ export default function Invoices() {
   useEffect(() => {
     setRows(null);
     setErr(null);
+    setSel(null);
     load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outlet?.id, range, pinned, dataVersion, from, to, only]);
@@ -115,11 +128,37 @@ export default function Invoices() {
     });
     return [...m.values()];
   };
+  const minMove = vnToday(-6);
+  const movable = (o: any) => o.channel !== 'aggregate' && o.business_date >= minMove;
+  const picked = (rows || []).filter((o) => sel?.has(o.id));
+  const toggle = (o: any) => {
+    if (!sel || !movable(o)) return;
+    const n = new Set(sel);
+    if (n.has(o.id)) n.delete(o.id); else n.add(o.id);
+    setSel(n);
+  };
+  /** Nhãn giảm của một dòng đã lưu: theo kiểu giảm của đơn (0063); đơn cũ thì suy 5%/10% như trước. */
+  const lineDisc = (o: any, l: any) => o.discount_kind === 'order' ? `Phần chia giảm tổng đơn · ${l.discount_qty} phần × ${vnd(l.discount_unit_vnd)}`
+    : o.discount_kind === 'per_part' ? `Giảm · ${l.discount_qty} phần × ${vnd(l.discount_unit_vnd)}`
+    : `Giảm ${pctOf(l.unit_price_vnd, l.discount_unit_vnd)}% · ${l.discount_qty} phần × ${vnd(l.discount_unit_vnd)}`;
   let lastDay = '';
   return (
     <div className="screen">
-      <Header title="Hóa đơn" sub={outlet.name} back />
-      <main className="main">
+      <Header title={sel ? `Đã chọn ${sel.size} đơn` : 'Hóa đơn'} sub={outlet.name} back={sel ? undefined : true}
+        right={canManage && rows && rows.length > 0 ? (
+          <button type="button" className="small strong" style={{ border: 0, background: 'transparent', color: 'var(--ink-brand)', minHeight: 44, padding: '0 8px', cursor: 'pointer' }}
+            onClick={() => setSel(sel ? null : new Set())}>{sel ? 'Xong' : 'Chọn'}</button>
+        ) : undefined} />
+      <main className={`main${sel ? ' with-bar' : ''}`}>
+        {sel && (
+          <>
+            <div className="row" style={{ gap: 8 }}>
+              <button type="button" className="chip" onClick={() => setSel(new Set((rows || []).filter(movable).map((o) => o.id)))}>Chọn tất cả</button>
+              <button type="button" className="chip" disabled={!sel.size} onClick={() => setSel(new Set())}>Bỏ chọn</button>
+            </div>
+            <span className="xs muted">Chạm vào đơn để chọn, rồi bấm Đổi ngày. Chỉ đổi được đơn trong 7 ngày gần nhất.</span>
+          </>
+        )}
         {!canManage && (
           <>
             <div className="chips fit4" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
@@ -186,18 +225,24 @@ export default function Invoices() {
                       {dd && <span className="num" style={{ color: 'var(--ink-brand)' }}>{dd.orders} đơn · {vnd(dd.revenue)}</span>}
                     </div>
                   )}
-                  <article className="inv">
-                    <Link to={`/bao-cao/don/${o.id}`} className="inv-top" aria-label={`Đơn số ${o.seq_in_day} lúc ${timeHM(o.placed_at)}, ${vnd(o.total_vnd)}. Mở chi tiết`}>
+                  <article className="inv" style={sel && !movable(o) ? { opacity: 0.5 } : sel?.has(o.id) ? { outline: '2px solid var(--brand)' } : undefined}>
+                    <Link to={`/bao-cao/don/${o.id}`} className="inv-top" aria-label={sel ? `${sel.has(o.id) ? 'Bỏ chọn' : 'Chọn'} đơn số ${o.seq_in_day}` : `Đơn số ${o.seq_in_day} lúc ${timeHM(o.placed_at)}, ${vnd(o.total_vnd)}. Mở chi tiết`}
+                      aria-pressed={sel ? sel.has(o.id) : undefined}
+                      onClick={sel ? (e) => { e.preventDefault(); toggle(o); } : undefined}>
                       <span className="row between">
-                        <span className="small muted num">{timeHM(o.placed_at)} · đơn số {o.seq_in_day}{o.channel === 'aggregate' ? ' · bổ sung' : ''}</span>
-                        <Icon name="chev" size={18} style={{ color: 'var(--ink-muted)' }} />
+                        <span className="row" style={{ gap: 8 }}>
+                          {sel && <span aria-hidden className={`check-box ${sel.has(o.id) ? 'on' : ''}`}>{sel.has(o.id) && <Icon name="check" size={16} sw={3} />}</span>}
+                          <span className="small muted num">{timeHM(o.placed_at)} · đơn số {o.seq_in_day}{o.channel === 'aggregate' ? ' · bổ sung' : ''}</span>
+                        </span>
+                        {!sel && <Icon name="chev" size={18} style={{ color: 'var(--ink-muted)' }} />}
                       </span>
+                      {movedFrom[o.id] && <span className="xs strong" style={{ color: 'var(--ink-brand)' }}>Chuyển từ {ddmm(movedFrom[o.id])}</span>}
                       <span className="strong" style={{ fontSize: 16 }}>{o.customer_name || 'Khách lẻ'}</span>
                       {merged(o.order_lines).map((l: any, i: number) => (
                         <span key={i} style={{ display: 'contents' }}>
                           <span className="ln"><span>{name(l.product_id)}{l.container === 'coc' ? ' · cốc giấy' : ''}</span><span className="num">× {l.qty}</span></span>
                           {l.discount_qty > 0 && (
-                            <span className="line-disc" style={{ marginTop: -4 }}><span>Giảm {pctOf(l.unit_price_vnd, l.discount_unit_vnd)}% · {l.discount_qty} phần × {vnd(l.discount_unit_vnd)}</span><span>− {vnd(l.discount_qty * l.discount_unit_vnd)}</span></span>
+                            <span className="line-disc" style={{ marginTop: -4 }}><span>{lineDisc(o, l)}</span><span>− {vnd(l.discount_qty * l.discount_unit_vnd)}</span></span>
                           )}
                         </span>
                       ))}
@@ -207,7 +252,7 @@ export default function Invoices() {
                         <span className="num" style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink-brand)' }}>{vnd(o.total_vnd)}</span>
                       </span>
                     </Link>
-                    <div className="inv-bot">
+                    {!sel && <div className="inv-bot">
                       <div className="seg3" role="group" aria-label="Đánh dấu nhận tiền">
                         {([['gift', 'Đơn tặng'], ['cash', 'Nhận t.mặt'], ['transfer', 'Nhận c.khoản']] as ['cash' | 'transfer' | 'gift', string][]).map(([k, l]) => (
                           <button key={k} type="button" aria-pressed={on === k} className={on === k ? 'on' : ''} disabled={busy || (!!on && on !== k)}
@@ -217,7 +262,7 @@ export default function Invoices() {
                         ))}
                       </div>
                       {err && err.id === o.id && <span className="err" style={{ display: 'block', marginTop: 8 }}>{err.text}</span>}
-                    </div>
+                    </div>}
                   </article>
                 </div>
               );
@@ -226,7 +271,26 @@ export default function Invoices() {
           </>
         )}
       </main>
-      <Nav />
+      {sel && (
+        <div className="bar no-nav">
+          <button className="btn lg block" disabled={!picked.length} onClick={() => setMoveOpen(true)}>
+            <Icon name="calendar" size={20} /> {picked.length ? `Đổi ngày ${picked.length} đơn · ${vnd(picked.reduce((a, o) => a + o.total_vnd, 0))}` : 'Chọn đơn để đổi ngày'}
+          </button>
+        </div>
+      )}
+      {moveOpen && picked.length > 0 && (
+        <MoveDateSheet outletId={outlet.id}
+          orders={picked.map((o) => ({ id: o.id, seq: o.seq_in_day, date: o.business_date, time: timeHM(o.placed_at), customer: o.customer_name || 'Khách lẻ',
+            total: o.total_vnd, cash: o.payment_method === 'cash', parts: o.order_lines.reduce((a: number, l: any) => a + l.qty, 0) }))}
+          onClose={() => setMoveOpen(false)}
+          onDone={(r) => {
+            setMoveOpen(false);
+            setSel(null);
+            toast.show(`Đã chuyển ${r.moved.length} đơn sang ${ddmm(r.business_date)}`);
+            bump();
+          }} />
+      )}
+      {!sel && <Nav />}
     </div>
   );
 }
