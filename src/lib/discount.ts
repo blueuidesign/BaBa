@@ -6,7 +6,7 @@ import { vnd } from './format';
  *  - order: một khoản cho tổng đơn, chia vào từng phần theo giá (làm tròn xuống).
  *  Máy chủ (fn_post_order) tính lại y hệt; app chỉ tính để hiện trước khi lưu. */
 export type Pct = 5 | 10;
-export const PCTS: Pct[] = [5, 10];
+export const PCTS: Pct[] = [10, 5];
 export type DiscLine = { price: number; qty: number };
 export type Disc =
   | null
@@ -15,8 +15,8 @@ export type Disc =
   | { kind: 'order'; amount: number };
 export type DiscKind = 'pct' | 'per_part' | 'order';
 
-/** Mở Giảm giá lên là chọn sẵn cách này (Tùng 19/11). */
-export const DEFAULT_DISC: Disc = { kind: 'per_part', amount: 5000, parts: null };
+/** Mở Giảm giá lên là chọn sẵn cách này (Tùng 20/11: 10%, tất cả phần). Bấm Theo tiền thì chọn sẵn 5.000 đ mỗi phần. */
+export const DEFAULT_DISC: Disc = { kind: 'pct', pct: 10, parts: null };
 export const PER_PART_QUICK = [2000, 3000, 5000, 10000];
 export const ORDER_QUICK = [5000, 10000, 15000, 20000];
 export const AMOUNT_STEP = 1000;
