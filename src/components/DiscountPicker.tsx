@@ -9,7 +9,7 @@ import { Icon } from './ui';
 export type DiscRow = DiscLine & { key: string; name: string; icon?: ReactNode };
 
 /** Bộ chọn giảm giá dùng chung cho màn Ghi đơn (sheet) và Sửa đơn (thiết kế X01–X04).
- *  Hàng đầu: 5% · 10% · Theo tiền. Theo tiền: Mỗi phần (bước 1.000 đ) hoặc Tổng đơn (gõ số). */
+ *  Hàng đầu (tô kín): 10% · 5% · Theo tiền. Hai hàng phụ kiểu viền. Theo tiền: Mỗi phần (bước 1.000 đ) hoặc Tổng đơn (gõ số). */
 export default function DiscountPicker({ rows, disc, setDisc }: { rows: DiscRow[]; disc: Disc; setDisc: (d: Disc) => void }) {
   const gross = grossOf(rows);
   const parts = partsOf(rows);
@@ -43,7 +43,7 @@ export default function DiscountPicker({ rows, disc, setDisc }: { rows: DiscRow[
       </div>
 
       {(kind === 'per_part' || kind === 'order') && (
-        <div className="seg3" role="radiogroup" aria-label="Giảm theo">
+        <div className="seg3 outline" role="radiogroup" aria-label="Giảm theo">
           <button type="button" role="radio" aria-checked={kind === 'per_part'} className={kind === 'per_part' ? 'on' : ''}
             style={{ flexDirection: 'column', gap: 2, minHeight: 60 }}
             onClick={() => kind !== 'per_part' && setDisc({ kind: 'per_part', amount: 5000, parts: null })}>
@@ -103,7 +103,7 @@ export default function DiscountPicker({ rows, disc, setDisc }: { rows: DiscRow[
       {disc && disc.kind !== 'order' && (
         <>
           <span className="h2" style={{ margin: 0 }}>Giảm cho</span>
-          <div className="seg3" role="radiogroup" aria-label="Giảm cho">
+          <div className="seg3 outline" role="radiogroup" aria-label="Giảm cho">
             <button type="button" role="radio" aria-checked={someN == null} className={someN == null ? 'on' : ''}
               style={{ flexDirection: 'column', gap: 2, minHeight: 60 }} onClick={() => setDisc(withParts(null))}>
               <span>Tất cả phần</span>

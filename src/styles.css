@@ -460,3 +460,6 @@ html, body { touch-action: pan-x pan-y; }
 /* Ô tích khi chọn nhiều đơn (Hóa đơn → Chọn, đổi ngày bán) */
 .check-box { width: 24px; height: 24px; flex-shrink: 0; border-radius: 7px; border: 2px solid #bdbdbd; background: var(--bg-100, #fff); display: inline-flex; align-items: center; justify-content: center; color: #fff; }
 .check-box.on { border-color: var(--brand); background: var(--brand); }
+
+/* Lựa chọn phụ (Giảm giá: Mỗi phần/Tổng đơn, Tất cả phần/Một số phần): viền xanh, nền trắng; chỉ hàng chính tô kín (Tùng 20/11) */
+.seg3.outline button.on { background: var(--bg-100); border: 2px solid var(--brand); color: var(--ink-brand); }

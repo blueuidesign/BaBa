@@ -114,8 +114,8 @@ Phiên bản 1.2 · 19/11/2026 · Thêm B-3 (giảm giá), B-4 (đổi ngày bá
 **Mô tả.** Là người đứng bán, tôi muốn bớt tiền cho khách quen trong vài chạm, để không phải tính nhẩm và báo cáo vẫn đúng. Thiết kế X01–X05 (thay Y05).
 
 **Tiêu chí nghiệm thu**
-- Khi bấm "Giảm giá" ở màn Ghi đơn thì bảng giảm giá mở với lựa chọn có sẵn **Theo tiền · Mỗi phần · 5.000 đ · Tất cả phần**.
-- Hàng đầu có ba nút theo thứ tự **5% · 10% · Theo tiền**.
+- Khi bấm "Giảm giá" ở màn Ghi đơn thì bảng giảm giá mở với lựa chọn có sẵn **10% · Tất cả phần** (Tùng 20/11). Bấm Theo tiền thì chọn sẵn 5.000 đ mỗi phần.
+- Hàng đầu có ba nút theo thứ tự **10% · 5% · Theo tiền**, nút đang chọn tô kín xanh đậm. Hai hàng phụ (Mỗi phần / Tổng đơn, Tất cả phần / Một số phần) kiểu viền: đang chọn thì viền xanh, nền trắng.
 - Khi chọn 5% hoặc 10% thì giảm theo phần trăm giá mỗi phần, cho tất cả phần hoặc một số phần (phần giá cao trước).
 - Khi chọn Theo tiền · Mỗi phần thì mỗi phần bớt một số tiền (nút +/− bước 1.000 đ, nút nhanh 2.000 · 3.000 · 5.000 · 10.000), cho tất cả phần hoặc một số phần.
 - Khi chọn Theo tiền · Tổng đơn thì gõ một khoản cho cả đơn (nút nhanh 5.000 · 10.000 · 15.000 · 20.000); app tự chia theo giá trị từng món để báo cáo lãi từng món đúng.

@@ -9,6 +9,7 @@ Người chốt: Tùng (chat 19/11/2026, 21:34–22:13). Thiết kế: canvas "K
 | 1 | Giảm giá có thêm **Theo tiền**: mỗi phần (mặc định 5.000 đ) hoặc một khoản cho tổng đơn. Thứ tự nút: 5% · 10% · Theo tiền. Mở Giảm giá là chọn sẵn 5.000 đ mỗi phần | Y05 (chỉ 5%, 10%) |
 | 2 | Chủ cơ sở **đổi ngày bán** của đơn: một hoặc nhiều đơn một lúc, tối đa trong 7 ngày gần nhất, **không cần lý do** | — |
 | 3 | Đơn chuyển ngày lấy số thứ tự mới của ngày mới, giữ giờ bán (Claude chọn, Tùng không phản đối) | — |
+| 1a | **20/11:** mặc định đổi thành **10% · Tất cả phần**; thứ tự nút 10% · 5% · Theo tiền; hai hàng lựa chọn phụ kiểu viền xanh | mặc định 5.000 đ mỗi phần (19/11) |
 | 4 | Sửa luôn lỗi đơn rỗng (mọi dòng số lượng 0) trong `fn_post_order` | Điểm 9.7 Thiết kế DB |
 
 ## Hệ quả
