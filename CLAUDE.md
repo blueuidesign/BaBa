@@ -16,7 +16,7 @@ App bán hàng và quản lý kho cho sữa hạt **Sữa lành từ BaBa**: PWA
 - Việc được giao nằm trong `tasks/`. Mở `tasks/README.md` xem task nào đang mở, chỉ làm task được giao cho phiên `code`.
 - Làm xong mục nào thì đánh `[x]` và ghi kết quả (commit, PR) ngay dưới mục đó, trong cùng PR. Điểm chưa rõ ghi vào "Câu hỏi mở" của task, không tự đoán.
 - Quyết định mới nhất nằm trong `docs/bien-ban/`. Biên bản mâu thuẫn với User Stories thì làm theo biên bản và sửa luôn User Stories trong cùng PR.
-- Không merge PR. Tùng duyệt và merge.
+- Claude được tự merge PR khi CI xanh (Tùng, từ 17/11/2026). Migration production vẫn phải hỏi Tùng trước khi chạy.
 
 ## Danh mục món
 
