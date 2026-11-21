@@ -54,13 +54,34 @@ export function Icon({ name, size = 22, sw = 1.8, className, style }: { name: ke
   );
 }
 
+/** Màu riêng của món tự chọn (Buffet, 0065): chai, cốc vẽ nhiều tầng màu thay vì một màu. */
+export const BUFFET_COLOR = '#C98A4B';
+const LAYERS = ['#B9675A', '#F2D27A', '#8DB35E', '#F0B74A', '#6B4532'];
+let layerSeq = 0;
+
 export function Bottle({ color, size = 40 }: { color: string | null; size?: number }) {
+  const multi = color?.toUpperCase() === BUFFET_COLOR;
+  const [cid] = useState(() => `bl${++layerSeq}`);
+  const body = 'M18 9h12v6c0 3 7 5 7 11v30a6 6 0 0 1-6 6H17a6 6 0 0 1-6-6V26c0-6 7-8 7-11Z';
   return (
     <svg width={size} height={size} viewBox="0 0 48 64" aria-hidden="true">
       <rect x="17" y="2" width="14" height="7" rx="2" fill="#1F3A2A" opacity="0.85" />
-      <path d="M18 9h12v6c0 3 7 5 7 11v30a6 6 0 0 1-6 6H17a6 6 0 0 1-6-6V26c0-6 7-8 7-11Z" fill={color || '#ddd'} stroke="#1F3A2A" strokeOpacity="0.35" strokeWidth="1.5" />
-      <rect x="14" y="30" width="20" height="16" rx="3" fill="#F7F3EB" opacity="0.92" />
-      <circle cx="24" cy="38" r="4.5" fill="#296241" />
+      {multi ? (
+        <>
+          <defs><clipPath id={cid}><path d={body} /></clipPath></defs>
+          <path d={body} fill="#F7F3EB" />
+          <g clipPath={`url(#${cid})`}>
+            {LAYERS.map((c, i) => <rect key={c} x="0" y={26 + i * 7.2} width="48" height="7.4" fill={c} />)}
+          </g>
+          <path d={body} fill="none" stroke="#1F3A2A" strokeOpacity="0.35" strokeWidth="1.5" />
+        </>
+      ) : (
+        <>
+          <path d={body} fill={color || '#ddd'} stroke="#1F3A2A" strokeOpacity="0.35" strokeWidth="1.5" />
+          <rect x="14" y="30" width="20" height="16" rx="3" fill="#F7F3EB" opacity="0.92" />
+          <circle cx="24" cy="38" r="4.5" fill="#296241" />
+        </>
+      )}
     </svg>
   );
 }
@@ -81,11 +102,21 @@ export function SugarLess({ on, size = 28 }: { on: boolean; size?: number }) {
 }
 
 export function Cup({ color, size = 40 }: { color: string | null; size?: number }) {
+  const multi = color?.toUpperCase() === BUFFET_COLOR;
   return (
     <svg width={size} height={size} viewBox="0 0 48 64" aria-hidden="true">
       <rect x="9" y="12" width="30" height="6" rx="3" fill="#1F3A2A" opacity="0.85" />
       <path d="M11 18h26l-3.2 38a4 4 0 0 1-4 3.6H18.2a4 4 0 0 1-4-3.6Z" fill="#F7F3EB" stroke="#1F3A2A" strokeOpacity="0.35" strokeWidth="1.5" />
-      <path d="M12.6 30h22.8l-1.2 14H13.8Z" fill={color || '#ddd'} />
+      {multi ? (
+        <>
+          <path d="M12.6 28h22.8l-0.5 6H13.1Z" fill={LAYERS[0]} />
+          <path d="M13.1 34h21.8l-0.5 6H13.6Z" fill={LAYERS[1]} />
+          <path d="M13.6 40h20.8l-0.5 6H14.1Z" fill={LAYERS[2]} />
+          <path d="M14.1 46h19.8l-0.5 6H14.6Z" fill={LAYERS[4]} />
+        </>
+      ) : (
+        <path d="M12.6 30h22.8l-1.2 14H13.8Z" fill={color || '#ddd'} />
+      )}
       <rect x="22.5" y="2" width="3" height="14" rx="1.5" fill="#1F3A2A" opacity="0.6" />
     </svg>
   );

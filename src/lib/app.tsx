@@ -10,6 +10,8 @@ export type Product = {
   id: string; code: string; name: string; short_name: string; line: string; color: string | null;
   image_url: string | null; has_caffeine: boolean; yield_per_jar: number; sort_order: number; kind: string;
   status: string; price: number; recipe: { ingredient_id: string; qty: number }[];
+  /** Món tự chọn (Buffet): giá và nguyên liệu theo từng dòng đơn */
+  is_custom?: boolean;
 };
 export type Ingredient = {
   id: string; code: string; name: string; grp: string; unit: string; purchase_unit: string;

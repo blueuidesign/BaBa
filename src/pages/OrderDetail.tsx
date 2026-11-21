@@ -5,6 +5,7 @@ import { supabase, errorText } from '../lib/supabase';
 import { useLoad } from '../lib/data';
 import { timeHM, vnd } from '../lib/format';
 import { pctOf, savedLabel } from '../lib/discount';
+import { buffetSummary } from '../components/BuffetSheet';
 import { Header, Icon, Loading, Nav, confirmDialog, reasonDialog, useToast } from '../components/ui';
 
 /** Chi tiết một đơn (mở từ Các đơn trong ngày): món, tiền, khách, cách nhận tiền; hủy đơn bằng bản ghi đảo. */
@@ -19,7 +20,7 @@ export default function OrderDetail() {
   const { data: o, loading } = useLoad(
     async () => {
       const { data } = await supabase.from('orders')
-        .select('id,outlet_id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,discount_kind,discount_value,is_gift,payment_method,customer_name,note,source,channel,order_lines(qty,product_id,container,sugar,unit_price_vnd,discount_qty,discount_unit_vnd,line_total_vnd)')
+        .select('id,outlet_id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,discount_kind,discount_value,is_gift,payment_method,customer_name,note,source,channel,order_lines(qty,product_id,container,sugar,unit_price_vnd,discount_qty,discount_unit_vnd,line_total_vnd,order_line_items(ingredient_id,qty))')
         .eq('id', id).maybeSingle();
       return (data as any) || null;
     },
@@ -102,6 +103,11 @@ export default function OrderDetail() {
                 <div key={i} className="list-row" style={{ minHeight: 44 }}>
                   <span className="grow">
                     <span className="strong">{l.qty} × {name(l.product_id)}{l.container === 'coc' ? ' · cốc giấy' : ''}{l.sugar === 'less' && <span className="less-tag" style={{ marginLeft: 6 }}>ít đường</span>}</span>
+                    {(l.order_line_items || []).length > 0 && (
+                      <span className="xs muted" style={{ display: 'block' }}>
+                        {buffetSummary(Object.fromEntries(l.order_line_items.map((x: any) => [x.ingredient_id, Number(x.qty)])), (id) => catalog?.ingredientById[id])}
+                      </span>
+                    )}
                     <span className="xs muted" style={{ display: 'block' }}>{vnd(l.unit_price_vnd)} mỗi phần</span>
                     {l.discount_qty > 0 && <span className="xs strong" style={{ display: 'block', color: 'var(--ink-brand)' }}>{lineDisc(l)}</span>}
                   </span>
