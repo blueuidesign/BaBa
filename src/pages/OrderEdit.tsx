@@ -8,7 +8,7 @@ import { Header, Icon, Loading, Nav, SugarLess, useToast } from '../components/u
 import { DEFAULT_DISC, allocate, discError, discFromOrder, discLabel, discPayload, discTotal, lineLabel, unitsOf, type Disc } from '../lib/discount';
 import DiscountPicker from '../components/DiscountPicker';
 import MoveDateSheet from '../components/MoveDateSheet';
-import BuffetSheet, { BUFFET_PRICE, buffetSummary, type BuffetPick } from '../components/BuffetSheet';
+import BuffetSheet, { BUFFET_PRICE, BuffetTag, buffetSummary, type BuffetPick } from '../components/BuffetSheet';
 
 type Line = { pid: string; container: 'chai' | 'coc'; qty: number; less: boolean; custom?: BuffetPick };
 
@@ -21,7 +21,7 @@ export default function OrderEdit() {
   const from = new URLSearchParams(useLocation().search).get('from') === 'home' ? '?from=home' : '';
   const { data: o, loading } = useLoad(async () => {
     const { data } = await supabase.from('orders')
-      .select('id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,discount_kind,discount_value,is_gift,payment_method,customer_name,order_lines(id,qty,product_id,container,sugar,unit_price_vnd,discount_qty,discount_unit_vnd,order_line_items(ingredient_id,qty))')
+      .select('id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,discount_kind,discount_value,is_gift,payment_method,customer_name,order_lines(id,qty,product_id,container,sugar,unit_price_vnd,discount_qty,discount_unit_vnd,buffet_combo_id,order_line_items(ingredient_id,qty))')
       .eq('id', id).maybeSingle();
     return (data as any) || null;
   }, [id]);
@@ -48,7 +48,7 @@ export default function OrderEdit() {
       const container = l.container === 'coc' ? 'coc' : 'chai';
       const items = l.order_line_items || [];
       const custom: BuffetPick | undefined = items.length
-        ? { key: l.id, container, less: l.sugar === 'less', price: l.unit_price_vnd, items: Object.fromEntries(items.map((i: any) => [i.ingredient_id, Number(i.qty)])) }
+        ? { key: l.id, container, less: l.sugar === 'less', price: l.unit_price_vnd, combo: l.buffet_combo_id ?? null, items: Object.fromEntries(items.map((i: any) => [i.ingredient_id, Number(i.qty)])) }
         : undefined;
       return { pid: l.product_id, container, qty: l.qty, less: l.sugar === 'less', custom };
     }));
@@ -104,7 +104,7 @@ export default function OrderEdit() {
     const { data, error } = await supabase.rpc('fn_edit_order', {
       p_order: id,
       p: { lines: kept.map((l) => ({ product_id: l.pid, qty: l.qty, container: l.container, ...(l.less ? { sugar: 'less' } : {}),
-        ...(l.custom ? { price: l.custom.price, custom: Object.entries(l.custom.items).filter(([, q]) => q > 0).map(([ingredient_id, qty]) => ({ ingredient_id, qty })) } : {}) })),
+        ...(l.custom ? { price: l.custom.price, ...(l.custom.combo ? { combo: l.custom.combo } : {}), custom: Object.entries(l.custom.items).filter(([, q]) => q > 0).map(([ingredient_id, qty]) => ({ ingredient_id, qty })) } : {}) })),
            ...(dSel ? { discount_vnd: 0, ...discPayload(dSel, parts, discWhy) } : { discount_vnd: discN, discount_reason: discN > 0 ? discWhy.trim() || null : null }),
            is_gift: isGift, payment_method: isGift ? '' : pay || '', customer_name: cust.trim() },
       p_reason: why.trim() || null
@@ -149,6 +149,7 @@ export default function OrderEdit() {
                   <span className="grow" role={l.custom ? 'button' : undefined} tabIndex={l.custom ? 0 : undefined} style={{ cursor: l.custom ? 'pointer' : undefined }}
                     onClick={l.custom ? () => setBf({ pick: l.custom!, idx: i }) : undefined}>
                     <span className="strong">{prod(l.pid)?.name || 'Món đã bỏ'}{l.container === 'coc' ? ' · cốc giấy' : ''}{l.less && <span className="less-tag" style={{ marginLeft: 6 }}>ít đường</span>}</span>
+                    {l.custom && <BuffetTag items={l.custom.items} combo={l.custom.combo} tierOf={(id: string) => catalog?.ingredientById[id]?.buffet_tier} />}
                     {l.custom && <span className="xs muted" style={{ display: 'block' }}>{buffetSummary(l.custom.items, (id) => catalog?.ingredientById[id])} · chạm để sửa</span>}
                     <span className="xs muted" style={{ display: 'block' }}>{l.qty ? `${vnd(lp(l))} mỗi phần` : 'Sẽ bỏ khỏi đơn'}</span>
                     {discN > 0 && ks[i] > 0 && us[i] > 0 && <span className="xs strong" style={{ display: 'block', color: 'var(--ink-brand)' }}>{lineLabel(dSel, ks[i], us[i])}</span>}

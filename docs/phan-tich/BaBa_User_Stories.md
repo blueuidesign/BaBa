@@ -150,14 +150,19 @@ Phiên bản 1.2 · 19/11/2026 · Thêm B-3 (giảm giá), B-4 (đổi ngày bá
 
 **Tiêu chí nghiệm thu**
 - Ô **Buffet** nằm cuối nhóm Mầm Xanh, icon chai (cốc) nhiều tầng màu, ghi "Tự chọn".
-- Chạm ô Buffet mở bảng chọn: Chai / Cốc giấy; giá mặc định 30.000 đ, nút ±5.000 đ; đủ nguyên liệu chính và phụ, hay dùng nhất ở trên.
+- Chạm ô Buffet mở bảng chọn (BG01–BG04, Hà 21/11): chọn **combo** rồi Chai / Cốc giấy.
+  - Combo: 2 cao cấp + 1 phổ thông 30.000 đ; 3 cao cấp + 1 phổ thông 35.000 đ; 2 cao cấp + 2 phổ thông 35.000 đ. Giá cố định, chỉ sửa gram; phải chọn đúng số hạt mới lưu được. Mặc định chọn combo đầu.
+  - **Khác**: chọn tùy ý, giá mặc định 30.000 đ, nút ±5.000 đ.
+  - Chỉ 11 nguyên liệu, chia hai nhóm. Cao cấp: óc chó, hạnh nhân, hạt điều. Phổ thông: đậu đỏ, mè đen, bắp, thanh long, bí đỏ, bột lá dứa, bột cacao, matcha (mỗi loại bột tính là một loại phổ thông). Trong mỗi nhóm, hay dùng nhất ở trên.
+  - Nhóm đủ số hạt của combo thì các nguyên liệu còn lại hiện "Đã đủ". Chọn thừa (khi đổi combo) thì báo đỏ, nói rõ bỏ bớt gì hoặc chọn combo nào.
+  - Nút "Thêm chai Buffet khác": lưu chai này rồi mở bảng mới cho chai tiếp theo.
 - Nguyên liệu chưa chọn chỉ có nút **Thêm** (nền xanh); bấm = 20 g, sau đó hiện − số +, mỗi lần ±5 g; về 0 thì trở lại nút Thêm. Không giới hạn tổng gam hay giá.
-- Mỗi chai Buffet là một dòng riêng; rà soát, hóa đơn, chi tiết đơn ghi nguyên liệu và số gam; chạm để sửa hoặc bỏ.
+- Mỗi chai Buffet là một dòng riêng; một đơn có nhiều chai Buffet khác nhau. Rà soát, hóa đơn, chi tiết đơn ghi nhãn nhỏ "2 cao cấp · 1 phổ thông" (Khác thì "Khác · …"), nguyên liệu và số gam; chạm để sửa hoặc bỏ.
 - Kho trừ đúng số gam đã chọn cộng syrup và bao bì; giá vốn tính từ chính số gam đó.
 - Giảm giá, ít đường, tặng, sửa đơn, đổi ngày áp lên Buffet như món khác.
 
 **Ngoại lệ**
-- Chưa chọn nguyên liệu nào: nút lưu bị khóa; máy chủ cũng từ chối.
+- Chưa chọn nguyên liệu nào, hoặc combo chưa đúng số hạt: nút lưu bị khóa; máy chủ cũng từ chối và lấy giá theo combo, không theo giá app gửi.
 - Nguyên liệu thiếu giá chuẩn: vẫn bán được, giá vốn dòng đó để trống.
 
 ---

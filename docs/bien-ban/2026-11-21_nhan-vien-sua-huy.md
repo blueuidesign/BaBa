@@ -18,3 +18,14 @@ Hệ quả: migration `0064_nhan_vien_sua_huy_7_ngay.sql`, kiểm thử `t_10_nh
 | 4 | Giá mặc định 30.000 đ, ±5.000 đ. Nguyên liệu: đủ các loại (chính và phụ), hay dùng nhất ở trên; nút Thêm nền xanh = 20 g, sau đó ±5 g. Không giới hạn. Bán được cốc giấy. Không đưa nguyên liệu đã chọn lên đầu |
 
 Hệ quả: migration `0065_buffet.sql`, kiểm thử `t_11_buffet.sql`, thiết kế BF01–BF05, User Stories B-5, Thiết kế DB 9.3b.
+
+## Buffet theo combo (cùng ngày, 10:43–10:49)
+
+| # | Nội dung | Thay cho |
+| --- | --- | --- |
+| 5 | Cao cấp: óc chó, hạnh nhân, hạt điều (cố định). Phổ thông: đậu đỏ, mè đen, bắp, thanh long, bí đỏ, bột lá dứa, bột cacao, matcha; mỗi loại bột tính là một loại phổ thông. Bảng chọn chỉ hiện 11 loại này | Đủ mọi nguyên liệu chính, phụ (#4) |
+| 6 | Combo: 2 cao cấp + 1 phổ thông 30.000 đ; 3 + 1 35.000 đ; 2 + 2 35.000 đ. Trong combo giá cố định, chỉ sửa gram. Thêm mục **Khác**: chọn tùy ý, chỉ ở đây sửa được giá (mặc định 30.000 đ, ±5.000 đ) | Giá tự chỉnh ±5.000 đ cho mọi chai (#4) |
+| 7 | Mỗi chai Buffet có ghi chú nhỏ số hạt cao cấp, phổ thông. Một đơn ghi được nhiều chai Buffet khác nhau; có nút "Thêm chai Buffet khác" | — |
+
+Giả định chưa hỏi lại: combo Khác mặc định 30.000 đ; mở bảng chọn sẵn combo 2 + 1.
+Hệ quả: migration `0066_buffet_combo.sql`, kiểm thử `t_12_buffet_combo.sql`, thiết kế BG01–BG05, User Stories B-5, Thiết kế DB 9.3b.
