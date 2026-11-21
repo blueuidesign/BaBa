@@ -67,10 +67,9 @@ begin
   perform t.eq((select count(*)::int from orders where reversal_of = (r->>'id')::uuid and status = 'reversal'), 1, 'hoàn tác: có một bản ghi đảo');
   perform t.throws(format('select fn_reverse_order(%L, %L)', r->>'id', 'lần hai'), 'không hoàn tác hai lần');
 
-  -- Sửa đơn: nhân viên không được, chủ cơ sở được; đơn cũ thành reversed, đơn mới thay thế
+  -- Sửa đơn: chủ cơ sở sửa được; đơn cũ thành reversed, đơn mới thay thế.
+  -- (Từ 0064 nhân viên cũng sửa được đơn trong 7 ngày: xem t_10_nhan_vien_sua_huy.sql)
   r := fn_post_order(jsonb_build_object('outlet_id', a, 'client_id', gen_random_uuid(), 'lines', jsonb_build_array(jsonb_build_object('product_id', md, 'qty', 2))));
-  perform t.throws(format($q$select fn_edit_order('%s', '{"client_id":"%s","lines":[{"product_id":"%s","qty":1}]}', 'bớt')$q$, r->>'id', gen_random_uuid(), md),
-                   'nhân viên không sửa được đơn', 'chủ cơ sở');
   perform t.login((f->>'owner')::uuid);
   x := fn_edit_order((r->>'id')::uuid, jsonb_build_object('client_id', gen_random_uuid(), 'lines', jsonb_build_array(jsonb_build_object('product_id', md, 'qty', 1))), 'khách đổi ý');
   perform t.eq((select status from orders where id = (r->>'id')::uuid), 'reversed', 'sửa đơn: đơn cũ thành reversed');
