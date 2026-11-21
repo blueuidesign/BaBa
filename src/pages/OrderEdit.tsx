@@ -8,8 +8,9 @@ import { Header, Icon, Loading, Nav, SugarLess, useToast } from '../components/u
 import { DEFAULT_DISC, allocate, discError, discFromOrder, discLabel, discPayload, discTotal, lineLabel, unitsOf, type Disc } from '../lib/discount';
 import DiscountPicker from '../components/DiscountPicker';
 import MoveDateSheet from '../components/MoveDateSheet';
+import BuffetSheet, { BUFFET_PRICE, buffetSummary, type BuffetPick } from '../components/BuffetSheet';
 
-type Line = { pid: string; container: 'chai' | 'coc'; qty: number; less: boolean };
+type Line = { pid: string; container: 'chai' | 'coc'; qty: number; less: boolean; custom?: BuffetPick };
 
 /** Sửa đơn đã ghi (chỉ chủ cơ sở, admin). Lưu = đảo đơn cũ + ghi đơn mới qua fn_edit_order; có ghi vào lịch sử. */
 export default function OrderEdit() {
@@ -20,7 +21,7 @@ export default function OrderEdit() {
   const from = new URLSearchParams(useLocation().search).get('from') === 'home' ? '?from=home' : '';
   const { data: o, loading } = useLoad(async () => {
     const { data } = await supabase.from('orders')
-      .select('id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,discount_kind,discount_value,is_gift,payment_method,customer_name,order_lines(qty,product_id,container,sugar,unit_price_vnd,discount_qty,discount_unit_vnd)')
+      .select('id,seq_in_day,business_date,placed_at,status,total_vnd,discount_vnd,discount_reason,discount_kind,discount_value,is_gift,payment_method,customer_name,order_lines(id,qty,product_id,container,sugar,unit_price_vnd,discount_qty,discount_unit_vnd,order_line_items(ingredient_id,qty))')
       .eq('id', id).maybeSingle();
     return (data as any) || null;
   }, [id]);
@@ -30,6 +31,8 @@ export default function OrderEdit() {
   // 'old' = đơn đang giảm một số tiền theo cách cũ (trước 16/11): giữ nguyên số đó cho tới khi chọn lại
   const [disc, setDisc] = useState<Disc | 'old'>(null);
   const [moveOpen, setMoveOpen] = useState(false);
+  // Bảng chọn Buffet: idx = dòng đang sửa, -1 = thêm mới
+  const [bf, setBf] = useState<{ pick: BuffetPick; idx: number } | null>(null);
   const [addLess, setAddLess] = useState(false);
   const [discWhy, setDiscWhy] = useState('');
   const [why, setWhy] = useState('');
@@ -41,7 +44,14 @@ export default function OrderEdit() {
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     if (!o) return;
-    setLines(o.order_lines.map((l: any) => ({ pid: l.product_id, container: l.container === 'coc' ? 'coc' : 'chai', qty: l.qty, less: l.sugar === 'less' })));
+    setLines(o.order_lines.map((l: any) => {
+      const container = l.container === 'coc' ? 'coc' : 'chai';
+      const items = l.order_line_items || [];
+      const custom: BuffetPick | undefined = items.length
+        ? { key: l.id, container, less: l.sugar === 'less', price: l.unit_price_vnd, items: Object.fromEntries(items.map((i: any) => [i.ingredient_id, Number(i.qty)])) }
+        : undefined;
+      return { pid: l.product_id, container, qty: l.qty, less: l.sugar === 'less', custom };
+    }));
     setDisc(discFromOrder(o, o.order_lines));
     setDiscWhy(o.discount_reason || '');
     setPay(o.is_gift ? 'gift' : o.payment_method || null);
@@ -51,12 +61,14 @@ export default function OrderEdit() {
   if (!outlet) return null;
   const prod = (pid: string) => catalog?.allProducts.find((p) => p.id === pid);
   const back = `/bao-cao/don/${id}${from}`;
+  /** Giá một phần: Buffet theo giá đã chọn của dòng, món thường theo bảng giá. */
+  const lp = (l: Line) => (l.custom ? l.custom.price : prod(l.pid)?.price || 0);
   const kept = lines.filter((l) => l.qty > 0);
   const isGift = pay === 'gift';
-  const gross = isGift ? 0 : kept.reduce((s, l) => s + l.qty * (prod(l.pid)?.price || 0), 0);
+  const gross = isGift ? 0 : kept.reduce((s, l) => s + l.qty * lp(l), 0);
   const parts = kept.reduce((s, l) => s + l.qty, 0);
   const dSel: Disc = isGift || disc === 'old' ? null : disc;
-  const dLines = lines.map((l) => ({ price: prod(l.pid)?.price || 0, qty: l.qty }));
+  const dLines = lines.map((l) => ({ price: lp(l), qty: l.qty }));
   const ks = allocate(dLines, dSel);
   const us = unitsOf(dLines, dSel);
   const discErr = discError(dLines, dSel);
@@ -73,6 +85,11 @@ export default function OrderEdit() {
     if (!addPid) return;
     const c = addCup ? 'coc' : 'chai';
     setErr(null);
+    if (prod(addPid)?.is_custom) {
+      setBf({ pick: { key: crypto.randomUUID(), container: c, less: addLess, price: BUFFET_PRICE, items: {} }, idx: -1 });
+      setAddPid('');
+      return;
+    }
     setLines((ls) => (ls.some((l) => l.pid === addPid && l.container === c && l.less === addLess)
       ? ls.map((l) => (l.pid === addPid && l.container === c && l.less === addLess ? { ...l, qty: l.qty + 1 } : l))
       : [...ls, { pid: addPid, container: c, qty: 1, less: addLess }]));
@@ -86,7 +103,8 @@ export default function OrderEdit() {
     setBusy(true);
     const { data, error } = await supabase.rpc('fn_edit_order', {
       p_order: id,
-      p: { lines: kept.map((l) => ({ product_id: l.pid, qty: l.qty, container: l.container, ...(l.less ? { sugar: 'less' } : {}) })),
+      p: { lines: kept.map((l) => ({ product_id: l.pid, qty: l.qty, container: l.container, ...(l.less ? { sugar: 'less' } : {}),
+        ...(l.custom ? { price: l.custom.price, custom: Object.entries(l.custom.items).filter(([, q]) => q > 0).map(([ingredient_id, qty]) => ({ ingredient_id, qty })) } : {}) })),
            ...(dSel ? { discount_vnd: 0, ...discPayload(dSel, parts, discWhy) } : { discount_vnd: discN, discount_reason: discN > 0 ? discWhy.trim() || null : null }),
            is_gift: isGift, payment_method: isGift ? '' : pay || '', customer_name: cust.trim() },
       p_reason: why.trim() || null
@@ -127,10 +145,12 @@ export default function OrderEdit() {
             <section className="card tight">
               <div className="h2" style={{ padding: '12px 0 2px' }}>Món</div>
               {lines.map((l, i) => (
-                <div key={l.pid + l.container + (l.less ? 'l' : '')} className="list-row" style={{ minHeight: 52, gap: 8, opacity: l.qty ? 1 : 0.45 }}>
-                  <span className="grow">
+                <div key={l.custom?.key || l.pid + l.container + (l.less ? 'l' : '')} className="list-row" style={{ minHeight: 52, gap: 8, opacity: l.qty ? 1 : 0.45 }}>
+                  <span className="grow" role={l.custom ? 'button' : undefined} tabIndex={l.custom ? 0 : undefined} style={{ cursor: l.custom ? 'pointer' : undefined }}
+                    onClick={l.custom ? () => setBf({ pick: l.custom!, idx: i }) : undefined}>
                     <span className="strong">{prod(l.pid)?.name || 'Món đã bỏ'}{l.container === 'coc' ? ' · cốc giấy' : ''}{l.less && <span className="less-tag" style={{ marginLeft: 6 }}>ít đường</span>}</span>
-                    <span className="xs muted" style={{ display: 'block' }}>{l.qty ? `${vnd(prod(l.pid)?.price || 0)} mỗi phần` : 'Sẽ bỏ khỏi đơn'}</span>
+                    {l.custom && <span className="xs muted" style={{ display: 'block' }}>{buffetSummary(l.custom.items, (id) => catalog?.ingredientById[id])} · chạm để sửa</span>}
+                    <span className="xs muted" style={{ display: 'block' }}>{l.qty ? `${vnd(lp(l))} mỗi phần` : 'Sẽ bỏ khỏi đơn'}</span>
                     {discN > 0 && ks[i] > 0 && us[i] > 0 && <span className="xs strong" style={{ display: 'block', color: 'var(--ink-brand)' }}>{lineLabel(dSel, ks[i], us[i])}</span>}
                   </span>
                   <button type="button" className="icon-btn" aria-label="Bớt một" disabled={l.qty === 0} onClick={() => step(i, -1)}><Icon name="minus" size={18} sw={2.4} /></button>
@@ -185,8 +205,8 @@ export default function OrderEdit() {
                 )}
                 {disc && disc !== 'old' && (
                   <DiscountPicker
-                    rows={lines.map((l) => ({ key: l.pid + l.container + (l.less ? 'l' : ''), name: `${prod(l.pid)?.name || 'Món đã bỏ'}${l.container === 'coc' ? ' · cốc giấy' : ''}${l.less ? ' · ít đường' : ''}`,
-                      price: prod(l.pid)?.price || 0, qty: l.qty }))}
+                    rows={lines.map((l) => ({ key: l.custom?.key || l.pid + l.container + (l.less ? 'l' : ''), name: `${prod(l.pid)?.name || 'Món đã bỏ'}${l.container === 'coc' ? ' · cốc giấy' : ''}${l.less ? ' · ít đường' : ''}`,
+                      price: lp(l), qty: l.qty }))}
                     disc={disc} setDisc={setDisc} />
                 )}
                 {discN > 0 && (
@@ -225,6 +245,16 @@ export default function OrderEdit() {
             </button>
           </div>
         </div>
+      )}
+      {bf && outlet && (
+        <BuffetSheet outletId={outlet.id} value={bf.pick} onClose={() => setBf(null)}
+          onSave={(b) => {
+            setErr(null);
+            setLines((ls) => (bf.idx < 0 ? [...ls, { pid: catalog?.products.find((p) => p.is_custom)?.id ?? '', container: b.container, qty: 1, less: b.less, custom: b }]
+              : ls.map((l, k) => (k === bf.idx ? { ...l, container: b.container, less: b.less, custom: b } : l))));
+            setBf(null);
+          }}
+          onDelete={bf.idx < 0 ? undefined : () => { setLines((ls) => ls.map((l, k) => (k === bf.idx ? { ...l, qty: 0 } : l))); setBf(null); }} />
       )}
       {moveOpen && o && (
         <MoveDateSheet outletId={outlet.id}

@@ -1,6 +1,6 @@
 # Mô tả chức năng · Kho BaBa bản 1 · User story
 
-Phiên bản 1.2 · 19/11/2026 · Thêm B-3 (giảm giá), B-4 (đổi ngày bán). Các phần khác còn theo bản 1.1 (09/11/2026), một số đã cũ: xem `Ghi_chu_trien_khai.md` mục 4 và Thiết kế DB mục 9
+Phiên bản 1.2 · 19/11/2026 · Thêm B-3 (giảm giá), B-4 (đổi ngày bán), B-5 (Buffet, 21/11). Các phần khác còn theo bản 1.1 (09/11/2026), một số đã cũ: xem `Ghi_chu_trien_khai.md` mục 4 và Thiết kế DB mục 9
 
 **Cách đọc.** Mỗi story có: mã, tên, mô tả ngắn (ai, muốn gì, để làm gì), tiêu chí nghiệm thu (Acceptance criteria, viết dạng *Khi… thì…*), và các trường hợp ngoại lệ (Exception) kèm cách app xử lý. Mã màn hình (A04, B01…) trỏ về bản thiết kế.
 
@@ -144,6 +144,21 @@ Phiên bản 1.2 · 19/11/2026 · Thêm B-3 (giảm giá), B-4 (đổi ngày bá
 - Ngày cũ đã ghi cuối ngày và đếm tiền: cảnh báo trước là tiền cần có của ngày đó sẽ lệch.
 - Ngày đã chốt theo cách cũ (trước 17/11): không chuyển vào hoặc ra được.
 - Nhân viên: không thấy nút; gọi thẳng máy chủ cũng bị từ chối.
+
+### B-5 Món Buffet tự chọn
+**Mô tả.** Là người đứng bán, tôi muốn ghi một chai (cốc) khách tự chọn nguyên liệu và giá, để kho trừ đúng và báo cáo đúng. Thiết kế BF01–BF05 (Tùng 21/11).
+
+**Tiêu chí nghiệm thu**
+- Ô **Buffet** nằm cuối nhóm Mầm Xanh, icon chai (cốc) nhiều tầng màu, ghi "Tự chọn".
+- Chạm ô Buffet mở bảng chọn: Chai / Cốc giấy; giá mặc định 30.000 đ, nút ±5.000 đ; đủ nguyên liệu chính và phụ, hay dùng nhất ở trên.
+- Nguyên liệu chưa chọn chỉ có nút **Thêm** (nền xanh); bấm = 20 g, sau đó hiện − số +, mỗi lần ±5 g; về 0 thì trở lại nút Thêm. Không giới hạn tổng gam hay giá.
+- Mỗi chai Buffet là một dòng riêng; rà soát, hóa đơn, chi tiết đơn ghi nguyên liệu và số gam; chạm để sửa hoặc bỏ.
+- Kho trừ đúng số gam đã chọn cộng syrup và bao bì; giá vốn tính từ chính số gam đó.
+- Giảm giá, ít đường, tặng, sửa đơn, đổi ngày áp lên Buffet như món khác.
+
+**Ngoại lệ**
+- Chưa chọn nguyên liệu nào: nút lưu bị khóa; máy chủ cũng từ chối.
+- Nguyên liệu thiếu giá chuẩn: vẫn bán được, giá vốn dòng đó để trống.
 
 ---
 

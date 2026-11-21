@@ -7,6 +7,7 @@ import { ddmm, timeHM, uuid, vnd, vnToday } from '../lib/format';
 import { Bottle, Cup, Header, Icon, Loading, Nav, SugarLess, confirmDialog } from '../components/ui';
 import { DEFAULT_DISC, allocate, discError, discLabel, discPayload, discTotal, lineLabel, unitsOf, type Disc } from '../lib/discount';
 import DiscountPicker from '../components/DiscountPicker';
+import BuffetSheet, { BUFFET_PRICE, buffetSummary, type BuffetPick } from '../components/BuffetSheet';
 
 
 export default function Order() {
@@ -17,6 +18,9 @@ export default function Order() {
   // Phần ít đường (20 ml syrup) giữ riêng: chai ít đường và cốc ít đường
   const [countsL, setCountsL] = useState<Record<string, number>>({});
   const [cupsL, setCupsL] = useState<Record<string, number>>({});
+  // Món tự chọn (Buffet, 0065): mỗi chai, cốc là một dòng riêng với giá và nguyên liệu riêng
+  const [buffets, setBuffets] = useState<BuffetPick[]>([]);
+  const [bfEdit, setBfEdit] = useState<{ pick: BuffetPick; isNew: boolean } | null>(null);
   const [cupMode, setCupMode] = useState(false);
   const [sugarMode, setSugarMode] = useState(false); // bật: chạm món là thêm phần ít đường
   const [bulkMode, setBulkMode] = useState(false); // bán nhiều: mỗi món có ô nhập số và nút cộng trừ
@@ -65,25 +69,31 @@ export default function Order() {
   const nOf = (m: Record<string, number>, pid: string) => m[pid] || 0;
   const allOf = (pid: string) => nOf(counts, pid) + nOf(countsL, pid) + nOf(cups, pid) + nOf(cupsL, pid);
   const picked = products.filter((p) => allOf(p.id) > 0);
-  const nChai = picked.reduce((s, p) => s + nOf(counts, p.id) + nOf(countsL, p.id), 0);
-  const nCoc = picked.reduce((s, p) => s + nOf(cups, p.id) + nOf(cupsL, p.id), 0);
-  const nLess = picked.reduce((s, p) => s + nOf(countsL, p.id) + nOf(cupsL, p.id), 0);
+  const bfProduct = products.find((p) => p.is_custom);
+  type Row = { p: (typeof products)[number]; qty: number; container: 'chai' | 'coc'; less: boolean; key: string; price: number; custom?: BuffetPick };
+  // Mỗi món tách thành dòng theo bao bì (chai, cốc) và ghi chú đường (bình thường, ít đường); mỗi chai Buffet là một dòng
+  const rows: Row[] = [
+    ...picked.flatMap((p) =>
+      ([[counts, 'chai', false], [countsL, 'chai', true], [cups, 'coc', false], [cupsL, 'coc', true]] as [Record<string, number>, 'chai' | 'coc', boolean][])
+        .filter(([m]) => m[p.id] > 0)
+        .map(([m, container, less]) => ({ p, qty: m[p.id], container, less, key: `${p.id}-${container}-${less ? 'l' : 'n'}`, price: p.price }))
+    ),
+    ...(bfProduct ? buffets.map((b) => ({ p: bfProduct, qty: 1, container: b.container, less: b.less, key: b.key, price: b.price, custom: b })) : [])
+  ];
+  const nChai = rows.reduce((s, r) => s + (r.container === 'chai' ? r.qty : 0), 0);
+  const nCoc = rows.reduce((s, r) => s + (r.container === 'coc' ? r.qty : 0), 0);
+  const nLess = rows.reduce((s, r) => s + (r.less ? r.qty : 0), 0);
   const bottles = nChai + nCoc;
   const partsLabel = [nChai ? `${nChai} chai` : '', nCoc ? `${nCoc} cốc giấy` : '', nLess ? `${nLess} ít đường` : ''].filter(Boolean).join(' · ');
-  const gross = picked.reduce((s, p) => s + allOf(p.id) * p.price, 0);
-  // Mỗi món tách thành dòng theo bao bì (chai, cốc) và ghi chú đường (bình thường, ít đường)
-  const rows = picked.flatMap((p) =>
-    ([[counts, 'chai', false], [countsL, 'chai', true], [cups, 'coc', false], [cupsL, 'coc', true]] as [Record<string, number>, 'chai' | 'coc', boolean][])
-      .filter(([m]) => m[p.id] > 0)
-      .map(([m, container, less]) => ({ p, qty: m[p.id], container, less, key: `${p.id}-${container}-${less ? 'l' : 'n'}` }))
-  );
+  const gross = rows.reduce((s, r) => s + r.qty * r.price, 0);
+  const ingOf = (id: string) => catalog?.ingredientById[id];
   const rowName = (r: { p: { name: string }; container: string }) => `${r.p.name}${r.container === 'coc' ? ' · cốc giấy' : ''}`;
   /** Ô đang ghi theo hai nút ở góc phải: cốc giấy và ít đường. */
   const setterOf = (cup: boolean, less: boolean) => (cup ? (less ? setCupsL : setCups) : less ? setCountsL : setCounts);
   const mapOf = (cup: boolean, less: boolean) => (cup ? (less ? cupsL : cups) : less ? countsL : counts);
   const isGift = pay === 'gift';
   // Giảm giá (5%, 10%, theo tiền mỗi phần hoặc tổng đơn): số phần được giảm và tiền giảm mỗi phần của từng dòng, cùng thứ tự với rows
-  const dLines = rows.map((r) => ({ price: r.p.price, qty: r.qty }));
+  const dLines = rows.map((r) => ({ price: r.price, qty: r.qty }));
   const dSel = isGift ? null : discount;
   const ks = allocate(dLines, dSel);
   const us = unitsOf(dLines, dSel);
@@ -102,10 +112,19 @@ export default function Order() {
 
   function inc(pid: string) {
     setErr(null);
+    if (pid === bfProduct?.id) {
+      setBfEdit({ pick: { key: uuid(), container: cupMode ? 'coc' : 'chai', less: sugarMode, price: BUFFET_PRICE, items: {} }, isNew: true });
+      return;
+    }
     setterOf(cupMode, sugarMode)((c) => ({ ...c, [pid]: (c[pid] || 0) + 1 }));
   }
   /** Bớt 1 ở món này: ưu tiên đúng loại đang bật ở hai nút góc phải; loại đó không có thì bớt loại nào đang có. */
   function dec(pid: string) {
+    if (pid === bfProduct?.id) {
+      setBuffets((b) => b.slice(0, -1));
+      if (buffets.length <= 1 && bottles <= 1) setRmMode(false);
+      return;
+    }
     const n = allOf(pid);
     if (!n) return;
     const order: [boolean, boolean][] = [[cupMode, sugarMode], [cupMode, !sugarMode], [!cupMode, sugarMode], [!cupMode, !sugarMode]];
@@ -131,7 +150,7 @@ export default function Order() {
       return next;
     });
   }
-  const clearItems = () => { setCounts({}); setCups({}); setCountsL({}); setCupsL({}); };
+  const clearItems = () => { setCounts({}); setCups({}); setCountsL({}); setCupsL({}); setBuffets([]); };
 
   // Giữ ngón tay trên món 0,5 giây thì số tự chạy (bớt nếu đang bật Bớt món); nhả tay hoặc kéo đi là dừng.
   const hold = useRef<{ t?: number; i?: number; x: number; y: number; fired: boolean }>({ x: 0, y: 0, fired: false });
@@ -166,7 +185,10 @@ export default function Order() {
   useEffect(() => holdStop, []);
 
   function buildCall(): QueuedCall {
-    const lines = rows.map((r) => ({ product_id: r.p.id, qty: r.qty, container: r.container, ...(r.less ? { sugar: 'less' } : {}) }));
+    const lines = rows.map((r) => ({
+      product_id: r.p.id, qty: r.qty, container: r.container, ...(r.less ? { sugar: 'less' } : {}),
+      ...(r.custom ? { price: r.custom.price, custom: Object.entries(r.custom.items).filter(([, q]) => q > 0).map(([ingredient_id, qty]) => ({ ingredient_id, qty })) } : {})
+    }));
     const id = uuid();
     return {
       id,
@@ -226,6 +248,17 @@ export default function Order() {
       setBusy(false);
     }
   }
+
+  const bfSheet = bfEdit && outlet && (
+    <BuffetSheet outletId={outlet.id} value={bfEdit.pick}
+      onClose={() => setBfEdit(null)}
+      onSave={(b) => {
+        setErr(null);
+        setBuffets((list) => (bfEdit.isNew ? [...list, b] : list.map((x) => (x.key === b.key ? b : x))));
+        setBfEdit(null);
+      }}
+      onDelete={bfEdit.isNew ? undefined : () => { setBuffets((list) => list.filter((x) => x.key !== bfEdit.pick.key)); setBfEdit(null); }} />
+  );
 
   const stuckSheet = stuck && (
     <>
@@ -304,10 +337,15 @@ export default function Order() {
             <div style={{ height: 1, background: 'var(--border)' }} />
             {rows.map((r, i) => (
               <div key={r.key}>
-                <div className="row" style={{ gap: 10, minHeight: 32 }}>
+                <div className="row" style={{ gap: 10, minHeight: 32, cursor: r.custom ? 'pointer' : undefined }}
+                  role={r.custom ? 'button' : undefined} tabIndex={r.custom ? 0 : undefined}
+                  onClick={r.custom ? () => setBfEdit({ pick: r.custom!, isNew: false }) : undefined}>
                   {r.container === 'coc' ? <Cup color={r.p.color} size={24} /> : <Bottle color={r.p.color} size={24} />}
-                  <span className="grow strong">{r.qty} × {rowName(r)}{r.less && <span className="less-tag" style={{ marginLeft: 6 }}>ít đường</span>}</span>
-                  <span className="num strong">{vnd(isGift ? 0 : r.qty * r.p.price)}</span>
+                  <span className="grow">
+                    <span className="strong">{r.qty} × {rowName(r)}{r.less && <span className="less-tag" style={{ marginLeft: 6 }}>ít đường</span>}</span>
+                    {r.custom && <span className="xs muted" style={{ display: 'block' }}>{buffetSummary(r.custom.items, ingOf)} · chạm để sửa</span>}
+                  </span>
+                  <span className="num strong">{vnd(isGift ? 0 : r.qty * r.price)}</span>
                 </div>
                 {disc > 0 && ks[i] > 0 && us[i] > 0 && (
                   <div className="row between xs strong num" style={{ paddingLeft: 34, color: 'var(--ink-brand)' }}>
@@ -372,6 +410,7 @@ export default function Order() {
           </button>
         </div>
         {discSheet}
+        {bfSheet}
         {stuckSheet}
       </div>
     );
@@ -401,9 +440,10 @@ export default function Order() {
                 <h2 className="h2">{line.name}</h2>
                 <div className="tiles">
                   {items.map((p) => {
-                    const nb = nOf(counts, p.id) + nOf(countsL, p.id);
-                    const nc = nOf(cups, p.id) + nOf(cupsL, p.id);
-                    const nl = nOf(countsL, p.id) + nOf(cupsL, p.id);
+                    const isBf = p.id === bfProduct?.id;
+                    const nb = isBf ? buffets.filter((b) => b.container === 'chai').length : nOf(counts, p.id) + nOf(countsL, p.id);
+                    const nc = isBf ? buffets.filter((b) => b.container === 'coc').length : nOf(cups, p.id) + nOf(cupsL, p.id);
+                    const nl = isBf ? buffets.filter((b) => b.less).length : nOf(countsL, p.id) + nOf(cupsL, p.id);
                     const n = nb + nc;
                     const left = (leftOf.get(p.id) ?? 0) - n;
                     const out = !allowNegative && left + n <= 0 && n === 0;
@@ -417,7 +457,7 @@ export default function Order() {
                           aria-pressed={n > 0}
                           aria-label={`${p.name}, ${vnd(p.price)}${SHOW_BOTTLES ? `, còn ${left}` : ''}${nb ? `, ${nb} chai` : ''}${nc ? `, ${nc} cốc giấy` : ''}${nl ? `, ${nl} ít đường` : ''}${rmMode && n ? ', chạm để bớt 1' : ''}`}
                           disabled={off}
-                          onPointerDown={(e) => holdStart(p.id, e)}
+                          onPointerDown={(e) => { if (!isBf) holdStart(p.id, e); }}
                           onPointerMove={holdMove}
                           onPointerUp={holdStop}
                           onPointerLeave={holdStop}
@@ -446,11 +486,11 @@ export default function Order() {
                           {!bulkMode && (
                             nl > 0 ? <span className="less-tag">{nl} ít đường</span> : (
                             <span className="meta">
-                              {vnd(p.price)}{SHOW_BOTTLES ? ` · còn ${left}` : ''}
+                              {isBf ? 'Tự chọn' : vnd(p.price)}{SHOW_BOTTLES && !isBf ? ` · còn ${left}` : ''}
                             </span>)
                           )}
                         </button>
-                        {bulkMode && (
+                        {bulkMode && !isBf && (
                           <span className="qty">
                             <button type="button" aria-label={`Bớt một ${p.short_name}`} disabled={cur === 0} onClick={() => setQty(p.id, cur - 1)}><Icon name="minus" size={14} sw={2.6} /></button>
                             <input
@@ -521,6 +561,7 @@ export default function Order() {
       <Nav />
 
       {discSheet}
+      {bfSheet}
 
       {stuckSheet}
 
