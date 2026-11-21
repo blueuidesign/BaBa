@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { useLoad } from '../lib/data';
-import { timeHM, vnd } from '../lib/format';
+import { timeHM, vnd, vnToday } from '../lib/format';
 import { pctOf, savedLabel } from '../lib/discount';
 import { Header, Icon, Loading, Nav, confirmDialog, reasonDialog, useToast } from '../components/ui';
 
@@ -68,6 +68,8 @@ export default function OrderDetail() {
   const subtotal = o ? o.order_lines.reduce((a: number, l: any) => a + l.qty * l.unit_price_vnd, 0) : 0;
   const parts = o ? o.order_lines.reduce((a: number, l: any) => a + l.qty, 0) : 0;
   const active = o?.status === 'active';
+  // Nhân viên sửa, hủy được đơn trong 7 ngày gần nhất (0064); chủ cơ sở không giới hạn
+  const canFix = canManage || (!!o && o.business_date >= vnToday(-6));
   const discText = o && o.discount_vnd > 0 ? savedLabel(o, o.order_lines) : '';
   const lineDisc = (l: any) => o?.discount_kind === 'order' ? `Phần chia giảm tổng đơn · ${l.discount_qty} phần × ${vnd(l.discount_unit_vnd)}`
     : o?.discount_kind === 'per_part' ? `Giảm · ${l.discount_qty} phần × ${vnd(l.discount_unit_vnd)}`
@@ -136,7 +138,7 @@ export default function OrderDetail() {
                 </div>
                 <span className="xs muted">
                   {o.is_gift || o.payment_method
-                    ? `Đã đánh dấu. Muốn đổi thì ${canManage ? 'bấm Sửa đơn bên dưới.' : 'nhờ chủ cơ sở sửa đơn.'}`
+                    ? `Đã đánh dấu. Muốn đổi thì ${canFix ? 'bấm Sửa đơn bên dưới.' : 'nhờ chủ cơ sở sửa đơn.'}`
                     : 'Chưa đánh dấu. Bấm một lần là ghi; sau đó muốn đổi phải vào Sửa đơn.'}
                 </span>
               </section>
@@ -151,7 +153,7 @@ export default function OrderDetail() {
             )}
 
             {err && <span className="err">{err}</span>}
-            {active && canManage && (
+            {active && canFix && (
               <div className="grid2">
                 <Link to={`/bao-cao/don/${o.id}/sua${fromHome ? '?from=home' : ''}`} className="btn secondary" style={{ textDecoration: 'none' }}>
                   <Icon name="history" size={18} sw={2} /> Sửa đơn
@@ -163,7 +165,7 @@ export default function OrderDetail() {
             )}
             {active && (
               <p className="xs muted">
-                {canManage ? 'Sửa và hủy được khi ngày đó chưa chốt. Mỗi lần sửa, hủy đều ghi vào Lịch sử sửa, hủy đơn trong Tài khoản.' : 'Đơn đã lưu thì chỉ chủ cơ sở sửa hoặc hủy được. Cách nhận tiền thì bạn đánh dấu được ở đây hoặc ở màn Hóa đơn.'}
+                {canManage ? 'Sửa và hủy được khi ngày đó chưa chốt. Mỗi lần sửa, hủy đều ghi vào Lịch sử sửa, hủy đơn trong Tài khoản.' : canFix ? 'Bạn sửa, hủy được đơn trong 7 ngày gần nhất. Mỗi lần sửa, hủy đều được ghi lại để chủ cơ sở xem.' : 'Đơn đã quá 7 ngày, chỉ chủ cơ sở sửa hoặc hủy được. Cách nhận tiền thì bạn vẫn đánh dấu được.'}
               </p>
             )}
           </>

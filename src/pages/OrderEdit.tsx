@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../lib/app';
 import { supabase, errorText } from '../lib/supabase';
 import { useLoad } from '../lib/data';
-import { ddmm, timeHM, vnd, weekdayLabel } from '../lib/format';
+import { ddmm, timeHM, vnd, vnToday, weekdayLabel } from '../lib/format';
 import { Header, Icon, Loading, Nav, SugarLess, useToast } from '../components/ui';
 import { DEFAULT_DISC, allocate, discError, discFromOrder, discLabel, discPayload, discTotal, lineLabel, unitsOf, type Disc } from '../lib/discount';
 import DiscountPicker from '../components/DiscountPicker';
@@ -24,6 +24,8 @@ export default function OrderEdit() {
       .eq('id', id).maybeSingle();
     return (data as any) || null;
   }, [id]);
+  // Nhân viên sửa được đơn trong 7 ngày gần nhất (0064); chủ cơ sở không giới hạn
+  const canFix = canManage || (!!o && o.business_date >= vnToday(-6));
   const [lines, setLines] = useState<Line[]>([]);
   // 'old' = đơn đang giảm một số tiền theo cách cũ (trước 16/11): giữ nguyên số đó cho tới khi chọn lại
   const [disc, setDisc] = useState<Disc | 'old'>(null);
@@ -104,8 +106,8 @@ export default function OrderEdit() {
           <Loading />
         ) : !o || o.status !== 'active' ? (
           <section className="card"><strong>Đơn này không sửa được</strong><span className="small muted">Đơn đã hủy hoặc không còn. Quay lại danh sách đơn.</span></section>
-        ) : !canManage ? (
-          <section className="card"><strong>Chỉ chủ cơ sở sửa được đơn</strong><span className="small muted">Nhờ chủ cơ sở sửa giúp. Bạn vẫn đánh dấu được cách nhận tiền ở màn chi tiết đơn.</span></section>
+        ) : !canFix ? (
+          <section className="card"><strong>Đơn đã quá 7 ngày</strong><span className="small muted">Nhân viên chỉ sửa được đơn trong 7 ngày gần nhất. Nhờ chủ cơ sở sửa giúp.</span></section>
         ) : (
           <>
             <p className="small muted">
@@ -118,9 +120,9 @@ export default function OrderEdit() {
                   <span className="xs strong muted" style={{ display: 'block', textTransform: 'uppercase', letterSpacing: '.04em' }}>Ngày bán</span>
                   <span className="strong">{weekdayLabel(o.business_date)} · {timeHM(o.placed_at)}</span>
                 </span>
-                <button type="button" className="chip" style={{ minHeight: 40 }} onClick={() => setMoveOpen(true)}>Đổi ngày</button>
+                {canManage && <button type="button" className="chip" style={{ minHeight: 40 }} onClick={() => setMoveOpen(true)}>Đổi ngày</button>}
               </div>
-              <span className="xs muted">Đổi ngày thì lưu ngay, không cần bấm Lưu sửa đổi. Muốn vừa đổi món vừa đổi ngày: lưu sửa món trước.</span>
+              {canManage && <span className="xs muted">Đổi ngày thì lưu ngay, không cần bấm Lưu sửa đổi. Muốn vừa đổi món vừa đổi ngày: lưu sửa món trước.</span>}
             </section>
             <section className="card tight">
               <div className="h2" style={{ padding: '12px 0 2px' }}>Món</div>
@@ -210,7 +212,7 @@ export default function OrderEdit() {
           </>
         )}
       </main>
-      {o && o.status === 'active' && canManage && (
+      {o && o.status === 'active' && canFix && (
         <div className="bar">
           {err && <span className="err">{err}</span>}
           <div className="row" style={{ gap: 12 }}>
