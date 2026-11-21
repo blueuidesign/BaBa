@@ -5,7 +5,7 @@ import { supabase, errorText } from '../lib/supabase';
 import { addDays, rangeOf } from '../lib/period';
 import { pctOf } from '../lib/discount';
 import MoveDateSheet from '../components/MoveDateSheet';
-import { buffetSummary } from '../components/BuffetSheet';
+import { BuffetTag, buffetSummary } from '../components/BuffetSheet';
 import { ddmm, timeHM, vnd, vnToday, weekdayLabel } from '../lib/format';
 import { Empty, Header, Icon, Loading, Nav, confirmDialog, useToast } from '../components/ui';
 
@@ -53,7 +53,7 @@ export default function Invoices() {
   async function load(offset: number) {
     if (!outlet) return;
     let qy = supabase.from('orders')
-      .select('id,seq_in_day,business_date,placed_at,total_vnd,discount_vnd,discount_kind,is_gift,payment_method,customer_name,channel,order_lines(id,qty,product_id,container,unit_price_vnd,discount_qty,discount_unit_vnd,order_line_items(ingredient_id,qty))')
+      .select('id,seq_in_day,business_date,placed_at,total_vnd,discount_vnd,discount_kind,is_gift,payment_method,customer_name,channel,order_lines(id,qty,product_id,container,unit_price_vnd,discount_qty,discount_unit_vnd,buffet_combo_id,order_line_items(ingredient_id,qty))')
       .eq('outlet_id', outlet.id).eq('status', 'active').lte('business_date', to)
       .order('business_date', { ascending: false }).order('placed_at', { ascending: false }).range(offset, offset + PAGE - 1);
     if (from) qy = qy.gte('business_date', from);
@@ -241,7 +241,7 @@ export default function Invoices() {
                       <span className="strong" style={{ fontSize: 16 }}>{o.customer_name || 'Khách lẻ'}</span>
                       {merged(o.order_lines).map((l: any, i: number) => (
                         <span key={i} style={{ display: 'contents' }}>
-                          <span className="ln"><span>{name(l.product_id)}{l.container === 'coc' ? ' · cốc giấy' : ''}</span><span className="num">× {l.qty}</span></span>
+                          <span className="ln"><span>{name(l.product_id)}{l.container === 'coc' ? ' · cốc giấy' : ''}{(l.order_line_items || []).length > 0 && <BuffetTag items={Object.fromEntries(l.order_line_items.map((x: any) => [x.ingredient_id, Number(x.qty)]))} combo={l.buffet_combo_id} tierOf={(id: string) => catalog?.ingredientById[id]?.buffet_tier} />}</span><span className="num">× {l.qty}</span></span>
                           {(l.order_line_items || []).length > 0 && (
                             <span className="xs muted" style={{ marginTop: -4 }}>
                               {buffetSummary(Object.fromEntries(l.order_line_items.map((x: any) => [x.ingredient_id, Number(x.qty)])), (id) => catalog?.ingredientById[id])} · {vnd(l.unit_price_vnd)}

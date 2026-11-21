@@ -7,7 +7,7 @@ import { ddmm, timeHM, uuid, vnd, vnToday } from '../lib/format';
 import { Bottle, Cup, Header, Icon, Loading, Nav, SugarLess, confirmDialog } from '../components/ui';
 import { DEFAULT_DISC, allocate, discError, discLabel, discPayload, discTotal, lineLabel, unitsOf, type Disc } from '../lib/discount';
 import DiscountPicker from '../components/DiscountPicker';
-import BuffetSheet, { BUFFET_PRICE, buffetSummary, type BuffetPick } from '../components/BuffetSheet';
+import BuffetSheet, { BUFFET_PRICE, BuffetTag, buffetSummary, type BuffetPick } from '../components/BuffetSheet';
 
 
 export default function Order() {
@@ -187,7 +187,7 @@ export default function Order() {
   function buildCall(): QueuedCall {
     const lines = rows.map((r) => ({
       product_id: r.p.id, qty: r.qty, container: r.container, ...(r.less ? { sugar: 'less' } : {}),
-      ...(r.custom ? { price: r.custom.price, custom: Object.entries(r.custom.items).filter(([, q]) => q > 0).map(([ingredient_id, qty]) => ({ ingredient_id, qty })) } : {})
+      ...(r.custom ? { price: r.custom.price, ...(r.custom.combo ? { combo: r.custom.combo } : {}), custom: Object.entries(r.custom.items).filter(([, q]) => q > 0).map(([ingredient_id, qty]) => ({ ingredient_id, qty })) } : {})
     }));
     const id = uuid();
     return {
@@ -257,6 +257,11 @@ export default function Order() {
         setBuffets((list) => (bfEdit.isNew ? [...list, b] : list.map((x) => (x.key === b.key ? b : x))));
         setBfEdit(null);
       }}
+      onSaveNext={bfEdit.isNew ? (b) => {
+        setErr(null);
+        setBuffets((list) => [...list, b]);
+        setBfEdit({ pick: { key: uuid(), container: b.container, less: b.less, price: BUFFET_PRICE, items: {} }, isNew: true });
+      } : undefined}
       onDelete={bfEdit.isNew ? undefined : () => { setBuffets((list) => list.filter((x) => x.key !== bfEdit.pick.key)); setBfEdit(null); }} />
   );
 
@@ -343,6 +348,7 @@ export default function Order() {
                   {r.container === 'coc' ? <Cup color={r.p.color} size={24} /> : <Bottle color={r.p.color} size={24} />}
                   <span className="grow">
                     <span className="strong">{r.qty} × {rowName(r)}{r.less && <span className="less-tag" style={{ marginLeft: 6 }}>ít đường</span>}</span>
+                    {r.custom && <BuffetTag items={r.custom.items} combo={r.custom.combo} tierOf={(id: string) => catalog?.ingredientById[id]?.buffet_tier} />}
                     {r.custom && <span className="xs muted" style={{ display: 'block' }}>{buffetSummary(r.custom.items, ingOf)} · chạm để sửa</span>}
                   </span>
                   <span className="num strong">{vnd(isGift ? 0 : r.qty * r.price)}</span>

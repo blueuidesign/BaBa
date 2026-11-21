@@ -18,6 +18,8 @@ export type Ingredient = {
   purchase_factor: number; kind: string; shelf_days: number | null; storage_note: string | null; sort_order: number;
   /** Gam của một quả (hoa quả nhập theo quả); null = không nhập theo quả */
   piece_g?: number | null;
+  /** Nhóm hạt trong Buffet (0066): premium = cao cấp, regular = phổ thông; null = không có trong Buffet */
+  buffet_tier?: 'premium' | 'regular' | null;
 };
 export type BatchRecipe = { id: string; code: string; name: string; output_ingredient_id: string; output_qty: number; note: string | null; items: { ingredient_id: string; qty: number }[] };
 export type PackagingRule = { ingredient_id: string; qty_per_unit: number; consume_at: string; product_kind: string };

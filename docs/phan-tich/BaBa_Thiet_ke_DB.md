@@ -1,6 +1,6 @@
 # Thiết kế cơ sở dữ liệu · Kho BaBa bản 1
 
-Phiên bản 1.5 · 19/11/2026 · PostgreSQL 17 trên Supabase (project `BaBa`, vùng ap-southeast-1) · khớp migration `0001`–`0065`
+Phiên bản 1.5 · 19/11/2026 · PostgreSQL 17 trên Supabase (project `BaBa`, vùng ap-southeast-1) · khớp migration `0001`–`0066`
 
 > **Đọc trước:** các mục 1–8 là thiết kế gốc (bản 1.2, 09/11/2026) và được giữ nguyên để biết lý do ban đầu. Từ đó tới nay đã có 53 migration nữa.
 > Những chỗ thiết kế gốc **không còn đúng** được liệt kê ở mục 9.1; mọi bảng, cột, hàm thêm sau nằm ở mục 9.2–9.6.
@@ -641,6 +641,8 @@ Một ngoại lệ có chủ ý của nguyên tắc sổ cái nối thêm: `fn_s
 - `_apply_sale_stock` trừ thêm `order_line_items.qty × order_lines.qty`; `_custom_unit_cost` = nguyên liệu × giá chuẩn + syrup + bao bì.
 - `fn_move_orders` chép cả `order_line_items`. `fn_buffet_ingredients(outlet)`: nguyên liệu nhóm main, additive, xếp theo số lần chọn trong Buffet rồi lượng đã dùng 30 ngày.
 
+- 0066: `ingredients.buffet_tier` ('premium' cao cấp, 'regular' phổ thông, null = không có trong Buffet). `buffet_combos (org_id, name, n_premium, n_regular, price_vnd, sort_order, valid_from, valid_to)`: đổi giá thì thêm dòng mới, đóng dòng cũ. `order_lines.buffet_combo_id`: null = Khác. `fn_post_order` nhận `lines[].combo`: kiểm đúng số hạt mỗi nhóm, giá lấy từ combo. `fn_buffet_options(outlet)` trả `{ingredients[{ingredient_id,name,unit,tier}], combos[{id,name,n_premium,n_regular,price}]}`; `fn_buffet_ingredients` giữ cho app cũ.
+
 ### 9.4 Trừ kho lúc bán
 
 `fn_post_order` gọi `_apply_sale_stock(order_id)` khi `outlet_deduct_on_sale(outlet)` là true. Mọi dòng trừ có `reason = 'sale_packaging'`, `ref_table = 'orders'`, nên `_reverse_order_core` đảo được hết khi hủy hoặc sửa đơn.
@@ -723,6 +725,7 @@ Edge Function: `send-push` (thông báo đẩy), `tro-ly` (trợ lý hỏi đáp
 | 0063 | Giảm theo số tiền (mỗi phần, tổng đơn); chặn đơn rỗng; `fn_move_orders` đổi ngày bán |
 | 0064 | Nhân viên sửa, hủy đơn trong 7 ngày gần nhất |
 | 0065 | Món Buffet: `products.is_custom`, bảng `order_line_items`, `_custom_unit_cost`, `fn_buffet_ingredients` |
+| 0066 | Buffet theo combo: `ingredients.buffet_tier`, bảng `buffet_combos`, `order_lines.buffet_combo_id`, `fn_buffet_options` |
 
 Các migration 0019, 0020, 0026, 0029, 0030, 0036, 0042–0050 là **dữ liệu của riêng cơ sở Phan Văn Hớn**, trỏ thẳng tới mã cơ sở và mã tài khoản admin. Muốn dựng lại database từ đầu thì hai bản ghi đó phải có trước migration 0019 (xem `tests/db/after_0018.sql`).
 
